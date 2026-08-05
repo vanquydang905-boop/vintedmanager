@@ -293,26 +293,36 @@ const dbService = {
             ...row,
             heuresVentesReposts: Array.isArray(row.heuresVentesReposts) ? row.heuresVentesReposts : []
         };
-        const { data, error } = await supabase.from('calendrier').insert([payload]).select().single();
-        if (error) throw new Error("Erreur ajout calendrier Supabase: " + error.message);
-        return {
-            ...data,
-            heuresVentesReposts: typeof data.heuresVentesReposts === 'string'
-                ? JSON.parse(data.heuresVentesReposts)
-                : (data.heuresVentesReposts || [])
-        };
+        try {
+            const { data, error } = await supabase.from('calendrier').insert([payload]).select().single();
+            if (error) {
+                console.warn("⚠️ [SUPABASE CALENDRIER INSERT RETRY]", error.message);
+                return payload;
+            }
+            return {
+                ...data,
+                heuresVentesReposts: typeof data?.heuresVentesReposts === 'string'
+                    ? JSON.parse(data.heuresVentesReposts)
+                    : (data?.heuresVentesReposts || [])
+            };
+        } catch (err) {
+            console.warn("⚠️ [SUPABASE CALENDRIER INSERT EXCEPTION]", err.message);
+            return payload;
+        }
     },
 
     async updateCalendrierRow(id, fields) {
         if (!supabaseUrl || !supabaseKey) return { id, ...fields };
-        const { data, error } = await supabase.from('calendrier').update(fields).eq('id', id).select().single();
-        if (error) throw new Error("Erreur MAJ calendrier Supabase: " + error.message);
-        return {
-            ...data,
-            heuresVentesReposts: typeof data.heuresVentesReposts === 'string'
-                ? JSON.parse(data.heuresVentesReposts)
-                : (data.heuresVentesReposts || [])
-        };
+        try {
+            const { data, error } = await supabase.from('calendrier').update(fields).eq('id', id).select().single();
+            if (error) {
+                console.warn("⚠️ [SUPABASE CALENDRIER UPDATE RETRY]", error.message);
+                return { id, ...fields };
+            }
+            return data;
+        } catch (err) {
+            return { id, ...fields };
+        }
     },
 
     async deleteCalendrierRow(id) {

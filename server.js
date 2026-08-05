@@ -687,6 +687,14 @@ app.get('/api/journal', async (req, res) => {
 });
 
 // ------------------- CHROME EXTENSION SYNC -------------------
+app.get('/api/extension/sync', (req, res) => {
+    res.json({
+        status: "online",
+        endpoint: "POST /api/extension/sync",
+        message: "Endpoint de synchronisation Vinted Manager actif. Envoyez des requêtes POST depuis l'extension Chrome."
+    });
+});
+
 app.post('/api/extension/sync', async (req, res) => {
     try {
         const { pseudo, organisationId, vues, likes, favoris, messages, ventes, items } = req.body;
@@ -721,17 +729,77 @@ app.post('/api/extension/sync', async (req, res) => {
         const countVentes = parseInt(ventes) || 0;
 
         let updatedCount = 0;
+        let createdCount = 0;
         const params = await dbService.getParametres(orgId);
 
-        if (accountLines.length > 0) {
+        if (Array.isArray(items) && items.length > 0) {
+            for (const item of items) {
+                if (!item.title && !item.sku) continue;
+                const matchLine = accountLines.find(l => 
+                    (item.sku && l.sku && l.sku.toLowerCase() === item.sku.toLowerCase()) ||
+                    (item.title && l.produit && l.produit.toLowerCase().includes(item.title.toLowerCase()))
+                );
+
+                const itemVues = parseInt(item.vues) || countVues;
+                const itemLikes = parseInt(item.likes) || countLikes;
+                const itemVente = (item.statut === 'vendu' || countVentes > 0) ? 1 : 0;
+                const itemSKU = item.sku || `SKU-${Math.floor(1000 + Math.random() * 9000)}`;
+
+                const score = calcScore({ vues: itemVues, likes: itemLikes, favoris: itemLikes, messages: countMessages, vente: itemVente }, params);
+                const classif = getClassification(score, itemVente, params);
+
+                if (matchLine) {
+                    await dbService.updateCalendrierRow(matchLine.id, {
+                        sku: itemSKU,
+                        produit: item.title || matchLine.produit,
+                        vues: Math.max(matchLine.vues || 0, itemVues),
+                        likes: Math.max(matchLine.likes || 0, itemLikes),
+                        favoris: Math.max(matchLine.favoris || 0, itemLikes),
+                        messages: countMessages,
+                        vente: Math.max(matchLine.vente || 0, itemVente),
+                        score,
+                        classification: classif
+                    });
+                    updatedCount++;
+                } else {
+                    const jourRaw = new Date().toLocaleDateString('fr-FR', { weekday: 'long' });
+                    const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
+                    const lineId = "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5);
+
+                    await dbService.createCalendrierRow({
+                        id: lineId,
+                        organisationId: orgId,
+                        date: todayStr,
+                        jour: jourCap,
+                        compteId: compte.id,
+                        agent: compte.agent || 'Extension Chrome',
+                        heurePrevue: "12:00",
+                        sku: itemSKU,
+                        produit: item.title || "Article Vinted",
+                        lien: "",
+                        vues: itemVues,
+                        likes: itemLikes,
+                        favoris: itemLikes,
+                        messages: countMessages,
+                        vente: itemVente,
+                        score,
+                        classification: classif,
+                        statut: item.statut === 'masqué' ? 'Non fait' : (item.statut === 'brouillon' ? 'Non fait' : 'Fait'),
+                        dateStatut: null,
+                        heureStatut: null
+                    });
+                    createdCount++;
+                }
+            }
+        } else if (accountLines.length > 0) {
             for (const line of accountLines) {
                 const newVues = Math.max(line.vues || 0, countVues);
                 const newLikes = Math.max(line.likes || 0, countLikes);
                 const newMessages = Math.max(line.messages || 0, countMessages);
                 const newVente = countVentes > 0 ? 1 : line.vente;
 
-                const score = calculateScore({ vues: newVues, likes: newLikes, favoris: newLikes, messages: newMessages, vente: newVente }, params.poidsScore);
-                const classif = classifyScore(score, params.seuils);
+                const score = calcScore({ vues: newVues, likes: newLikes, favoris: newLikes, messages: newMessages, vente: newVente }, params);
+                const classif = getClassification(score, newVente, params);
 
                 await dbService.updateCalendrierRow(line.id, {
                     vues: newVues,
@@ -746,13 +814,16 @@ app.post('/api/extension/sync', async (req, res) => {
             }
         }
 
-        await dbService.logAction("Extension Sync", `Synchronisation Chrome pour @${pseudo} (${countVues} vues, ${countLikes} likes, ${countVentes} ventes)`, "Succès", orgId);
+        const totalItemsCount = Array.isArray(items) ? items.length : 0;
+        await dbService.logAction("Extension Sync", `Synchronisation Chrome complète pour @${pseudo} (${totalItemsCount} articles : ${createdCount} créés, ${updatedCount} mis à jour)`, "Succès", orgId);
         res.json({
             success: true,
             pseudo,
             compteId: compte.id,
             updatedRows: updatedCount,
-            message: `Synchronisation réussie pour ${pseudo}`
+            createdRows: createdCount,
+            totalArticles: totalItemsCount,
+            message: `Synchronisation réussie pour ${pseudo} (${totalItemsCount} articles traités)`
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

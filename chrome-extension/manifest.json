@@ -1,19 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Vinted Manager - Extension de Synchronisation",
-  "version": "1.0.0",
-  "description": "Scrape et synchronise automatiquement les vues, favoris, messages et ventes Vinted vers votre serveur Vinted Manager.",
+  "name": "Vinted Manager - Extension de Synchronisation (Dotb & Proxy)",
+  "version": "1.2.0",
+  "description": "Scrape et synchronise automatiquement les vues, favoris, messages et ventes Vinted (support Dotb & Proxy) vers Vinted Manager.",
   "permissions": [
     "activeTab",
     "storage",
     "scripting"
   ],
   "host_permissions": [
-    "https://*.vinted.fr/*",
-    "https://*.vinted.com/*",
-    "https://*.vinted.be/*",
-    "https://*.vinted.es/*",
-    "http://localhost:3000/*"
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -25,13 +21,11 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.vinted.fr/*",
-        "https://*.vinted.com/*",
-        "https://*.vinted.be/*",
-        "https://*.vinted.es/*"
+        "<all_urls>"
       ],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ]
 }
