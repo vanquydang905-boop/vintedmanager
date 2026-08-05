@@ -1,0 +1,138 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+    width: 320px;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 16px;
+}
+
+.popup-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo {
+    width: 34px;
+    height: 34px;
+    background: linear-gradient(135deg, #09b1ba 0%, #056c72 100%);
+    color: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+}
+
+h2 {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.subtitle {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    color: #f8fafc;
+    font-size: 12px;
+}
+
+input:focus {
+    outline: none;
+    border-color: #09b1ba;
+}
+
+.metrics-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.metric {
+    background: #1e293b;
+    padding: 8px 10px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metric-label {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.metric-val {
+    font-weight: 700;
+    font-size: 13px;
+    color: #09b1ba;
+}
+
+.btn-sync {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #09b1ba 0%, #056c72 100%);
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.btn-sync:hover {
+    opacity: 0.9;
+}
+
+.status-msg {
+    font-size: 11px;
+    text-align: center;
+    min-height: 16px;
+}
+
+.status-msg.success {
+    color: #10b981;
+}
+
+.status-msg.error {
+    color: #ef4444;
+}

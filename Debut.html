@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vinted Manager - Publication & Tracking</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --primary: #09b1ba;
+            --primary-dark: #07898f;
+            --danger: #ff4d4f;
+            --success: #52c41a;
+            --warning: #faad14;
+            --text-main: #333333;
+            --text-light: #666666;
+            --border: #e8e8e8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--card-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 10;
+        }
+
+        .sidebar h1 {
+            color: var(--primary);
+            font-size: 24px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            padding: 12px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 16px;
+            color: var(--text-light);
+            border-radius: 8px;
+            margin-bottom: 5px;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .nav-btn:hover,
+        .nav-btn.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+            width: calc(100% - 250px);
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .btn-warning {
+            background-color: var(--warning);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #e0e0e0;
+            color: var(--text-main);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            min-width: 1200px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #fafafa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+
+        input,
+        select,
+        textarea {
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        input[type="checkbox"] {
+            width: auto;
+        }
+
+        .status-non-fait {
+            color: var(--warning);
+            font-weight: 600;
+        }
+
+        .status-fait {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .status-ecarte {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .status-gagnant {
+            color: var(--primary);
+            font-weight: 700;
+            background: #e6fffb;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .status-retester {
+            color: #fa8c16;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filters>div {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: var(--text-main);
+            color: white;
+            border-radius: 8px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .inline-input {
+            padding: 4px;
+            width: 100%;
+            min-width: 80px;
+        }
+
+        .readonly-cell {
+            background: #f9f9f9;
+            font-weight: bold;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 50%;
+            min-width: 300px;
+        }
+
+        .close {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+                padding: 70px 15px 20px;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .grid-2,
+            .grid-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <button class="btn btn-primary mobile-menu-btn" onclick="toggleSidebar()">☰ Menu</button>
+
+    <div class="sidebar" id="sidebar">
+        <h1>Vinted Manager</h1>
+        <button class="nav-btn active" onclick="showView('dashboard', this)">📅 Calendrier</button>
+        <button class="nav-btn" onclick="showView('comptes', this)">👥 Comptes</button>
+        <button class="nav-btn" onclick="showView('planning', this)">⚙️ Génération</button>
+        <button class="nav-btn" onclick="showView('classement', this)">🏆 Classement</button>
+        <button class="nav-btn" onclick="showView('gagnants', this)">✨ Suggestions</button>
+        <button class="nav-btn" onclick="showView('incidents', this)">⚠️ Incidents</button>
+        <button class="nav-btn" onclick="showView('parametres', this)">🔧 Paramètres</button>
+        <button class="nav-btn" onclick="showView('journal', this)">📜 Journal</button>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);">
+        <button class="btn btn-success" onclick="exportJSON()">📥 Exporter JSON</button>
+        <button class="btn btn-secondary" style="margin-top: 10px;"
+            onclick="document.getElementById('importFile').click()">📤 Importer JSON</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+    </div>
+
+    <div class="main-content">
+
+        <!-- DASHBOARD -->
+        <div id="view-dashboard" class="view">
+            <div class="header-actions">
+                <h2>Tableau de bord Calendrier</h2>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-primary" onclick="addManualLine()">+ Ajouter ligne</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="filters">
+                    <div><label>Compte</label><select id="filter-compte" onchange="renderDashboard()">
+                            <option value="">Tous</option>
+                        </select></div>
+                    <div><label>Agent</label><select id="filter-agent" onchange="renderDashboard()">
+                            <option value="">Tous</option>
+                        </select></div>
+                    <div><label>Statut</label><select id="filter-statut" onchange="renderDashboard()">
+                            <option value="">Tous</option>
+                            <option>Non fait</option>
+                            <option>Fait</option>
+                        </select></div>
+                    <div><label>Classification</label><select id="filter-classif" onchange="renderDashboard()">
+                            <option value="">Toutes</option>
+                            <option>Gagnant</option>
+                            <option>À retester</option>
+                            <option>Écarté</option>
+                        </select></div>
+                </div>
+                <table id="table-dashboard">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Jour</th>
+                            <th>Compte</th>
+                            <th>Agent</th>
+                            <th>Heure</th>
+                            <th>SKU</th>
+                            <th>Vues</th>
+                            <th>Favoris</th>
+                            <th>Msgs</th>
+                            <th>Vente</th>
+                            <th>Score</th>
+                            <th>Classif.</th>
+                            <th>Statut</th>
+                            <th>Ventes/Reposts</th>
+                            <th>Prochain Repost</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-dashboard"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- COMPTES -->
+        <div id="view-comptes" class="view" style="display:none;">
+            <h2>Gestion des Comptes</h2>
+            <div class="card">
+                <h3>Ajouter / Modifier un compte</h3>
+                <form id="form-compte" onsubmit="saveCompte(event)">
+                    <input type="hidden" id="compte-id">
+                    <div class="grid-3">
+                        <div class="form-group"><label>Pseudo</label><input type="text" id="compte-pseudo" required>
+                        </div>
+                        <div class="form-group"><label>Agent (Tuteur)</label><input type="text" id="compte-agent"
+                                required></div>
+                        <div class="form-group"><label>Lien Profil</label><input type="text" id="compte-lien"></div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group"><label>Statut</label>
+                            <select id="compte-statut">
+                                <option value="Actif">Actif</option>
+                                <option value="Limité">Limité</option>
+                                <option value="Banni">Banni</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Date Création</label><input type="date" id="compte-date"></div>
+                    </div>
+                    <div class="form-group"><label>Notes</label><textarea id="compte-notes" rows="2"></textarea></div>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetFormCompte()">Annuler</button>
+                </form>
+            </div>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pseudo</th>
+                            <th>Agent</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-comptes"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PLANNING -->
+        <div id="view-planning" class="view" style="display:none;">
+            <h2>Génération de Planning</h2>
+            <div class="card">
+                <p>Génère automatiquement les créneaux pour les comptes <b>Actifs</b> en respectant le décalage horaire
+                    configuré.</p>
+                <div class="form-group" style="margin-top:15px;">
+                    <label>Nombre de jours à générer</label>
+                    <input type="number" id="nb-jours-planning" value="7" min="1" max="30" style="width:100px;">
+                </div>
+                <button class="btn btn-primary" onclick="generatePlanning()">Générer le Planning</button>
+            </div>
+        </div>
+
+        <!-- CLASSEMENT -->
+        <div id="view-classement" class="view" style="display:none;">
+            <h2>Classement Automatique</h2>
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Top SKU par Score</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Score Total</th>
+                                <th>Ventes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-top-sku"></tbody>
+                    </table>
+                </div>
+                <div class="card">
+                    <h3>Top Créneaux par Score Moyen</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Heure</th>
+                                <th>Score Moyen</th>
+                                <th>Nb Pubs</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-top-creneaux"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAGNANTS -->
+        <div id="view-gagnants" class="view" style="display:none;">
+            <h2>Suggestions de Produits Gagnants</h2>
+            <div class="card">
+                <p>Sélectionnez un SKU gagnant et publiez-le sur tous les comptes actifs qui ne l'ont pas encore.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Score Moyen</th>
+                            <th>Nb Ventes</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-gagnants"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- INCIDENTS -->
+        <div id="view-incidents" class="view" style="display:none;">
+            <h2>Gestion des Incidents</h2>
+            <div class="card">
+                <h3>Déclarer un incident</h3>
+                <form onsubmit="saveIncident(event)">
+                    <div class="grid-3">
+                        <div class="form-group"><label>Compte</label><select id="inc-compte" required></select></div>
+                        <div class="form-group"><label>Type</label>
+                            <select id="inc-type" onchange="toggleIncidentFields()">
+                                <option>Limitation</option>
+                                <option>Ban temporaire</option>
+                                <option>Ban définitif</option>
+                                <option>Annonces masquées</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Date/Heure</label><input type="datetime-local" id="inc-date" required></div>
+                    </div>
+                    <div id="wrapper-annonces-masquees" class="grid-2" style="display:none; margin-top:15px; background: rgba(239, 68, 68, 0.05); padding: 15px; border-radius: 8px; border: 1px dashed var(--danger);">
+                        <div class="form-group"><label>Nombre d'annonces</label><input type="number" id="inc-nb-annonces" min="1" placeholder="ex: 5"></div>
+                        <div class="form-group"><label>SKU des annonces</label><input type="text" id="inc-sku" placeholder="ex: SKU-101, SKU-102"></div>
+                    </div>
+                    <button type="submit" class="btn btn-danger" style="margin-top:15px;">Enregistrer l'incident</button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>Historique des incidents</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Compte</th>
+                            <th>Type</th>
+                            <th>Pubs 24h</th>
+                            <th>Détail Ventes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-incidents"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PARAMETRES -->
+        <div id="view-parametres" class="view" style="display:none;">
+            <h2>Paramètres de l'Application</h2>
+            <div class="card">
+                <h3>Règles de Calcul & Planning</h3>
+                <div class="grid-3">
+                    <div class="form-group"><label>Poids: Vues</label><input type="number" step="0.1"
+                            id="param-poids-vues"></div>
+                    <div class="form-group"><label>Poids: Likes</label><input type="number" step="0.1"
+                            id="param-poids-likes"></div>
+                    <div class="form-group"><label>Poids: Favoris</label><input type="number" step="0.1"
+                            id="param-poids-favoris"></div>
+                    <div class="form-group"><label>Poids: Messages</label><input type="number" step="0.1"
+                            id="param-poids-messages"></div>
+                    <div class="form-group"><label>Poids: Vente</label><input type="number" step="0.1"
+                            id="param-poids-vente"></div>
+                </div>
+                <div class="grid-3">
+                    <div class="form-group"><label>Seuil Écarté (&lt;)</label><input type="number"
+                            id="param-seuil-ecarte"></div>
+                    <div class="form-group"><label>Seuil Gagnant (&gt;=)</label><input type="number"
+                            id="param-seuil-gagnant"></div>
+                    <div class="form-group"><label>Décalage entre comptes (min)</label><input type="number"
+                            id="param-decalage"></div>
+                    <div class="form-group"><label>Créneaux/Jour</label><input type="number" id="param-creneaux"></div>
+                    <div class="form-group"><label>Délai Repost (min)</label><input type="number"
+                            id="param-delai-repost"></div>
+                    <div class="form-group"><label>Jours Planning Défaut</label><input type="number"
+                            id="param-jours-defaut"></div>
+                </div>
+
+                <button class="btn btn-primary" onclick="saveParametres()" style="margin-top:20px;">Sauvegarder Paramètres</button>
+            </div>
+        </div>
+
+        <!-- JOURNAL -->
+        <div id="view-journal" class="view" style="display:none;">
+            <h2>Journal d'Activité</h2>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Horodatage</th>
+                            <th>Action</th>
+                            <th>Détail</th>
+                            <th>Résultat</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-journal"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // ==========================================
+        // 1. MODÈLE DE DONNÉES & PERSISTANCE
+        // ==========================================
+        const defaultDB = {
+            "parametres": {
+                "poidsScore": { "vues": 0.1, "likes": 1, "favoris": 2, "messages": 5, "vente": 20 },
+                "seuils": { "ecarte": 15, "gagnant": 40 },
+                "decalageMinutesEntreComptes": 60,
+                "margeAleatoireMinutes": 15,
+                "creneauxParJour": 3,
+                "delaiProchainRepostMinutes": 30,
+                "heuresParPeriode": {
+                    "matin": ["06:30", "07:30", "08:30", "09:30", "10:30", "11:30"],
+                    "midi": ["12:00", "13:00", "14:00", "15:00", "16:00", "17:00"],
+                    "soir": ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00"]
+                },
+                "nbJoursPlanningParDefaut": 7,
+                "heureDeclencheurAuto": "05:00"
+            },
+            "comptes": [],
+            "calendrier": [],
+            "incidents": [],
+            "journal": []
+        };
+
+        let db = loadDB();
+
+        function loadDB() {
+            const stored = localStorage.getItem('vinted_manager_db');
+            if (stored) {
+                try { return JSON.parse(stored); }
+                catch (e) { return JSON.parse(JSON.stringify(defaultDB)); }
+            }
+            return JSON.parse(JSON.stringify(defaultDB));
+        }
+
+        function saveDB() {
+            localStorage.setItem('vinted_manager_db', JSON.stringify(db));
+        }
+
+        function exportJSON() {
+            const dataStr = JSON.stringify(db, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vinted_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            logAction("Export JSON", "Exportation manuelle des données", "Succès");
+            showToast("Données exportées avec succès");
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (!imported.parametres || !imported.comptes || !imported.calendrier) {
+                        throw new Error("Structure JSON invalide");
+                    }
+                    if (confirm("Voulez-vous vraiment écraser les données actuelles ?")) {
+                        db = imported;
+                        saveDB();
+                        renderAll();
+                        logAction("Import JSON", "Importation manuelle des données", "Succès");
+                        showToast("Données importées avec succès");
+                    }
+                } catch (err) {
+                    alert("Erreur: Fichier JSON invalide ou incomplet. " + err.message);
+                    logAction("Import JSON", "Échec importation: " + err.message, "Échec");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ""; // Reset input
+        }
+
+        function logAction(action, detail, resultat) {
+            db.journal.unshift({
+                horodatage: new Date().toISOString(),
+                action: action,
+                detail: detail,
+                resultat: resultat
+            });
+            saveDB();
+        }
+
+        // ==========================================
+        // 2. LOGIQUE MÉTIER & CALCULS
+        // ==========================================
+        function calcScore(item) {
+            const p = db.parametres.poidsScore;
+            return (item.vues || 0) * p.vues +
+                (item.likes || 0) * p.likes +
+                (item.favoris || 0) * p.favoris +
+                (item.messages || 0) * p.messages +
+                (item.vente || 0) * p.vente;
+        }
+
+        function getClassification(score, vente) {
+            const s = db.parametres.seuils;
+            if (vente === 1 || score >= s.gagnant) return "Gagnant";
+            if (score < s.ecarte) return "Écarté";
+            return "À retester";
+        }
+
+        function getCompteById(id) { return db.comptes.find(c => c.id === id); }
+        function getActiveComptes() { return db.comptes.filter(c => c.statut === 'Actif'); }
+
+        // ==========================================
+        // 3. RENDU DE L'INTERFACE (VUES)
+        // ==========================================
+        function showView(viewName, btn) {
+            document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+            document.getElementById(`view-${viewName}`).style.display = 'block';
+
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            // Render specific view data
+            if (viewName === 'dashboard') renderDashboard();
+            if (viewName === 'comptes') renderComptes();
+            if (viewName === 'planning') renderPlanning();
+            if (viewName === 'classement') renderClassement();
+            if (viewName === 'gagnants') renderGagnants();
+            if (viewName === 'incidents') renderIncidents();
+            if (viewName === 'parametres') renderParametres();
+            if (viewName === 'journal') renderJournal();
+
+            if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // --- DASHBOARD ---
+        function renderDashboard() {
+            // Populate filters
+            const fCompte = document.getElementById('filter-compte');
+            const fAgent = document.getElementById('filter-agent');
+            fCompte.innerHTML = '<option value="">Tous</option>' + db.comptes.map(c => `<option value="${c.id}">${c.pseudo}</option>`).join('');
+            fAgent.innerHTML = '<option value="">Tous</option>' + [...new Set(db.comptes.map(c => c.agent))].map(a => `<option value="${a}">${a}</option>`).join('');
+
+            const fC = fCompte.value, fA = fAgent.value, fS = document.getElementById('filter-statut').value, fCl = document.getElementById('filter-classif').value;
+
+            const tbody = document.getElementById('tbody-dashboard');
+            tbody.innerHTML = '';
+
+            db.calendrier
+                .filter(l => (!fC || l.compteId === fC) && (!fA || l.agent === fA) && (!fS || l.statut === fS) && (!fCl || l.classification === fCl))
+                .sort((a, b) => new Date(a.date + ' ' + a.heurePrevue) - new Date(b.date + ' ' + b.heurePrevue))
+                .forEach(l => {
+                    const tr = document.createElement('tr');
+                    tr.style.background = l.statut === 'Fait' ? '#f6ffed' : '';
+
+                    tr.innerHTML = `
+                        <td>${l.date}</td>
+                        <td>${l.jour}</td>
+                        <td>${getCompteById(l.compteId)?.pseudo || 'N/A'}</td>
+                        <td>${l.agent}</td>
+                        <td>${l.heurePrevue}</td>
+                        <td><input type="text" class="inline-input" value="${l.sku}" onchange="updateLine('${l.id}', 'sku', this.value)"></td>
+                        <td><input type="number" class="inline-input" value="${l.vues}" onchange="updateLine('${l.id}', 'vues', this.value)"></td>
+                        <td><input type="number" class="inline-input" value="${l.likes}" onchange="updateLine('${l.id}', 'likes', this.value)"></td>
+                        <td><input type="number" class="inline-input" value="${l.favoris}" onchange="updateLine('${l.id}', 'favoris', this.value)"></td>
+                        <td><input type="number" class="inline-input" value="${l.messages}" onchange="updateLine('${l.id}', 'messages', this.value)"></td>
+                        <td><select class="inline-input" onchange="updateLine('${l.id}', 'vente', this.value)">
+                                <option value="0" ${l.vente == 0 ? 'selected' : ''}>0</option>
+                                <option value="1" ${l.vente == 1 ? 'selected' : ''}>1</option>
+                            </select></td>
+                        <td class="readonly-cell">${l.score.toFixed(1)}</td>
+                        <td class="status-${l.classification.toLowerCase().replace('é', 'e').replace(' ', '')}">${l.classification}</td>
+                        <td>
+                            <select class="inline-input" style="font-weight:bold; color:${l.statut === 'Fait' ? 'var(--success)' : 'var(--warning)'}" onchange="updateLine('${l.id}', 'statut', this.value)">
+                                <option ${l.statut === 'Non fait' ? 'selected' : ''}>Non fait</option>
+                                <option ${l.statut === 'Fait' ? 'selected' : ''}>Fait</option>
+                            </select>
+                        </td>
+                        <td>${l.nbVentesReposts} ${l.heuresVentesReposts.length > 0 ? '(' + l.heuresVentesReposts.join(', ') + ')' : ''}</td>
+                        <td>${l.prochainRepost || '-'}</td>
+                        <td><button class="btn btn-danger" style="padding:5px 10px;" onclick="deleteLine('${l.id}')">X</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+        }
+
+        function updateLine(id, field, value) {
+            const line = db.calendrier.find(l => l.id === id);
+            if (!line) return;
+
+            if (field === 'statut') {
+                line.statut = value;
+                if (value === 'Fait') {
+                    line.dateStatut = new Date().toISOString().split('T')[0];
+                    line.heureStatut = new Date().toTimeString().split(' ')[0].substring(0, 5);
+                    logAction("Statut Calendrier", `Ligne ${id} marquée comme Faite`, "Succès");
+                }
+            } else if (field === 'vente') {
+                line.vente = parseInt(value);
+                if (line.vente === 1) {
+                    line.nbVentesReposts++;
+                    const now = new Date().toTimeString().split(' ')[0].substring(0, 5);
+                    line.heuresVentesReposts.push(now);
+                    const reposDate = new Date();
+                    reposDate.setMinutes(reposDate.getMinutes() + db.parametres.delaiProchainRepostMinutes);
+                    line.prochainRepost = reposDate.toTimeString().split(' ')[0].substring(0, 5);
+                    logAction("Vente détectée", `Vente enregistrée pour ${id}`, "Succès");
+                }
+            } else if (['vues', 'likes', 'favoris', 'messages'].includes(field)) {
+                line[field] = parseInt(value) || 0;
+            } else {
+                line[field] = value;
+            }
+
+            // Recalcul dynamique
+            line.score = calcScore(line);
+            line.classification = getClassification(line.score, line.vente);
+
+            // Règle produit unique (avertissement)
+            if (field === 'sku' && value && line.classification !== 'Gagnant') {
+                const exists = db.calendrier.find(l => l.sku === value && l.compteId !== line.compteId && l.id !== id);
+                if (exists) showToast(`Attention: SKU ${value} déjà publié sur un autre compte!`);
+            }
+
+            saveDB();
+            renderDashboard(); // Rafraîchir l'affichage pour les champs calculés
+        }
+
+        function addManualLine() {
+            const newLine = {
+                "id": "ligne_" + Date.now(),
+                "date": new Date().toISOString().split('T')[0],
+                "jour": new Date().toLocaleDateString('fr-FR', { weekday: 'long' }),
+                "compteId": db.comptes[0]?.id || "",
+                "agent": db.comptes[0]?.agent || "",
+                "heurePrevue": "12:00",
+                "sku": "", "produit": "", "lien": "",
+                "vues": 0, "likes": 0, "favoris": 0, "messages": 0, "vente": 0,
+                "score": 0, "classification": "À retester", "statut": "Non fait",
+                "dateStatut": null, "heureStatut": null,
+                "nbVentesReposts": 0, "heuresVentesReposts": [], "prochainRepost": null
+            };
+            db.calendrier.push(newLine);
+            saveDB();
+            renderDashboard();
+        }
+
+        function deleteLine(id) {
+            db.calendrier = db.calendrier.filter(l => l.id !== id);
+            saveDB();
+            renderDashboard();
+        }
+
+        // --- COMPTES ---
+        function renderComptes() {
+            const tbody = document.getElementById('tbody-comptes');
+            tbody.innerHTML = db.comptes.map(c => `
+                <tr>
+                    <td>${c.pseudo}</td>
+                    <td>${c.agent}</td>
+                    <td style="color:${c.statut === 'Actif' ? 'green' : 'red'}">${c.statut}</td>
+                    <td>
+                        <button class="btn btn-secondary" onclick="editCompte('${c.id}')">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteCompte('${c.id}')">Suppr</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function editCompte(id) {
+            const c = getCompteById(id);
+            document.getElementById('compte-id').value = c.id;
+            document.getElementById('compte-pseudo').value = c.pseudo;
+            document.getElementById('compte-agent').value = c.agent;
+            document.getElementById('compte-lien').value = c.lienProfil;
+            document.getElementById('compte-statut').value = c.statut;
+            document.getElementById('compte-date').value = c.dateCreation;
+            document.getElementById('compte-notes').value = c.notes;
+        }
+
+        function resetFormCompte() {
+            document.getElementById('form-compte').reset();
+            document.getElementById('compte-id').value = '';
+        }
+
+        function saveCompte(e) {
+            e.preventDefault();
+            const id = document.getElementById('compte-id').value;
+            const data = {
+                pseudo: document.getElementById('compte-pseudo').value,
+                agent: document.getElementById('compte-agent').value,
+                lienProfil: document.getElementById('compte-lien').value,
+                statut: document.getElementById('compte-statut').value,
+                dateCreation: document.getElementById('compte-date').value,
+                notes: document.getElementById('compte-notes').value
+            };
+
+            if (id) {
+                const c = getCompteById(id);
+                Object.assign(c, data);
+                // Propagation de l'agent
+                db.calendrier.filter(l => l.compteId === id).forEach(l => l.agent = data.agent);
+            } else {
+                db.comptes.push({
+                    id: "compte_" + Date.now(),
+                    ...data
+                });
+            }
+            saveDB();
+            resetFormCompte();
+            renderComptes();
+            logAction("Gestion Compte", `Compte ${data.pseudo} sauvegardé`, "Succès");
+        }
+
+        function deleteCompte(id) {
+            if (confirm("Supprimer ce compte et ses lignes associées ?")) {
+                db.comptes = db.comptes.filter(c => c.id !== id);
+                db.calendrier = db.calendrier.filter(l => l.compteId !== id);
+                saveDB();
+                renderComptes();
+            }
+        }
+
+        // --- PLANNING ---
+        function renderPlanning() {
+            document.getElementById('nb-jours-planning').value = db.parametres.nbJoursPlanningParDefaut;
+        }
+
+        function generatePlanning() {
+            const nbJours = parseInt(document.getElementById('nb-jours-planning').value);
+            const activeComptes = getActiveComptes();
+            if (activeComptes.length === 0) { alert("Aucun compte actif !"); return; }
+
+            const p = db.parametres;
+            const allHours = [...p.heuresParPeriode.matin, ...p.heuresParPeriode.midi, ...p.heuresParPeriode.soir];
+            const decalageMs = p.decalageMinutesEntreComptes * 60000;
+
+            let generated = 0;
+            const today = new Date();
+
+            for (let i = 0; i < nbJours; i++) {
+                const dateObj = new Date(today);
+                dateObj.setDate(today.getDate() + i);
+                const dateStr = dateObj.toISOString().split('T')[0];
+                const jour = dateObj.toLocaleDateString('fr-FR', { weekday: 'long' });
+                const jourCap = jour.charAt(0).toUpperCase() + jour.slice(1);
+
+                // Récupérer les heures déjà prises pour ce jour
+                const usedSlotsToday = db.calendrier
+                    .filter(l => l.date === dateStr)
+                    .map(l => new Date(`${dateStr}T${l.heurePrevue}:00`).getTime());
+
+                let compteIndex = 0;
+                // Pour chaque créneau théorique par jour
+                for (let s = 0; s < p.creneauxParJour; s++) {
+                    for (let c = 0; c < activeComptes.length; c++) {
+                        const compte = activeComptes[(compteIndex + c) % activeComptes.length];
+
+                        // Trouver une heure valide avec variation aléatoire
+                        let chosenHour = null;
+                        const margeAleatoireMin = p.margeAleatoireMinutes || 0;
+                        for (const hour of allHours) {
+                            const maxAttempts = (margeAleatoireMin > 0) ? 6 : 1;
+                            for (let att = 0; att < maxAttempts; att++) {
+                                let candidateHour = hour;
+                                if (margeAleatoireMin > 0) {
+                                    const randomOffsetMin = Math.floor(Math.random() * (2 * margeAleatoireMin + 1)) - margeAleatoireMin;
+                                    const baseDate = new Date(`${dateStr}T${hour}:00`);
+                                    baseDate.setMinutes(baseDate.getMinutes() + randomOffsetMin);
+                                    const hStr = String(baseDate.getHours()).padStart(2, '0');
+                                    const mStr = String(baseDate.getMinutes()).padStart(2, '0');
+                                    candidateHour = `${hStr}:${mStr}`;
+                                }
+
+                                const timeMs = new Date(`${dateStr}T${candidateHour}:00`).getTime();
+                                const isFree = usedSlotsToday.every(used => Math.abs(timeMs - used) >= decalageMs);
+                                if (isFree) {
+                                    chosenHour = candidateHour;
+                                    usedSlotsToday.push(timeMs);
+                                    break;
+                                }
+                            }
+                            if (chosenHour) break;
+                        }
+
+                        if (chosenHour) {
+                            db.calendrier.push({
+                                "id": "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5),
+                                "date": dateStr,
+                                "jour": jourCap,
+                                "compteId": compte.id,
+                                "agent": compte.agent,
+                                "heurePrevue": chosenHour,
+                                "sku": "", "produit": "", "lien": "",
+                                "vues": 0, "likes": 0, "favoris": 0, "messages": 0, "vente": 0,
+                                "score": 0, "classification": "À retester", "statut": "Non fait",
+                                "dateStatut": null, "heureStatut": null,
+                                "nbVentesReposts": 0, "heuresVentesReposts": [], "prochainRepost": null
+                            });
+                            generated++;
+                        }
+                    }
+                    compteIndex++;
+                }
+            }
+            saveDB();
+            logAction("Génération planning", `${generated} lignes générées pour ${nbJours} jours`, "Succès");
+            alert(`${generated} lignes de planning générées avec succès !`);
+            showView('dashboard', document.querySelector('.nav-btn[onclick*="dashboard"]'));
+        }
+
+        // --- CLASSEMENT ---
+        function renderClassement() {
+            // Top SKU
+            const skuScores = {};
+            db.calendrier.filter(l => l.sku).forEach(l => {
+                if (!skuScores[l.sku]) skuScores[l.sku] = { score: 0, ventes: 0, count: 0 };
+                skuScores[l.sku].score += l.score;
+                skuScores[l.sku].ventes += l.vente;
+                skuScores[l.sku].count++;
+            });
+            const topSku = Object.entries(skuScores).map(([sku, d]) => ({ sku, score: d.score, avg: d.score / d.count, ventes: d.ventes })).sort((a, b) => b.score - a.score);
+            document.getElementById('tbody-top-sku').innerHTML = topSku.slice(0, 10).map(s => `<tr><td>${s.sku}</td><td>${s.score.toFixed(1)}</td><td>${s.ventes}</td></tr>`).join('') || '<tr><td colspan="3">Aucun SKU</td></tr>';
+
+            // Top Créneaux
+            const hourScores = {};
+            db.calendrier.forEach(l => {
+                if (!hourScores[l.heurePrevue]) hourScores[l.heurePrevue] = { score: 0, count: 0 };
+                hourScores[l.heurePrevue].score += l.score;
+                hourScores[l.heurePrevue].count++;
+            });
+            const topHours = Object.entries(hourScores).map(([h, d]) => ({ h, avg: d.score / d.count, count: d.count })).sort((a, b) => b.avg - a.avg);
+            document.getElementById('tbody-top-creneaux').innerHTML = topHours.slice(0, 10).map(h => `<tr><td>${h.h}</td><td>${h.avg.toFixed(1)}</td><td>${h.count}</td></tr>`).join('') || '<tr><td colspan="3">Aucune donnée</td></tr>';
+        }
+
+        // --- GAGNANTS ---
+        function renderGagnants() {
+            const skuGagnants = {};
+            db.calendrier.filter(l => l.classification === 'Gagnant' && l.sku).forEach(l => {
+                if (!skuGagnants[l.sku]) skuGagnants[l.sku] = { count: 0, ventes: 0 };
+                skuGagnants[l.sku].count++;
+                skuGagnants[l.sku].ventes += l.vente;
+            });
+
+            const tbody = document.getElementById('tbody-gagnants');
+            tbody.innerHTML = Object.entries(skuGagnants).map(([sku, d]) => {
+                return `<tr>
+                    <td>${sku}</td>
+                    <td>${d.count}</td>
+                    <td>${d.ventes}</td>
+                    <td><button class="btn btn-primary" onclick="publishWinnerToAll('${sku}')">Publier sur tous les comptes actifs</button></td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="4">Aucun produit gagnant détecté pour le moment.</td></tr>';
+        }
+
+        function publishWinnerToAll(sku) {
+            const actives = getActiveComptes();
+            const dateStr = new Date().toISOString().split('T')[0];
+            const jour = new Date().toLocaleDateString('fr-FR', { weekday: 'long' });
+            const jourCap = jour.charAt(0).toUpperCase() + jour.slice(1);
+            let added = 0;
+
+            actives.forEach(c => {
+                const dejaPublie = db.calendrier.some(l => l.compteId === c.id && l.sku === sku);
+                if (!dejaPublie) {
+                    db.calendrier.push({
+                        "id": "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5),
+                        "date": dateStr, "jour": jourCap, "compteId": c.id, "agent": c.agent,
+                        "heurePrevue": "12:00", "sku": sku, "produit": "REPOST GAGNANT", "lien": "",
+                        "vues": 0, "likes": 0, "favoris": 0, "messages": 0, "vente": 0,
+                        "score": 0, "classification": "À retester", "statut": "Non fait",
+                        "dateStatut": null, "heureStatut": null, "nbVentesReposts": 0, "heuresVentesReposts": [], "prochainRepost": null
+                    });
+                    added++;
+                }
+            });
+            saveDB();
+            logAction("Suggestion Gagnant", `SKU ${sku} publié sur ${added} comptes`, "Succès");
+            showToast(`${added} lignes ajoutées au calendrier.`);
+            showView('dashboard', document.querySelector('.nav-btn[onclick*="dashboard"]'));
+        }
+
+        // --- INCIDENTS ---
+        function renderIncidents() {
+            const sel = document.getElementById('inc-compte');
+            sel.innerHTML = '<option value="">Sélectionner...</option>' + db.comptes.map(c => `<option value="${c.id}">${c.pseudo}</option>`).join('');
+            document.getElementById('inc-date').value = new Date().toISOString().substring(0, 16);
+
+            toggleIncidentFields();
+            const tbody = document.getElementById('tbody-incidents');
+            tbody.innerHTML = db.incidents.map(inc => {
+                const c = getCompteById(inc.compteId);
+                const details = inc.type === 'Annonces masquées'
+                    ? `${inc.nbAnnoncesMasquees || 0} annonces (${inc.skuAnnoncesMasquees || 'SKU N/A'})`
+                    : (inc.detailVentes.length > 0 ? inc.detailVentes.join(', ') : 'Aucune');
+                return `<tr>
+                    <td>${inc.dateBlocage} ${inc.heureBlocage}</td>
+                    <td>${c?.pseudo || 'N/A'}</td>
+                    <td>${inc.type}</td>
+                    <td>${inc.nbPubs24h}</td>
+                    <td>${details}</td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="5">Aucun incident.</td></tr>';
+        }
+
+        function saveIncident(e) {
+            e.preventDefault();
+            const compteId = document.getElementById('inc-compte').value;
+            const type = document.getElementById('inc-type').value;
+            const dateHeure = document.getElementById('inc-date').value;
+            if (!compteId) return;
+
+            const [date, heure] = dateHeure.split('T');
+            const compte = getCompteById(compteId);
+
+            // Calcul pubs 24h
+            const dateIncident = new Date(dateHeure);
+            const pubs24h = db.calendrier.filter(l => l.compteId === compteId && new Date(l.date + 'T' + l.heurePrevue) >= new Date(dateIncident.getTime() - 86400000) && new Date(l.date + 'T' + l.heurePrevue) <= dateIncident);
+
+            const ventes24h = pubs24h.filter(p => p.vente === 1).map(p => p.sku || 'N/A');
+
+            const nbAnnonces = parseInt(document.getElementById('inc-nb-annonces')?.value) || 0;
+            const skuAnnonces = document.getElementById('inc-sku')?.value || '';
+
+            db.incidents.unshift({
+                id: "inc_" + Date.now(),
+                compteId,
+                dateBlocage: date,
+                heureBlocage: heure,
+                type,
+                nbPubs24h: pubs24h.length,
+                heuresPubs24h: pubs24h.map(p => p.heurePrevue),
+                nbVentesConnues: ventes24h.length,
+                detailVentes: ventes24h,
+                nbAnnoncesMasquees: nbAnnonces,
+                skuAnnoncesMasquees: skuAnnonces
+            });
+
+            // MAJ statut compte
+            if (type === 'Ban définitif') compte.statut = 'Banni';
+            else compte.statut = 'Limité';
+
+            saveDB();
+            logAction("Incident", `Incident ${type} enregistré pour ${compte.pseudo}`, "Succès");
+            renderIncidents();
+            showToast("Incident enregistré et statut mis à jour.");
+        }
+
+        // --- PARAMETRES ---
+        function renderParametres() {
+            const p = db.parametres;
+            document.getElementById('param-poids-vues').value = p.poidsScore.vues;
+            document.getElementById('param-poids-likes').value = p.poidsScore.likes;
+            document.getElementById('param-poids-favoris').value = p.poidsScore.favoris;
+            document.getElementById('param-poids-messages').value = p.poidsScore.messages;
+            document.getElementById('param-poids-vente').value = p.poidsScore.vente;
+            document.getElementById('param-seuil-ecarte').value = p.seuils.ecarte;
+            document.getElementById('param-seuil-gagnant').value = p.seuils.gagnant;
+            document.getElementById('param-decalage').value = p.decalageMinutesEntreComptes;
+            document.getElementById('param-creneaux').value = p.creneauxParJour;
+            document.getElementById('param-delai-repost').value = p.delaiProchainRepostMinutes;
+            document.getElementById('param-jours-defaut').value = p.nbJoursPlanningParDefaut;
+            if (document.getElementById('param-matin')) {
+                p.heuresParPeriode.matin = document.getElementById('param-matin').value.split(',').map(s => s.trim());
+                p.heuresParPeriode.midi = document.getElementById('param-midi').value.split(',').map(s => s.trim());
+                p.heuresParPeriode.soir = document.getElementById('param-soir').value.split(',').map(s => s.trim());
+            }
+
+            // Recalculer tous les scores existants
+            db.calendrier.forEach(l => {
+                l.score = calcScore(l);
+                l.classification = getClassification(l.score, l.vente);
+            });
+
+            saveDB();
+            logAction("Paramètres", "Mise à jour des paramètres et recalcul général", "Succès");
+            showToast("Paramètres sauvegardés. Scores recalculés.");
+        }
+
+        // --- JOURNAL ---
+        function renderJournal() {
+            document.getElementById('tbody-journal').innerHTML = db.journal.map(j => `
+                <tr>
+                    <td>${new Date(j.horodatage).toLocaleString('fr-FR')}</td>
+                    <td>${j.action}</td>
+                    <td>${j.detail}</td>
+                    <td style="color:${j.resultat === 'Succès' ? 'green' : 'red'}">${j.resultat}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="4">Journal vide.</td></tr>';
+        }
+
+        // ==========================================
+        // 4. UTILITAIRES
+        // ==========================================
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+
+        // Init
+        renderAll();
+        function renderAll() {
+            showView('dashboard', document.querySelector('.nav-btn'));
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Vinted Manager Sync</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div className="popup-container">
+        <div className="header">
+            <div className="logo">V</div>
+            <div>
+                <h2>Vinted Manager</h2>
+                <p className="subtitle">Extension de Synchronisation</p>
+            </div>
+        </div>
+
+        <div className="section">
+            <label htmlFor="serverUrl">URL du Serveur API</label>
+            <input type="text" id="serverUrl" value="http://localhost:3000" placeholder="http://localhost:3000" />
+        </div>
+
+        <div className="section">
+            <label htmlFor="pseudoOverride">Pseudo Vinted</label>
+            <input type="text" id="pseudoOverride" placeholder="Auto-détecté ou ex: vintage_store" />
+        </div>
+
+        <div className="metrics-box">
+            <div className="metric">
+                <span className="metric-label">👀 Vues</span>
+                <span className="metric-val" id="valVues">0</span>
+            </div>
+            <div className="metric">
+                <span className="metric-label">❤️ Likes</span>
+                <span className="metric-val" id="valLikes">0</span>
+            </div>
+            <div className="metric">
+                <span className="metric-label">💬 Msgs</span>
+                <span className="metric-val" id="valMsgs">0</span>
+            </div>
+            <div className="metric">
+                <span className="metric-label">💰 Ventes</span>
+                <span className="metric-val" id="valVentes">0</span>
+            </div>
+        </div>
+
+        <button id="btnSync" className="btn-sync">
+            ⚡ Scraper & Synchroniser
+        </button>
+
+        <div id="statusMsg" className="status-msg"></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
