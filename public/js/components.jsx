@@ -548,6 +548,7 @@ function PlanningView({ appState, onGeneratePlanning }) {
 
     const [dateDebut, setDateDebut] = useState(todayStr);
     const [dateFin, setDateFin] = useState(defaultEndStr);
+    const [creneauxParJour, setCreneauxParJour] = useState((appState.parametres && appState.parametres.creneauxParJour) || 6);
     const [loading, setLoading] = useState(false);
 
     const activeComptes = useMemo(() => (appState.comptes || []).filter(c => c.statut === 'Actif'), [appState.comptes]);
@@ -560,6 +561,10 @@ function PlanningView({ appState, onGeneratePlanning }) {
         return Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
     }, [dateDebut, dateFin]);
 
+    const totalEstimatedSlots = useMemo(() => {
+        return activeComptes.length * totalDays * creneauxParJour;
+    }, [activeComptes.length, totalDays, creneauxParJour]);
+
     const setPreset = (days) => {
         const start = new Date();
         const end = new Date();
@@ -571,7 +576,7 @@ function PlanningView({ appState, onGeneratePlanning }) {
     const handleGenerate = async () => {
         if (!dateDebut || !dateFin || totalDays <= 0) return;
         setLoading(true);
-        await onGeneratePlanning(dateDebut, dateFin);
+        await onGeneratePlanning(dateDebut, dateFin, creneauxParJour);
         setLoading(false);
     };
 
@@ -588,7 +593,7 @@ function PlanningView({ appState, onGeneratePlanning }) {
                     Le moteur calcule automatiquement la répartition optimale des créneaux horaires pour l'ensemble des <b>{activeComptes.length} comptes au statut Actif</b>, en appliquant les règles d'espacement et la marge d'intervalle aléatoire.
                 </p>
 
-                <div className="grid-2" style={{ marginBottom: '18px' }}>
+                <div className="grid-3" style={{ marginBottom: '18px' }}>
                     <div className="form-group">
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <i className="fa-solid fa-calendar-day" style={{ color: 'var(--primary)' }}></i>
@@ -612,6 +617,21 @@ function PlanningView({ appState, onGeneratePlanning }) {
                             min={dateDebut}
                             onChange={(e) => setDateFin(e.target.value)}
                             style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <i className="fa-solid fa-bullhorn" style={{ color: 'var(--primary)' }}></i>
+                            Publications / Compte / Jour
+                        </label>
+                        <input
+                            type="number"
+                            min="1"
+                            max="30"
+                            value={creneauxParJour}
+                            onChange={(e) => setCreneauxParJour(parseInt(e.target.value) || 1)}
+                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
+                            placeholder="ex: 6"
                         />
                     </div>
                 </div>
@@ -638,7 +658,11 @@ function PlanningView({ appState, onGeneratePlanning }) {
                         gap: '8px'
                     }}>
                         <i className="fa-solid fa-calendar-days" style={{ fontSize: '16px' }}></i>
-                        <span>Période sélectionnée : du <b>{dateDebut}</b> au <b>{dateFin}</b> (soit <b>{totalDays} jour{totalDays > 1 ? 's' : ''}</b> au total)</span>
+                        <span>
+                            Période : du <b>{dateDebut}</b> au <b>{dateFin}</b> ({totalDays} jour{totalDays > 1 ? 's' : ''}) — 
+                            <b> {creneauxParJour} pub{creneauxParJour > 1 ? 's' : ''}/compte/jour</b> pour {activeComptes.length} compte(s) actif(s) 
+                            (soit <b>{totalEstimatedSlots} publication{totalEstimatedSlots > 1 ? 's' : ''} au total</b>)
+                        </span>
                     </div>
                 ) : (
                     <div style={{
@@ -662,7 +686,7 @@ function PlanningView({ appState, onGeneratePlanning }) {
                     style={{ padding: '12px 24px', fontSize: '15px' }}
                 >
                     {loading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> : <i className="fa-solid fa-bolt" style={{ marginRight: '8px' }}></i>}
-                    {loading ? 'Génération en cours...' : `Générer le Planning (${totalDays} jour${totalDays > 1 ? 's' : ''})`}
+                    {loading ? 'Génération en cours...' : `Générer le Planning (${totalEstimatedSlots} pub${totalEstimatedSlots > 1 ? 's' : ''})`}
                 </button>
             </div>
         </section>

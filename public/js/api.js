@@ -154,14 +154,14 @@ const API = {
     },
     async deleteCalendrierRow(id) { return this.deleteCalendrierLine(id); },
 
-    async generatePlanning(dateDebut, dateFin, organisationId = null) {
+    async generatePlanning(dateDebut, dateFin, creneauxParJour = null, organisationId = null) {
         let payload = {};
         if (typeof dateDebut === 'object') {
             payload = dateDebut;
         } else if (dateDebut && !dateFin && typeof dateDebut === 'number') {
-            payload = { nbJours: dateDebut, organisationId };
+            payload = { nbJours: dateDebut, creneauxParJour, organisationId };
         } else {
-            payload = { dateDebut, dateFin, organisationId };
+            payload = { dateDebut, dateFin, creneauxParJour, organisationId };
         }
         return this.fetchJSON('/api/calendrier/generate', {
             method: 'POST',

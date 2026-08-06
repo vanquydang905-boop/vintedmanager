@@ -177,9 +177,9 @@ function App() {
         }
     };
 
-    const handleGeneratePlanning = async (dateDebut, dateFin) => {
+    const handleGeneratePlanning = async (dateDebut, dateFin, creneauxParJour) => {
         try {
-            const res = await API.generatePlanning(dateDebut, dateFin, currentOrgId);
+            const res = await API.generatePlanning(dateDebut, dateFin, creneauxParJour, currentOrgId);
             showToast(res.message || "Planning généré avec succès");
             await loadData();
         } catch (err) {

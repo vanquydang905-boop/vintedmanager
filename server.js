@@ -461,6 +461,8 @@ app.post('/api/calendrier/generate', async (req, res) => {
         let generated = 0;
         const existingAll = await dbService.getCalendrier(orgId);
 
+        const slotsPerAccount = req.body.creneauxParJour ? parseInt(req.body.creneauxParJour) : (params.creneauxParJour || 3);
+
         for (const dateObj of datesList) {
             const dateStr = dateObj.toISOString().split('T')[0];
             const jourRaw = dateObj.toLocaleDateString('fr-FR', { weekday: 'long' });
@@ -470,7 +472,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
             const usedSlotsToday = existingSlots.map(l => new Date(`${dateStr}T${l.heurePrevue}:00`).getTime());
 
             let compteIndex = 0;
-            for (let s = 0; s < (params.creneauxParJour || 3); s++) {
+            for (let s = 0; s < slotsPerAccount; s++) {
                 for (let c = 0; c < activeComptes.length; c++) {
                     const compte = activeComptes[(compteIndex + c) % activeComptes.length];
 
