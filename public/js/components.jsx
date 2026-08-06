@@ -36,10 +36,10 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser.email || ''}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <span className="badge" style={{
-                        background: currentUser.role === 'admin' ? '#9333ea' : (currentUser.role === 'cadre' ? '#2563eb' : '#16a34a'),
+                        background: currentUser.role === 'admin' ? '#9333ea' : (currentUser.role === 'cadre' ? '#0284c7' : '#16a34a'),
                         color: 'white', fontSize: '11px', padding: '2px 8px'
                     }}>
-                        {currentUser.role === 'admin' ? 'Admin' : (currentUser.role === 'cadre' ? 'Cadre' : 'Agent')}
+                        {currentUser.role === 'admin' ? 'Admin Principal' : (currentUser.role === 'cadre' ? 'Admin Organisation' : 'Agent')}
                     </span>
                     <button className="btn btn-danger btn-sm" onClick={onLogout} title="Se déconnecter" style={{ padding: '3px 8px', fontSize: '11px' }}>
                         <i className="fa-solid fa-right-from-bracket"></i> Déconnexion
@@ -1015,7 +1015,7 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                 <h3 className="card-title">{userId ? 'Modifier l\'agent' : 'Ajouter un nouveau profil Agent'}</h3>
                 {!isAdmin && (
                     <p style={{ fontSize: '12px', color: 'var(--info)', marginBottom: '16px', background: '#eff6ff', padding: '8px 12px', borderRadius: '6px' }}>
-                        <i className="fa-solid fa-circle-info"></i> En tant que Cadre, vous pouvez créer uniquement des profil <strong>Agent de publication</strong> pour votre organisation.
+                        <i className="fa-solid fa-circle-info"></i> En tant qu'<strong>Admin Organisation</strong>, vous pouvez créer uniquement des profils <strong>Agent de publication</strong> pour votre organisation.
                     </p>
                 )}
                 <form onSubmit={handleSubmit}>
@@ -1031,8 +1031,8 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                         <div className="form-group">
                             <label>Rôle</label>
                             <select value={isAdmin ? role : 'agent'} onChange={(e) => setRole(e.target.value)} disabled={!isAdmin}>
-                                {isAdmin && <option value="admin">Administrateur</option>}
-                                {isAdmin && <option value="cadre">Cadre / Manager</option>}
+                                {isAdmin && <option value="admin">Admin Principal</option>}
+                                {isAdmin && <option value="cadre">Admin Organisation</option>}
                                 <option value="agent">Agent de publication</option>
                             </select>
                         </div>
@@ -1092,10 +1092,10 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                                         <td>{u.email}</td>
                                         <td>
                                             <span className="badge" style={{
-                                                background: u.role === 'admin' ? '#9333ea' : (u.role === 'cadre' ? '#2563eb' : '#16a34a'),
+                                                background: u.role === 'admin' ? '#9333ea' : (u.role === 'cadre' ? '#0284c7' : '#16a34a'),
                                                 color: 'white'
                                             }}>
-                                                {u.role === 'admin' ? 'Admin' : (u.role === 'cadre' ? 'Cadre' : 'Agent')}
+                                                {u.role === 'admin' ? 'Admin Principal' : (u.role === 'cadre' ? 'Admin Organisation' : 'Agent')}
                                             </span>
                                         </td>
                                         <td><span className="badge badge-compte">{((organisations.find(o => o.id === u.organisationId) || {}).nom) || u.organisationId || 'Par défaut'}</span></td>
