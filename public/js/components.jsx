@@ -1095,14 +1095,18 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                                         <td>{u.agentAssigne || u.nom}</td>
                                         <td>{u.dateCreation || '-'}</td>
                                         <td>
-                                            <div style={{ display: 'flex', gap: '6px' }}>
-                                                <button className="btn btn-primary btn-sm" onClick={() => handleEdit(u)} title="Éditer">
-                                                    <i className="fa-solid fa-pen"></i>
-                                                </button>
-                                                <button className="btn btn-danger btn-sm" onClick={() => onDeleteUser(u.id)} title="Supprimer">
-                                                    <i className="fa-solid fa-trash"></i>
-                                                </button>
-                                            </div>
+                                            {(isAdmin || u.role === 'agent') ? (
+                                                <div style={{ display: 'flex', gap: '6px' }}>
+                                                    <button className="btn btn-primary btn-sm" onClick={() => handleEdit(u)} title="Éditer">
+                                                        <i className="fa-solid fa-pen"></i>
+                                                    </button>
+                                                    <button className="btn btn-danger btn-sm" onClick={() => onDeleteUser(u.id)} title="Supprimer">
+                                                        <i className="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Protégé (Admin)</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
