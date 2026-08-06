@@ -212,7 +212,7 @@ body {
 /* MAIN CONTENT */
 .main-content {
     margin-left: 270px;
-    padding: 28px 32px;
+    padding: 28px 32px 60px 32px;
     width: calc(100% - 270px);
     max-width: calc(100vw - 270px);
     box-sizing: border-box;
@@ -225,7 +225,7 @@ body {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 32px;
     width: 100%;
 }
 
@@ -298,22 +298,6 @@ body {
     color: var(--text-main);
 }
 
-.metric-info h4 {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    margin-bottom: 4px;
-}
-
-.metric-info .value {
-    font-family: 'Outfit', sans-serif;
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--text-main);
-}
-
 /* CARDS & CONTAINERS */
 .card {
     background: var(--card-bg);
@@ -321,7 +305,7 @@ body {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
-    margin-bottom: 24px;
+    margin-bottom: 32px;
     transition: box-shadow 0.2s ease;
 }
 
