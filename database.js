@@ -1,17 +1,10 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_KEY || '';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://kdtmpgcsfawbsiiscazu.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'sb_publishable_EStL78lhwgNnP2RVOTmRTw_6XYeSTKJ';
 
-if (!supabaseUrl || !supabaseKey) {
-    console.warn('\n⚠️ [SUPABASE WARNING] SUPABASE_URL ou SUPABASE_KEY manquant dans les variables d\'environnement !\n');
-}
-
-const supabase = createClient(
-    supabaseUrl || 'https://placeholder.supabase.co',
-    supabaseKey || 'placeholder-key'
-);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helpers de conversion CamelCase <-> Lowercase pour Supabase PostgreSQL
 const camelMap = {
