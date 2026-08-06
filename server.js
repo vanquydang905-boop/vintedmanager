@@ -14,6 +14,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ==========================================
 // UTILITIES & HELPERS
 // ==========================================
+function getLocalDateString(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function calcScore(item, params) {
     const p = params.poidsScore || { vues: 0.1, likes: 1, favoris: 2, messages: 5, vente: 20 };
     const favCount = (item.favoris || 0) + (item.likes || 0);
@@ -458,7 +465,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
         const slotsPerAccount = req.body.creneauxParJour ? parseInt(req.body.creneauxParJour) : (params.creneauxParJour || 3);
 
         for (const dateObj of datesList) {
-            const dateStr = dateObj.toISOString().split('T')[0];
+            const dateStr = getLocalDateString(dateObj);
             const jourRaw = dateObj.toLocaleDateString('fr-FR', { weekday: 'long' });
             const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
 

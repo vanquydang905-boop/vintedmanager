@@ -537,13 +537,20 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOp
     );
 }
 
+function getLocalDateString(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // ------------------- VIEW: PLANNING GENERATION -------------------
 function PlanningView({ appState, onGeneratePlanning }) {
-    const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+    const todayStr = useMemo(() => getLocalDateString(), []);
     const defaultEndStr = useMemo(() => {
         const d = new Date();
         d.setDate(d.getDate() + 6);
-        return d.toISOString().split('T')[0];
+        return getLocalDateString(d);
     }, []);
 
     const [dateDebut, setDateDebut] = useState(todayStr);
@@ -569,8 +576,8 @@ function PlanningView({ appState, onGeneratePlanning }) {
         const start = new Date();
         const end = new Date();
         end.setDate(start.getDate() + days - 1);
-        setDateDebut(start.toISOString().split('T')[0]);
-        setDateFin(end.toISOString().split('T')[0]);
+        setDateDebut(getLocalDateString(start));
+        setDateFin(getLocalDateString(end));
     };
 
     const handleGenerate = async () => {

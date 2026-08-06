@@ -93,6 +93,13 @@ function hashPassword(password) {
     return `sha256$${hash}`;
 }
 
+function getLocalDateString(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function verifyPassword(inputPassword, storedHash) {
     if (!inputPassword || !storedHash) return false;
     if (!storedHash.startsWith('sha256$')) {
@@ -141,7 +148,7 @@ const dbService = {
 
     async createOrganisation(org) {
         const payload = {
-            dateCreation: new Date().toISOString().split('T')[0],
+            dateCreation: getLocalDateString(),
             ...org
         };
         const idx = DEFAULT_ORGANISATIONS.findIndex(o => o.id === payload.id);
@@ -240,7 +247,7 @@ const dbService = {
     async createUtilisateur(user) {
         const payload = {
             organisationId: 'org_default',
-            dateCreation: new Date().toISOString().split('T')[0],
+            dateCreation: getLocalDateString(),
             ...user
         };
 
@@ -318,7 +325,7 @@ const dbService = {
         const payload = {
             organisationId: 'org_default',
             statut: 'Actif',
-            dateCreation: new Date().toISOString().split('T')[0],
+            dateCreation: getLocalDateString(),
             notes: '',
             ...compte
         };
