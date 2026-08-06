@@ -648,7 +648,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             email,
             motDePasse,
             gereParInitiales,
-            agent: agent || (agentsList[0] ? (agentsList[0].agentAssigne || agentsList[0].nom) : 'Agent'),
+            agent: agent || 'À attribuer',
             statut,
             dateStatutCompte,
             organisationId: isAdmin ? organisationId : userOrgId,
@@ -723,7 +723,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                 email: emailStr,
                 motDePasse: mp,
                 gereParInitiales: initiales,
-                agent: agentsList[0] ? (agentsList[0].agentAssigne || agentsList[0].nom) : 'Muller',
+                agent: 'À attribuer',
                 statut: statutStr,
                 dateStatutCompte: dateStatut,
                 organisationId: userOrgId,
@@ -822,7 +822,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 </button>
                             </div>
                             <select value={agent} onChange={(e) => setAgent(e.target.value)}>
-                                <option value="">Sélectionner un agent...</option>
+                                <option value="">À attribuer (Non spécifié)</option>
                                 {agentsList.map(a => (
                                     <option key={a.id} value={a.agentAssigne || a.nom}>{a.nom} ({a.agentAssigne || a.role})</option>
                                 ))}
@@ -953,7 +953,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                         <td><span style={{ fontSize: '12px' }}>{c.email || '-'}</span></td>
                                         <td><code style={{ fontSize: '11px', backgroundColor: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{c.motDePasse || '-'}</code></td>
                                         <td>{c.gereParInitiales ? <span className="badge" style={{ backgroundColor: '#475569', color: '#fff' }}>{c.gereParInitiales}</span> : '-'}</td>
-                                        <td><span className="badge badge-agent">{c.agent}</span></td>
+                                        <td>{c.agent && c.agent !== 'À attribuer' ? <span className="badge badge-agent">{c.agent}</span> : <span className="badge" style={{ backgroundColor: '#64748b', color: '#fff' }}>À attribuer</span>}</td>
                                         <td>
                                             <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite')}`}>
                                                 {c.statut}
