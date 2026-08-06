@@ -408,7 +408,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                     <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} style={{ width: '16px', height: '16px', cursor: 'pointer' }} title="Tout sélectionner / Tout désélectionner" />
                                 </th>
                                 <th>Date</th>
-                                <th>Jour</th>
                                 <th>Compte</th>
                                 <th>Agent</th>
                                 <th>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
@@ -432,7 +431,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             <input type="checkbox" checked={selectedIds.includes(l.id)} onChange={() => toggleSelectRow(l.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                         </td>
                                         <td>{l.date}</td>
-                                        <td><b>{l.jour}</b></td>
                                         <td>
                                             <select className="input-table" value={l.compteId || ''} onChange={(e) => {
                                                 const selCompte = comptes.find(c => c.id === e.target.value);
@@ -532,7 +530,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="14" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="13" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
                                         Aucune ligne de calendrier trouvée pour ces filtres.
                                     </td>
                                 </tr>
