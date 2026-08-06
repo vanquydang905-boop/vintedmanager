@@ -212,30 +212,41 @@ body {
 /* MAIN CONTENT */
 .main-content {
     margin-left: 270px;
-    padding: 32px 38px;
+    padding: 28px 32px;
     width: calc(100% - 270px);
+    max-width: calc(100vw - 270px);
     box-sizing: border-box;
     flex: 1;
+    overflow-x: hidden;
 }
 
 /* METRICS GRID */
 .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
     margin-bottom: 24px;
+    width: 100%;
+}
+
+@media (max-width: 1200px) {
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 .metric-card {
     background: var(--card-bg);
-    padding: 22px;
+    padding: 18px;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 14px;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .metric-card:hover {
@@ -245,19 +256,47 @@ body {
 }
 
 .metric-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
+    font-size: 20px;
 }
 
 .metric-icon.teal { background: var(--primary-light); color: var(--primary-dark); }
 .metric-icon.green { background: var(--success-bg); color: var(--success); }
 .metric-icon.orange { background: var(--warning-bg); color: var(--warning); }
 .metric-icon.blue { background: var(--info-bg); color: var(--info); }
+.metric-icon.purple { background: #f3e8ff; color: #9333ea; }
+.metric-icon.amber { background: #fffbeb; color: #d97706; }
+
+.metric-info {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.metric-info h4 {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.metric-info .value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-main);
+}
 
 .metric-info h4 {
     font-size: 12px;
