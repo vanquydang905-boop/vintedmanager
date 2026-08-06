@@ -928,26 +928,12 @@ function ParametresView({ appState, onSaveParametres }) {
 
 // ------------------- VIEW: LOGIN -------------------
 function LoginView({ onLoginSubmit, loginError }) {
-    const [loginInput, setLoginInput] = useState('florencio@vintedmanager.com');
-    const [password, setPassword] = useState('ChangeMe123!');
+    const [loginInput, setLoginInput] = useState('');
+    const [password, setPassword] = useState('');
 
     const handleSubmit = (e) => {
         e.preventDefault();
         onLoginSubmit(loginInput, password);
-    };
-
-    const handleQuickLogin = (role) => {
-        onLoginSubmit('', '', role);
-    };
-
-    const selectAdmin = () => {
-        setLoginInput('florencio@vintedmanager.com');
-        setPassword('ChangeMe123!');
-    };
-
-    const selectMuller = () => {
-        setLoginInput('tsaralahy343@gmail.com');
-        setPassword('muller2026');
     };
 
     return (
@@ -1017,32 +1003,10 @@ function LoginView({ onLoginSubmit, loginError }) {
                     </div>
                 )}
 
-                <div style={{
-                    backgroundColor: '#f0f9ff',
-                    border: '1px solid #bae6fd',
-                    padding: '14px',
-                    borderRadius: '10px',
-                    marginBottom: '20px',
-                    fontSize: '12px',
-                    color: '#0369a1'
-                }}>
-                    <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <i className="fa-solid fa-users"></i> Choix rapide du compte :
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <button type="button" onClick={selectAdmin} style={{ flex: 1, padding: '8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#09b1ba', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                            Admin (Florencio)
-                        </button>
-                        <button type="button" onClick={selectMuller} style={{ flex: 1, padding: '8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                            Agent (Muller)
-                        </button>
-                    </div>
-                </div>
-
                 <form onSubmit={handleSubmit}>
                     <div className="form-group" style={{ marginBottom: '16px' }}>
                         <label style={{ fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px', fontSize: '13px' }}>Adresse Email ou Nom d'utilisateur</label>
-                        <input type="text" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} placeholder="ex: Florencio ou Muller" required style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }} />
+                        <input type="text" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} placeholder="Nom d'utilisateur ou Email" required style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }} />
                     </div>
                     <div className="form-group" style={{ marginBottom: '22px' }}>
                         <label style={{ fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px', fontSize: '13px' }}>Mot de passe</label>
@@ -1052,16 +1016,6 @@ function LoginView({ onLoginSubmit, loginError }) {
                         <i className="fa-solid fa-right-to-bracket" style={{ marginRight: '8px' }}></i> Se connecter
                     </button>
                 </form>
-
-                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '18px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 4px 0' }}>Connexion Instantanée 1-Clic :</p>
-                    <button type="button" onClick={() => handleQuickLogin('admin_florencio')} style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#10b981', color: '#fff', fontWeight: 600, borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
-                        ⚡ Entrée 1-Clic (Admin Florencio)
-                    </button>
-                    <button type="button" onClick={() => onLoginSubmit('tsaralahy343@gmail.com', 'muller2026')} style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#6366f1', color: '#fff', fontWeight: 600, borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
-                        ⚡ Entrée 1-Clic (Agent Muller)
-                    </button>
-                </div>
             </div>
         </div>
     );

@@ -81,26 +81,38 @@ let DEFAULT_PARAMETRES = {
     heureDeclencheurAuto: "05:00"
 };
 
-let DEFAULT_ORGANISATIONS = [
-    { id: 'org_default', nom: 'Organisation Principale', dateCreation: '2026-08-07' },
-    { id: 'org_paris', nom: 'Agence Vinted Paris', dateCreation: '2026-08-07' }
-];
+const crypto = require('crypto');
 
-let DEFAULT_UTILISATEURS = [
-    { id: 'usr_admin_florencio', nom: 'Florencio', email: 'florencio@vintedmanager.com', role: 'admin', organisationId: 'org_default', agentAssigne: '', motDePasse: process.env.INITIAL_ADMIN_PASSWORD || 'ChangeMe123!', dateCreation: '2026-08-07' },
-    { id: 'usr_muller', nom: 'Muller', email: 'tsaralahy343@gmail.com', role: 'agent', organisationId: 'org_default', agentAssigne: 'Muller', motDePasse: 'muller2026', dateCreation: '2026-08-07' }
-];
+function hashPassword(password) {
+    if (!password) return '';
+    if (typeof password === 'string' && (password.startsWith('sha256$') || password.startsWith('scrypt$'))) {
+        return password;
+    }
+    const salt = process.env.PASSWORD_SALT || 'vinted_manager_secure_salt_2026';
+    const hash = crypto.createHmac('sha256', salt).update(password).digest('hex');
+    return `sha256$${hash}`;
+}
 
-let DEFAULT_COMPTES = [
-    { id: 'compte_demo1', organisationId: 'org_default', pseudo: 'vinted_boutique_fr', agent: 'Muller', statut: 'Actif', dateCreation: '2026-08-07', notes: 'Compte principal' }
-];
+function verifyPassword(inputPassword, storedHash) {
+    if (!inputPassword || !storedHash) return false;
+    if (!storedHash.startsWith('sha256$')) {
+        return inputPassword === storedHash;
+    }
+    const hashedInput = hashPassword(inputPassword);
+    return hashedInput === storedHash;
+}
 
+let DEFAULT_ORGANISATIONS = [];
+let DEFAULT_UTILISATEURS = [];
+let DEFAULT_COMPTES = [];
 let DEFAULT_CALENDRIER = [];
 let DEFAULT_INCIDENTS = [];
 let DEFAULT_JOURNAL = [];
 
 const dbService = {
     supabase,
+    hashPassword,
+    verifyPassword,
     DEFAULT_PARAMETRES,
     DEFAULT_ORGANISATIONS,
     DEFAULT_UTILISATEURS,
@@ -232,6 +244,10 @@ const dbService = {
             ...user
         };
 
+        if (payload.motDePasse) {
+            payload.motDePasse = hashPassword(payload.motDePasse);
+        }
+
         const idx = DEFAULT_UTILISATEURS.findIndex(u => u.id === payload.id);
         if (idx >= 0) DEFAULT_UTILISATEURS[idx] = payload;
         else DEFAULT_UTILISATEURS.unshift(payload);
@@ -247,17 +263,22 @@ const dbService = {
     },
 
     async updateUtilisateur(id, fields) {
+        const updatedFields = { ...fields };
+        if (updatedFields.motDePasse) {
+            updatedFields.motDePasse = hashPassword(updatedFields.motDePasse);
+        }
+
         const idx = DEFAULT_UTILISATEURS.findIndex(u => u.id === id);
-        if (idx >= 0) DEFAULT_UTILISATEURS[idx] = { ...DEFAULT_UTILISATEURS[idx], ...fields };
+        if (idx >= 0) DEFAULT_UTILISATEURS[idx] = { ...DEFAULT_UTILISATEURS[idx], ...updatedFields };
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const dbFields = toDbFormat(fields);
+                const dbFields = toDbFormat(updatedFields);
                 const { data, error } = await supabase.from('utilisateurs').update(dbFields).eq('id', id).select();
                 if (!error && data && data.length) return fromDbFormat(data[0]);
             } catch (err) {}
         }
-        return { id, ...fields };
+        return { id, ...updatedFields };
     },
 
     async deleteUtilisateur(id) {

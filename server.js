@@ -146,7 +146,7 @@ app.get('/api/users', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { email, motDePasse, role } = req.body;
+        const { email, motDePasse } = req.body;
         const users = await dbService.getUtilisateurs();
         
         let found = null;
@@ -155,25 +155,19 @@ app.post('/api/auth/login', async (req, res) => {
             found = users.find(u => 
                 ((u.email && u.email.toLowerCase() === loginInput) ||
                  (u.nom && u.nom.toLowerCase() === loginInput)) &&
-                u.motDePasse === motDePasse
+                dbService.verifyPassword(motDePasse, u.motDePasse)
             );
-        } else if (role) {
-            if (role === 'admin_florencio') {
-                found = users.find(u => u.email === 'florencio@vintedmanager.com') || users.find(u => u.role === 'admin');
-            } else if (role === 'cadre_paris') {
-                found = users.find(u => u.email === 'sophie.paris@vintedmanager.com') || users.find(u => u.role === 'cadre');
-            } else if (role === 'agent_paris') {
-                found = users.find(u => u.email === 'lucas.paris@vintedmanager.com') || users.find(u => u.role === 'agent');
-            } else {
-                found = users.find(u => u.role === role);
-            }
         }
 
         if (!found) {
-            return res.status(401).json({ error: "Identifiants ou rôle invalide" });
+            return res.status(401).json({ error: "Identifiants ou mot de passe invalide" });
         }
 
-        await dbService.logAction("Authentification", `Connexion de ${found.nom} (${found.role})`, "Succès", found.organisationId || 'org_default');
+        if (found.motDePasse && !found.motDePasse.startsWith('sha256$')) {
+            await dbService.updateUtilisateur(found.id, { motDePasse });
+        }
+
+        await dbService.logAction("Authentification", `Connexion sécurisée de ${found.nom} (${found.role})`, "Succès", found.organisationId || 'org_default');
         res.json({
             id: found.id,
             nom: found.nom,
