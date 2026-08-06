@@ -558,10 +558,15 @@ app.post('/api/calendrier/generate', async (req, res) => {
             ? parseInt(params.margeAleatoireMinutes) 
             : (params.modePlanification === 'aleatoire' ? 10 : 5);
 
-        // Plage horaire globale par défaut : 07:00 à 22:00 (15h = 900 min)
-        const startHourMin = 7 * 60; // 07:00
-        const endHourMin = 22 * 60;   // 22:00
-        const windowDurationMin = endHourMin - startHourMin; // 900 min
+        // Plage horaire globale personnalisable (ex: 07:00 à 22:00)
+        const startHourStr = req.body.heureDebut || "07:00";
+        const endHourStr = req.body.heureFin || "22:00";
+        const [startH, startM] = startHourStr.split(':').map(Number);
+        const [endH, endM] = endHourStr.split(':').map(Number);
+
+        const startHourMin = (isNaN(startH) ? 7 : startH) * 60 + (isNaN(startM) ? 0 : startM);
+        const endHourMin = (isNaN(endH) ? 22 : endH) * 60 + (isNaN(endM) ? 0 : endM);
+        const windowDurationMin = Math.max(60, endHourMin - startHourMin);
 
         let generated = 0;
 

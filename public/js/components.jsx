@@ -211,6 +211,12 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         setSelectedIds([]);
     };
 
+    const handleBulkHeure = async (newHeure) => {
+        if (selectedIds.length === 0 || !newHeure || !onBulkUpdateCalendrier) return;
+        await onBulkUpdateCalendrier(selectedIds, { heurePrevue: newHeure });
+        setSelectedIds([]);
+    };
+
     const handleBulkDelete = async () => {
         if (selectedIds.length === 0 || !onBulkDeleteCalendrier) return;
         if (window.confirm(`Voulez-vous vraiment supprimer ces ${selectedIds.length} lignes sélectionnées ?`)) {
@@ -364,6 +370,21 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                             </select>
                         )}
 
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="Modifier l'heure prévisionnelle en masse">
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>🕐 Heure:</span>
+                            <input
+                                type="time"
+                                className="input-table"
+                                style={{ width: 'auto', backgroundColor: '#334155', color: '#fff', border: '1px solid #475569', padding: '4px 8px', fontSize: '12px' }}
+                                onChange={(e) => {
+                                    if (e.target.value) {
+                                        handleBulkHeure(e.target.value);
+                                        e.target.value = '';
+                                    }
+                                }}
+                            />
+                        </div>
+
                         {(currentUser && currentUser.role !== 'agent') && (
                             <button type="button" className="btn btn-sm btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleBulkDelete}>
                                 <i className="fa-solid fa-trash" style={{ marginRight: '4px' }}></i> Supprimer ({selectedIds.length})
@@ -433,7 +454,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         <td>
                                             {(() => {
                                                 const conv = convertHHMM(l.heurePrevue, l.date, 'FR', 'MADA');
-                                                const displayTime = selectedTZ === 'MADA' ? conv.time : l.heurePrevue;
                                                 const otherFlag = selectedTZ === 'MADA' ? '🇫🇷' : '🇲🇬';
                                                 const otherTime = selectedTZ === 'MADA' ? l.heurePrevue : conv.time;
                                                 const shiftTag = selectedTZ === 'MADA' 
@@ -442,7 +462,14 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
                                                 return (
                                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                        <b style={{ fontSize: '13.5px' }}>{displayTime}</b>
+                                                        <input
+                                                            type="time"
+                                                            className="input-table"
+                                                            style={{ fontWeight: 700, width: '92px', fontSize: '13px', padding: '2px 4px' }}
+                                                            value={l.heurePrevue || ''}
+                                                            onChange={(e) => onUpdateRow(l.id, { heurePrevue: e.target.value })}
+                                                            title="Cliquer pour modifier le créneau horaire"
+                                                        />
                                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', whiteSpace: 'nowrap' }} title={`Heure équivalente (${selectedTZ === 'MADA' ? 'France' : 'Madagascar'})`}>
                                                             {otherFlag} {otherTime}
                                                             {shiftTag && <span style={{ color: '#d97706', fontWeight: 700, marginLeft: '3px' }}>{shiftTag}</span>}
@@ -797,35 +824,43 @@ function PlanningView({ appState, onGeneratePlanning }) {
     const [dateDebut, setDateDebut] = useState(todayStr);
     const [dateFin, setDateFin] = useState(defaultEndStr);
     const [creneauxParJour, setCreneauxParJour] = useState((appState.parametres && appState.parametres.creneauxParJour) || 6);
+    const [heureDebut, setHeureDebut] = useState("07:00");
+    const [heureFin, setHeureFin] = useState("22:00");
     const [loading, setLoading] = useState(false);
 
-    const activeComptes = useMemo(() => (appState.comptes || []).filter(c => c.statut === 'Actif'), [appState.comptes]);
+    const comptes = appState.comptes || [];
+    const activeComptes = useMemo(() => comptes.filter(c => c.statut === 'Actif'), [comptes]);
 
     const totalDays = useMemo(() => {
         if (!dateDebut || !dateFin) return 0;
-        const d1 = new Date(dateDebut);
-        const d2 = new Date(dateFin);
-        if (isNaN(d1.getTime()) || isNaN(d2.getTime()) || d2 < d1) return 0;
-        return Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+        const start = new Date(dateDebut);
+        const end = new Date(dateFin);
+        const diffTime = end.getTime() - start.getTime();
+        if (diffTime < 0) return 0;
+        return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
     }, [dateDebut, dateFin]);
 
     const totalEstimatedSlots = useMemo(() => {
-        return activeComptes.length * totalDays * creneauxParJour;
-    }, [activeComptes.length, totalDays, creneauxParJour]);
+        return totalDays * activeComptes.length * creneauxParJour;
+    }, [totalDays, activeComptes.length, creneauxParJour]);
 
     const setPreset = (days) => {
         const start = new Date();
         const end = new Date();
-        end.setDate(start.getDate() + days - 1);
+        end.setDate(start.getDate() + (days - 1));
         setDateDebut(getLocalDateString(start));
         setDateFin(getLocalDateString(end));
     };
 
     const handleGenerate = async () => {
+        if (activeComptes.length === 0) return;
         if (!dateDebut || !dateFin || totalDays <= 0) return;
         setLoading(true);
-        await onGeneratePlanning(dateDebut, dateFin, creneauxParJour);
-        setLoading(false);
+        try {
+            await onGeneratePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -880,6 +915,33 @@ function PlanningView({ appState, onGeneratePlanning }) {
                             onChange={(e) => setCreneauxParJour(parseInt(e.target.value) || 1)}
                             style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
                             placeholder="ex: 6"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid-2" style={{ marginBottom: '18px' }}>
+                    <div className="form-group">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <i className="fa-solid fa-clock" style={{ color: 'var(--primary)' }}></i>
+                            Heure de Début des Créneaux
+                        </label>
+                        <input
+                            type="time"
+                            value={heureDebut}
+                            onChange={(e) => setHeureDebut(e.target.value)}
+                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <i className="fa-solid fa-moon" style={{ color: 'var(--primary)' }}></i>
+                            Heure de Fin des Créneaux
+                        </label>
+                        <input
+                            type="time"
+                            value={heureFin}
+                            onChange={(e) => setHeureFin(e.target.value)}
+                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
                         />
                     </div>
                 </div>
