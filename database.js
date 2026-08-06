@@ -266,8 +266,7 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const { data, error } = await supabase.from('comptes').update(fields).eq('id', id).select().single();
-                if (error) console.warn("⚠️ [SUPABASE COMPTE UPDATE FAIL]", error.message);
+                const { data, error } = await supabase.from('comptes').update(fields).eq('id', id).select();
             } catch (err) {}
         }
         if (fields.agent) {
