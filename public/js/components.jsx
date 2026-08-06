@@ -539,14 +539,39 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOp
 
 // ------------------- VIEW: PLANNING GENERATION -------------------
 function PlanningView({ appState, onGeneratePlanning }) {
-    const [nbJours, setNbJours] = useState((appState.parametres && appState.parametres.nbJoursPlanningParDefaut) || 7);
+    const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+    const defaultEndStr = useMemo(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 6);
+        return d.toISOString().split('T')[0];
+    }, []);
+
+    const [dateDebut, setDateDebut] = useState(todayStr);
+    const [dateFin, setDateFin] = useState(defaultEndStr);
     const [loading, setLoading] = useState(false);
 
     const activeComptes = useMemo(() => (appState.comptes || []).filter(c => c.statut === 'Actif'), [appState.comptes]);
 
+    const totalDays = useMemo(() => {
+        if (!dateDebut || !dateFin) return 0;
+        const d1 = new Date(dateDebut);
+        const d2 = new Date(dateFin);
+        if (isNaN(d1.getTime()) || isNaN(d2.getTime()) || d2 < d1) return 0;
+        return Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+    }, [dateDebut, dateFin]);
+
+    const setPreset = (days) => {
+        const start = new Date();
+        const end = new Date();
+        end.setDate(start.getDate() + days - 1);
+        setDateDebut(start.toISOString().split('T')[0]);
+        setDateFin(end.toISOString().split('T')[0]);
+    };
+
     const handleGenerate = async () => {
+        if (!dateDebut || !dateFin || totalDays <= 0) return;
         setLoading(true);
-        await onGeneratePlanning(nbJours);
+        await onGeneratePlanning(dateDebut, dateFin);
         setLoading(false);
     };
 
@@ -563,14 +588,81 @@ function PlanningView({ appState, onGeneratePlanning }) {
                     Le moteur calcule automatiquement la répartition optimale des créneaux horaires pour l'ensemble des <b>{activeComptes.length} comptes au statut Actif</b>, en appliquant les règles d'espacement et la marge d'intervalle aléatoire.
                 </p>
 
-                <div className="form-group" style={{ maxWidth: '300px' }}>
-                    <label>Nombre de jours à planifier</label>
-                    <input type="number" min="1" max="30" value={nbJours} onChange={(e) => setNbJours(parseInt(e.target.value) || 7)} />
+                <div className="grid-2" style={{ marginBottom: '18px' }}>
+                    <div className="form-group">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <i className="fa-solid fa-calendar-day" style={{ color: 'var(--primary)' }}></i>
+                            Date de Début
+                        </label>
+                        <input
+                            type="date"
+                            value={dateDebut}
+                            onChange={(e) => setDateDebut(e.target.value)}
+                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <i className="fa-solid fa-calendar-check" style={{ color: 'var(--primary)' }}></i>
+                            Date de Fin
+                        </label>
+                        <input
+                            type="date"
+                            value={dateFin}
+                            min={dateDebut}
+                            onChange={(e) => setDateFin(e.target.value)}
+                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
+                        />
+                    </div>
                 </div>
 
-                <button className="btn btn-primary" onClick={handleGenerate} disabled={loading} style={{ padding: '12px 24px', fontSize: '15px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPreset(1)}>Aujourd'hui (1 jour)</button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPreset(7)}>7 Jours à venir</button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPreset(14)}>14 Jours à venir</button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPreset(30)}>30 Jours à venir</button>
+                </div>
+
+                {totalDays > 0 ? (
+                    <div style={{
+                        backgroundColor: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        color: '#15803d',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        marginBottom: '20px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}>
+                        <i className="fa-solid fa-calendar-days" style={{ fontSize: '16px' }}></i>
+                        <span>Période sélectionnée : du <b>{dateDebut}</b> au <b>{dateFin}</b> (soit <b>{totalDays} jour{totalDays > 1 ? 's' : ''}</b> au total)</span>
+                    </div>
+                ) : (
+                    <div style={{
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fca5a5',
+                        color: '#b91c1c',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        marginBottom: '20px',
+                        fontSize: '13px',
+                        fontWeight: 600
+                    }}>
+                        ⚠️ La date de fin doit être égale ou supérieure à la date de début.
+                    </div>
+                )}
+
+                <button
+                    className="btn btn-primary"
+                    onClick={handleGenerate}
+                    disabled={loading || totalDays <= 0}
+                    style={{ padding: '12px 24px', fontSize: '15px' }}
+                >
                     {loading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> : <i className="fa-solid fa-bolt" style={{ marginRight: '8px' }}></i>}
-                    {loading ? 'Génération en cours...' : 'Générer le Planning'}
+                    {loading ? 'Génération en cours...' : `Générer le Planning (${totalDays} jour${totalDays > 1 ? 's' : ''})`}
                 </button>
             </div>
         </section>

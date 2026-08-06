@@ -422,7 +422,6 @@ app.delete('/api/calendrier/:id', async (req, res) => {
 // Génération automatique du planning
 app.post('/api/calendrier/generate', async (req, res) => {
     try {
-        const nbJours = parseInt(req.body.nbJours) || 7;
         const orgId = req.body.organisationId || 'org_default';
         const params = await dbService.getParametres(orgId);
         const comptes = await dbService.getComptes(orgId);
@@ -432,6 +431,27 @@ app.post('/api/calendrier/generate', async (req, res) => {
             return res.status(400).json({ error: "Aucun compte actif !" });
         }
 
+        let datesList = [];
+        if (req.body.dateDebut && req.body.dateFin) {
+            let curr = new Date(req.body.dateDebut);
+            let end = new Date(req.body.dateFin);
+            if (!isNaN(curr.getTime()) && !isNaN(end.getTime())) {
+                while (curr <= end) {
+                    datesList.push(new Date(curr));
+                    curr.setDate(curr.getDate() + 1);
+                }
+            }
+        }
+        if (datesList.length === 0) {
+            const nbJours = parseInt(req.body.nbJours) || 7;
+            const today = new Date();
+            for (let i = 0; i < nbJours; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() + i);
+                datesList.push(d);
+            }
+        }
+
         const allHours = [...params.heuresParPeriode.matin, ...params.heuresParPeriode.midi, ...params.heuresParPeriode.soir];
         const decalageMs = (params.decalageMinutesEntreComptes || 60) * 60000;
         const margeAleatoireMin = params.margeAleatoireMinutes !== undefined 
@@ -439,12 +459,9 @@ app.post('/api/calendrier/generate', async (req, res) => {
             : (params.modePlanification === 'aleatoire' ? 15 : 0);
 
         let generated = 0;
-        const today = new Date();
         const existingAll = await dbService.getCalendrier(orgId);
 
-        for (let i = 0; i < nbJours; i++) {
-            const dateObj = new Date(today);
-            dateObj.setDate(today.getDate() + i);
+        for (const dateObj of datesList) {
             const dateStr = dateObj.toISOString().split('T')[0];
             const jourRaw = dateObj.toLocaleDateString('fr-FR', { weekday: 'long' });
             const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
@@ -520,7 +537,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
             }
         }
 
-        await dbService.logAction("Génération planning", `${generated} lignes générées pour ${nbJours} jours`, "Succès", orgId);
+        await dbService.logAction("Génération planning", `${generated} lignes générées pour ${datesList.length} jours (du ${datesList[0].toISOString().split('T')[0]} au ${datesList[datesList.length - 1].toISOString().split('T')[0]})`, "Succès", orgId);
         res.json({ message: `${generated} lignes de planning générées avec succès !`, generated });
     } catch (err) {
         res.status(500).json({ error: err.message });
