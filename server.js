@@ -562,86 +562,83 @@ app.post('/api/calendrier/generate', async (req, res) => {
         let generated = 0;
         const existingAll = await dbService.getCalendrier(orgId);
 
-        const slotsPerAccount = req.body.creneauxParJour ? parseInt(req.body.creneauxParJour) : (params.creneauxParJour || 3);
+        const slotsPerAccount = req.body.creneauxParJour ? parseInt(req.body.creneauxParJour) : (params.creneauxParJour || 6);
+        const margeAleatoireMin = params.margeAleatoireMinutes !== undefined 
+            ? parseInt(params.margeAleatoireMinutes) 
+            : (params.modePlanification === 'aleatoire' ? 10 : 5);
+
+        // Plage horaire globale par défaut : 07:00 à 22:00 (15h = 900 min)
+        const startHourMin = 7 * 60; // 07:00
+        const endHourMin = 22 * 60;   // 22:00
+        const windowDurationMin = endHourMin - startHourMin; // 900 min
+
+        let generated = 0;
 
         for (const dateObj of datesList) {
             const dateStr = getLocalDateString(dateObj);
             const jourRaw = dateObj.toLocaleDateString('fr-FR', { weekday: 'long' });
             const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
 
-            const existingSlots = existingAll.filter(l => l.date === dateStr);
-            const usedSlotsToday = existingSlots.map(l => new Date(`${dateStr}T${l.heurePrevue}:00`).getTime());
+            const intervalPerSlot = windowDurationMin / Math.max(1, slotsPerAccount);
 
-            let compteIndex = 0;
-            for (let s = 0; s < slotsPerAccount; s++) {
-                for (let c = 0; c < activeComptes.length; c++) {
-                    const compte = activeComptes[(compteIndex + c) % activeComptes.length];
+            for (let c = 0; c < activeComptes.length; c++) {
+                const compte = activeComptes[c];
+                // Décalage de 5 minutes entre comptes pour étaler les publications
+                const accountStaggerMin = (c * 5) % 30;
 
-                    let chosenHour = null;
-                    for (const hour of allHours) {
-                        const maxAttempts = (margeAleatoireMin > 0) ? 6 : 1;
-                        for (let att = 0; att < maxAttempts; att++) {
-                            let candidateHour = hour;
-                            if (margeAleatoireMin > 0) {
-                                const randomOffsetMin = Math.floor(Math.random() * (2 * margeAleatoireMin + 1)) - margeAleatoireMin;
-                                const baseDate = new Date(`${dateStr}T${hour}:00`);
-                                baseDate.setMinutes(baseDate.getMinutes() + randomOffsetMin);
-                                const hStr = String(baseDate.getHours()).padStart(2, '0');
-                                const mStr = String(baseDate.getMinutes()).padStart(2, '0');
-                                candidateHour = `${hStr}:${mStr}`;
-                            }
+                for (let s = 0; s < slotsPerAccount; s++) {
+                    // Calcul de l'heure cible
+                    let targetMinutes = startHourMin + Math.round(s * intervalPerSlot) + accountStaggerMin;
 
-                            const timeMs = new Date(`${dateStr}T${candidateHour}:00`).getTime();
-                            const isFree = (params.modePlanification === 'fixe')
-                                ? usedSlotsToday.every(used => timeMs !== used)
-                                : usedSlotsToday.every(used => Math.abs(timeMs - used) >= decalageMs);
-
-                            if (isFree) {
-                                chosenHour = candidateHour;
-                                usedSlotsToday.push(timeMs);
-                                break;
-                            }
-                        }
-
-                        if (chosenHour) break;
+                    // Marge aléatoire discrète (± N minutes) pour un rendu naturel
+                    if (margeAleatoireMin > 0) {
+                        const offset = Math.floor(Math.random() * (2 * margeAleatoireMin + 1)) - margeAleatoireMin;
+                        targetMinutes += offset;
                     }
 
-                    if (chosenHour) {
-                        const id = "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5);
-                        await dbService.createCalendrierRow({
-                            id,
-                            organisationId: orgId,
-                            date: dateStr,
-                            jour: jourCap,
-                            compteId: compte.id,
-                            agent: compte.agent,
-                            heurePrevue: chosenHour,
-                            sku: "",
-                            produit: "",
-                            lien: "",
-                            vues: 0,
-                            likes: 0,
-                            favoris: 0,
-                            messages: 0,
-                            vente: 0,
-                            score: 0,
-                            classification: "À retester",
-                            statut: "Non fait",
-                            dateStatut: null,
-                            heureStatut: null,
-                            nbVentesReposts: 0,
-                            heuresVentesReposts: [],
-                            prochainRepost: null
-                        });
-                        generated++;
-                    }
+                    // Bornage entre 06:30 (390 min) et 23:30 (1410 min)
+                    targetMinutes = Math.max(390, Math.min(1410, targetMinutes));
+
+                    const hStr = String(Math.floor(targetMinutes / 60)).padStart(2, '0');
+                    const mStr = String(targetMinutes % 60).padStart(2, '0');
+                    const chosenHour = `${hStr}:${mStr}`;
+
+                    const id = "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5);
+                    await dbService.createCalendrierRow({
+                        id,
+                        organisationId: orgId,
+                        date: dateStr,
+                        jour: jourCap,
+                        compteId: compte.id,
+                        agent: compte.agent,
+                        heurePrevue: chosenHour,
+                        sku: "",
+                        produit: "",
+                        lien: "",
+                        vues: 0,
+                        likes: 0,
+                        favoris: 0,
+                        messages: 0,
+                        vente: 0,
+                        score: 0,
+                        classification: "À retester",
+                        statut: "Non fait",
+                        dateStatut: null,
+                        heureStatut: null,
+                        nbVentesReposts: 0,
+                        heuresVentesReposts: [],
+                        prochainRepost: null
+                    });
+                    generated++;
                 }
-                compteIndex++;
             }
         }
 
-        await dbService.logAction("Génération planning", `${generated} lignes générées pour ${datesList.length} jours (du ${datesList[0].toISOString().split('T')[0]} au ${datesList[datesList.length - 1].toISOString().split('T')[0]})`, "Succès", orgId);
-        res.json({ message: `${generated} lignes de planning générées avec succès !`, generated });
+        const dateStartStr = datesList[0].toISOString().split('T')[0];
+        const dateEndStr = datesList[datesList.length - 1].toISOString().split('T')[0];
+
+        await dbService.logAction("Génération planning", `${generated} lignes générées pour ${datesList.length} jours et ${activeComptes.length} comptes (${slotsPerAccount} pub/compte/jour, du ${dateStartStr} au ${dateEndStr})`, "Succès", orgId);
+        res.json({ message: `${generated} lignes de planning générées avec succès (${slotsPerAccount} publications par compte et par jour) !`, generated });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
