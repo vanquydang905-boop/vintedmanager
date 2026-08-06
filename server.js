@@ -287,20 +287,30 @@ app.get('/api/comptes', async (req, res) => {
 
 app.post('/api/comptes', async (req, res) => {
     try {
-        const { pseudo, agent, lienProfil, statut, dateCreation, notes, organisationId } = req.body;
-        const id = "compte_" + Date.now();
+        const {
+            pseudo, agent, lienProfil, statut, dateCreation, notes, organisationId,
+            numeroCompte, telephone, email, motDePasse, gereParInitiales, dateStatutCompte
+        } = req.body;
+        // Use provided id if given (e.g. from text-paste import), otherwise generate
+        const id = req.body.id || ("compte_" + Date.now());
         const newCompte = {
             id,
             organisationId: organisationId || 'org_default',
-            pseudo,
-            agent,
+            numeroCompte: numeroCompte || '',
+            pseudo: pseudo || '',
+            telephone: telephone || '',
+            email: email || '',
+            motDePasse: motDePasse || '',
+            gereParInitiales: gereParInitiales || '',
+            agent: agent || 'À attribuer',
             lienProfil: lienProfil || '',
             statut: statut || 'Actif',
+            dateStatutCompte: dateStatutCompte || '',
             dateCreation: dateCreation || new Date().toISOString().split('T')[0],
             notes: notes || ''
         };
         const created = await dbService.createCompte(newCompte);
-        await dbService.logAction("Gestion Compte", `Création du compte ${pseudo}`, "Succès", newCompte.organisationId);
+        await dbService.logAction("Gestion Compte", `Création du compte ${pseudo || numeroCompte}`, "Succès", newCompte.organisationId);
         res.json(created);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -310,9 +320,15 @@ app.post('/api/comptes', async (req, res) => {
 app.put('/api/comptes/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { pseudo, agent, lienProfil, statut, dateCreation, notes, organisationId } = req.body;
-        const updated = await dbService.updateCompte(id, { pseudo, agent, lienProfil, statut, dateCreation, notes, organisationId });
-        await dbService.logAction("Gestion Compte", `Modification du compte ${pseudo}`, "Succès", organisationId || 'org_default');
+        const {
+            pseudo, agent, lienProfil, statut, dateCreation, notes, organisationId,
+            numeroCompte, telephone, email, motDePasse, gereParInitiales, dateStatutCompte
+        } = req.body;
+        const updated = await dbService.updateCompte(id, {
+            pseudo, agent, lienProfil, statut, dateCreation, notes, organisationId,
+            numeroCompte, telephone, email, motDePasse, gereParInitiales, dateStatutCompte
+        });
+        await dbService.logAction("Gestion Compte", `Modification du compte ${pseudo || id}`, "Succès", organisationId || 'org_default');
         res.json(updated);
     } catch (err) {
         res.status(500).json({ error: err.message });
