@@ -373,25 +373,37 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 }
 
 // ------------------- VIEW: COMPTES -------------------
-function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentModal }) {
+function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentModal }) {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const userOrgId = (currentUser && currentUser.organisationId) || 'org_default';
+
     const [compteId, setCompteId] = useState('');
     const [pseudo, setPseudo] = useState('');
     const [agent, setAgent] = useState('');
     const [statut, setStatut] = useState('Actif');
-    const [organisationId, setOrganisationId] = useState('org_default');
+    const [organisationId, setOrganisationId] = useState(userOrgId);
     const [notes, setNotes] = useState('');
 
     const comptes = appState.comptes || [];
     const utilisateurs = appState.utilisateurs || [];
     const organisations = appState.organisations || [];
-    const agentsList = useMemo(() => utilisateurs.filter(u => u.role === 'agent' || u.agentAssigne), [utilisateurs]);
+    const agentsList = useMemo(() => {
+        let base = utilisateurs.filter(u => u.role === 'agent' || u.agentAssigne);
+        if (!isAdmin) base = base.filter(u => (u.organisationId || 'org_default') === userOrgId);
+        return base;
+    }, [utilisateurs, isAdmin, userOrgId]);
+
+    const visibleComptes = useMemo(() => {
+        if (isAdmin) return comptes;
+        return comptes.filter(c => (c.organisationId || 'org_default') === userOrgId);
+    }, [comptes, isAdmin, userOrgId]);
 
     const handleEdit = (c) => {
         setCompteId(c.id);
         setPseudo(c.pseudo);
         setAgent(c.agent);
         setStatut(c.statut);
-        setOrganisationId(c.organisationId || 'org_default');
+        setOrganisationId(isAdmin ? (c.organisationId || 'org_default') : userOrgId);
         setNotes(c.notes || '');
     };
 
@@ -400,13 +412,13 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
         setPseudo('');
         setAgent('');
         setStatut('Actif');
-        setOrganisationId('org_default');
+        setOrganisationId(userOrgId);
         setNotes('');
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSaveCompte({ id: compteId, pseudo, agent, statut, organisationId, notes });
+        onSaveCompte({ id: compteId, pseudo, agent, statut, organisationId: isAdmin ? organisationId : userOrgId, notes });
         handleReset();
     };
 
@@ -446,7 +458,7 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
 
                         <div className="form-group">
                             <label>Organisation</label>
-                            <select value={organisationId} onChange={(e) => setOrganisationId(e.target.value)}>
+                            <select value={isAdmin ? organisationId : userOrgId} onChange={(e) => setOrganisationId(e.target.value)} disabled={!isAdmin}>
                                 {organisations.map(o => (
                                     <option key={o.id} value={o.id}>{o.nom}</option>
                                 ))}
@@ -483,7 +495,7 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
 
             {/* LISTE COMPTES */}
             <div className="card">
-                <h3 className="card-title">Liste des Comptes enregistrés ({comptes.length})</h3>
+                <h3 className="card-title">Liste des Comptes enregistrés ({visibleComptes.length})</h3>
                 <div className="table-container">
                     <table>
                         <thead>
@@ -498,8 +510,8 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
                             </tr>
                         </thead>
                         <tbody>
-                            {comptes.length > 0 ? (
-                                comptes.map(c => (
+                            {visibleComptes.length > 0 ? (
+                                visibleComptes.map(c => (
                                     <tr key={c.id}>
                                         <td><b>{c.pseudo}</b></td>
                                         <td><span className="badge badge-agent">{c.agent}</span></td>
@@ -933,24 +945,32 @@ function LoginView({ onLoginSubmit }) {
 }
 
 // ------------------- VIEW: UTILISATEURS -------------------
-function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
+function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const userOrgId = (currentUser && currentUser.organisationId) || 'org_default';
+
     const [userId, setUserId] = useState('');
     const [nom, setNom] = useState('');
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState('agent');
-    const [organisationId, setOrganisationId] = useState('org_default');
+    const [role, setRole] = useState(isAdmin ? 'agent' : 'agent');
+    const [organisationId, setOrganisationId] = useState(userOrgId);
     const [agentAssigne, setAgentAssigne] = useState('');
     const [motDePasse, setMotDePasse] = useState('123456');
 
     const utilisateurs = appState.utilisateurs || [];
     const organisations = appState.organisations || [];
 
+    const visibleUsers = useMemo(() => {
+        if (isAdmin) return utilisateurs;
+        return utilisateurs.filter(u => (u.organisationId || 'org_default') === userOrgId);
+    }, [utilisateurs, isAdmin, userOrgId]);
+
     const handleEdit = (u) => {
         setUserId(u.id);
         setNom(u.nom);
         setEmail(u.email);
-        setRole(u.role);
-        setOrganisationId(u.organisationId || 'org_default');
+        setRole(isAdmin ? u.role : 'agent');
+        setOrganisationId(isAdmin ? (u.organisationId || 'org_default') : userOrgId);
         setAgentAssigne(u.agentAssigne || '');
         setMotDePasse(u.motDePasse || '');
     };
@@ -960,7 +980,7 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
         setNom('');
         setEmail('');
         setRole('agent');
-        setOrganisationId('org_default');
+        setOrganisationId(userOrgId);
         setAgentAssigne('');
         setMotDePasse('123456');
     };
@@ -971,8 +991,8 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
             id: userId,
             nom,
             email,
-            role,
-            organisationId,
+            role: isAdmin ? role : 'agent',
+            organisationId: isAdmin ? organisationId : userOrgId,
             agentAssigne: agentAssigne || nom,
             motDePasse
         });
@@ -981,11 +1001,16 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
 
     return (
         <section className="view">
-            <h2 className="page-title" style={{ marginBottom: '20px' }}>Gestion des Utilisateurs & Rôles</h2>
+            <h2 className="page-title" style={{ marginBottom: '20px' }}>Gestion des Utilisateurs & Agents</h2>
 
             {/* FORMULAIRE UTILISATEUR */}
             <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 className="card-title">{userId ? 'Modifier l\'utilisateur' : 'Ajouter un nouvel utilisateur / agent'}</h3>
+                <h3 className="card-title">{userId ? 'Modifier l\'agent' : 'Ajouter un nouveau profil Agent'}</h3>
+                {!isAdmin && (
+                    <p style={{ fontSize: '12px', color: 'var(--info)', marginBottom: '16px', background: '#eff6ff', padding: '8px 12px', borderRadius: '6px' }}>
+                        <i className="fa-solid fa-circle-info"></i> En tant que Cadre, vous pouvez créer uniquement des profil <strong>Agent de publication</strong> pour votre organisation.
+                    </p>
+                )}
                 <form onSubmit={handleSubmit}>
                     <div className="grid-3">
                         <div className="form-group">
@@ -998,9 +1023,9 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
                         </div>
                         <div className="form-group">
                             <label>Rôle</label>
-                            <select value={role} onChange={(e) => setRole(e.target.value)}>
-                                <option value="admin">👑 Administrateur</option>
-                                <option value="cadre">👔 Cadre / Manager</option>
+                            <select value={isAdmin ? role : 'agent'} onChange={(e) => setRole(e.target.value)} disabled={!isAdmin}>
+                                {isAdmin && <option value="admin">👑 Administrateur</option>}
+                                {isAdmin && <option value="cadre">👔 Cadre / Manager</option>}
                                 <option value="agent">🧑‍💼 Agent de publication</option>
                             </select>
                         </div>
@@ -1009,7 +1034,7 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
                     <div className="grid-3">
                         <div className="form-group">
                             <label>Organisation</label>
-                            <select value={organisationId} onChange={(e) => setOrganisationId(e.target.value)}>
+                            <select value={isAdmin ? organisationId : userOrgId} onChange={(e) => setOrganisationId(e.target.value)} disabled={!isAdmin}>
                                 {organisations.map(o => (
                                     <option key={o.id} value={o.id}>{o.nom}</option>
                                 ))}
@@ -1027,7 +1052,7 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
 
                     <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                         <button type="submit" className="btn btn-primary">
-                            <i className="fa-solid fa-user-plus"></i> Enregistrer l'utilisateur
+                            <i className="fa-solid fa-user-plus"></i> Enregistrer l'agent
                         </button>
                         {userId && (
                             <button type="button" className="btn btn-secondary" onClick={handleReset}>Annuler</button>
@@ -1038,7 +1063,7 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
 
             {/* TABLEAU DES UTILISATEURS */}
             <div className="card">
-                <h3 className="card-title">Liste des Utilisateurs enregistrés ({utilisateurs.length})</h3>
+                <h3 className="card-title">Liste des Utilisateurs / Agents ({visibleUsers.length})</h3>
                 <div className="table-container">
                     <table>
                         <thead>
@@ -1053,8 +1078,8 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {utilisateurs.length > 0 ? (
-                                utilisateurs.map(u => (
+                            {visibleUsers.length > 0 ? (
+                                visibleUsers.map(u => (
                                     <tr key={u.id}>
                                         <td><b>{u.nom}</b></td>
                                         <td>{u.email}</td>

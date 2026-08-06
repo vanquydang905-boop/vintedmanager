@@ -52,8 +52,11 @@ function App() {
 
     const loadData = useCallback(async (orgId) => {
         if (!currentUser) return;
+        const targetOrgId = (currentUser.role !== 'admin' && currentUser.organisationId) 
+            ? currentUser.organisationId 
+            : (orgId || currentOrgId);
         try {
-            const data = await API.getFullDB(orgId || currentOrgId);
+            const data = await API.getFullDB(targetOrgId);
             setAppState(prev => ({ ...prev, ...data }));
         } catch (err) {
             console.error("[React App loadData Error]", err);
@@ -63,7 +66,11 @@ function App() {
 
     useEffect(() => {
         if (currentUser) {
-            loadData(currentOrgId);
+            if (currentUser.role !== 'admin' && currentUser.organisationId && currentOrgId !== currentUser.organisationId) {
+                setCurrentOrgId(currentUser.organisationId);
+            }
+            const targetOrgId = (currentUser.role !== 'admin' && currentUser.organisationId) ? currentUser.organisationId : currentOrgId;
+            loadData(targetOrgId);
         }
     }, [currentUser, currentOrgId, loadData]);
 
@@ -73,6 +80,9 @@ function App() {
             const user = await API.login(payload);
             localStorage.setItem('vinted_manager_user', JSON.stringify(user));
             setCurrentUser(user);
+            if (user.role !== 'admin' && user.organisationId) {
+                setCurrentOrgId(user.organisationId);
+            }
             showToast(`Bienvenue, ${user.nom} !`);
         } catch (err) {
             showToast("Identifiants incorrects. Veuillez réessayer.", true);
@@ -86,6 +96,10 @@ function App() {
     };
 
     const handleSwitchOrg = (orgId) => {
+        if (currentUser && currentUser.role !== 'admin') {
+            showToast("Accès restreint à votre organisation uniquement.", true);
+            return;
+        }
         setCurrentOrgId(orgId);
         showToast("Chargement de l'organisation...");
     };
@@ -191,12 +205,18 @@ function App() {
 
     const handleSaveUser = async (userData) => {
         try {
-            if (userData.id) {
-                await API.updateUtilisateur(userData.id, userData);
-                showToast("Utilisateur mis à jour");
+            const finalData = { ...userData };
+            // Restriction Cadre : Cadres can ONLY create agent profiles for their own organisation
+            if (currentUser && currentUser.role !== 'admin') {
+                finalData.role = 'agent';
+                finalData.organisationId = currentUser.organisationId || 'org_default';
+            }
+            if (finalData.id) {
+                await API.updateUtilisateur(finalData.id, finalData);
+                showToast("Profil utilisateur mis à jour");
             } else {
-                await API.createUtilisateur({ ...userData, organisationId: currentOrgId });
-                showToast("Utilisateur créé avec succès");
+                await API.createUtilisateur({ ...finalData, organisationId: finalData.organisationId || currentOrgId });
+                showToast("Profil agent créé avec succès");
             }
             await loadData();
         } catch (err) {
@@ -237,64 +257,64 @@ function App() {
             showToast("Organisation supprimée");
             await loadData();
         } catch (err) {
-            showToast("Erreur lors de la suppression d'organisation", true);
+            showToast("Erreur lors de la suppression de l'organisation", true);
         }
     };
 
     const handlePublishWinner = async (sku) => {
         try {
             const res = await API.publishWinner(sku, currentOrgId);
-            showToast(res.message || `SKU ${sku} publié sur les comptes`);
+            showToast(res.message || `SKU ${sku} republié`);
             await loadData();
         } catch (err) {
-            showToast("Erreur lors de la publication du produit gagnant", true);
+            showToast("Erreur lors de la publication de la suggestion", true);
         }
     };
 
     const handleExportJSON = async () => {
         try {
-            const dbData = await API.getFullDB(currentOrgId);
-            const blob = new Blob([JSON.stringify(dbData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `vinted_manager_export_${currentOrgId}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast("Base de données exportée en JSON");
+            const data = await API.getFullDB(currentOrgId);
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `vinted_manager_export_${currentOrgId}_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast("Export de la base de données réussi");
         } catch (err) {
             showToast("Erreur lors de l'export JSON", true);
         }
     };
 
-    const handleImportJSON = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const imported = JSON.parse(event.target.result);
-                await API.restoreFullDB(imported);
-                showToast("Importation JSON effectuée avec succès");
-                await loadData();
-            } catch (err) {
-                showToast("Fichier JSON invalide", true);
-            }
-        };
-        reader.readAsText(file);
+    const handleImportJSON = (e) => {
+        const fileReader = new FileReader();
+        if (e.target.files && e.target.files[0]) {
+            fileReader.readAsText(e.target.files[0], "UTF-8");
+            fileReader.onload = async (event) => {
+                try {
+                    const parsed = JSON.parse(event.target.result);
+                    await API.importDB(parsed);
+                    showToast("Restauration complète effectuée avec succès !");
+                    await loadData();
+                } catch (err) {
+                    showToast("Échec de l'import : Fichier JSON invalide", true);
+                }
+            };
+        }
     };
 
     if (!currentUser) {
         return (
-            <>
+            <div className="app-container">
                 <LoginView onLoginSubmit={handleLoginSubmit} />
                 <Toast toast={toast} />
-            </>
+            </div>
         );
     }
 
     return (
-        <div style={{ display: 'flex', width: '100%', minHeight: '100vh' }}>
+        <div className="app-container">
             <Sidebar
                 currentUser={currentUser}
                 currentOrgId={currentOrgId}
@@ -320,10 +340,11 @@ function App() {
 
                 {activeView === 'comptes' && (
                     <ComptesView
+                        currentUser={currentUser}
                         appState={appState}
                         onSaveCompte={handleSaveCompte}
                         onDeleteCompte={handleDeleteCompte}
-                        onOpenQuickAgentModal={() => alert("Pour créer un agent, rendez-vous dans la section Utilisateurs.")}
+                        onOpenQuickAgentModal={() => setActiveView('utilisateurs')}
                     />
                 )}
 
@@ -350,6 +371,7 @@ function App() {
 
                 {activeView === 'utilisateurs' && (
                     <UtilisateursView
+                        currentUser={currentUser}
                         appState={appState}
                         onSaveUser={handleSaveUser}
                         onDeleteUser={handleDeleteUser}
