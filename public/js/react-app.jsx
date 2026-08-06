@@ -67,9 +67,10 @@ function App() {
         }
     }, [currentUser, currentOrgId, loadData]);
 
-    const handleLoginSubmit = async (loginInput, password) => {
+    const handleLoginSubmit = async (loginInput, password, role = null) => {
         try {
-            const user = await API.login({ email: loginInput, motDePasse: password });
+            const payload = role ? { role } : { email: loginInput, motDePasse: password };
+            const user = await API.login(payload);
             localStorage.setItem('vinted_manager_user', JSON.stringify(user));
             setCurrentUser(user);
             showToast(`Bienvenue, ${user.nom} !`);

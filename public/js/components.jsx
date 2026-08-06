@@ -780,12 +780,21 @@ function ParametresView({ appState, onSaveParametres }) {
 
 // ------------------- VIEW: LOGIN -------------------
 function LoginView({ onLoginSubmit }) {
-    const [loginInput, setLoginInput] = useState('');
-    const [password, setPassword] = useState('');
+    const [loginInput, setLoginInput] = useState('florencio@vintedmanager.com');
+    const [password, setPassword] = useState('ChangeMe123!');
 
     const handleSubmit = (e) => {
         e.preventDefault();
         onLoginSubmit(loginInput, password);
+    };
+
+    const handleQuickLogin = (role) => {
+        onLoginSubmit('', '', role);
+    };
+
+    const handleFillDefaults = () => {
+        setLoginInput('florencio@vintedmanager.com');
+        setPassword('ChangeMe123!');
     };
 
     return (
@@ -797,19 +806,34 @@ function LoginView({ onLoginSubmit }) {
                     <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>Connectez-vous pour accéder au tableau de bord</p>
                 </div>
 
+                <div style={{ backgroundColor: '#f0f7ff', borderLeft: '4px solid #007bff', padding: '12px 14px', borderRadius: '4px', marginBottom: '20px', fontSize: '12px', color: '#1e3a8a' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa-solid fa-circle-info"></i> Identifiants par Défaut (Administrateur)
+                    </div>
+                    <div>• <strong>Email / Nom :</strong> <code>florencio@vintedmanager.com</code> ou <code>Florencio</code></div>
+                    <div>• <strong>Mot de passe :</strong> <code>ChangeMe123!</code></div>
+                </div>
+
                 <form onSubmit={handleSubmit}>
                     <div className="form-group" style={{ marginBottom: '16px' }}>
                         <label style={{ fontWeight: 600 }}>Adresse Email ou Nom d'utilisateur</label>
                         <input type="text" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} placeholder="ex: Florencio" required style={{ width: '100%', padding: '10px', borderRadius: '6px' }} />
                     </div>
-                    <div className="form-group" style={{ marginBottom: '24px' }}>
+                    <div className="form-group" style={{ marginBottom: '20px' }}>
                         <label style={{ fontWeight: 600 }}>Mot de passe</label>
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required style={{ width: '100%', padding: '10px', borderRadius: '6px' }} />
                     </div>
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '15px', fontWeight: 600 }}>
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '15px', fontWeight: 600, marginBottom: '12px' }}>
                         <i className="fa-solid fa-right-to-bracket" style={{ marginRight: '8px' }}></i> Se connecter
                     </button>
                 </form>
+
+                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px', marginTop: '12px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>Accès Rapide 1-Clic :</p>
+                    <button type="button" onClick={() => handleQuickLogin('admin_florencio')} className="btn" style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#10b981', color: '#fff', fontWeight: 600, borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
+                        ⚡ Connexion Directe 1-Clic (Admin Florencio)
+                    </button>
+                </div>
             </div>
         </section>
     );
