@@ -39,7 +39,7 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                         background: currentUser.role === 'admin' ? '#9333ea' : (currentUser.role === 'cadre' ? '#2563eb' : '#16a34a'),
                         color: 'white', fontSize: '11px', padding: '2px 8px'
                     }}>
-                        {currentUser.role === 'admin' ? '👑 Admin' : (currentUser.role === 'cadre' ? '👔 Cadre' : '🧑‍💼 Agent')}
+                        {currentUser.role === 'admin' ? 'Admin' : (currentUser.role === 'cadre' ? 'Cadre' : 'Agent')}
                     </span>
                     <button className="btn btn-danger btn-sm" onClick={onLogout} title="Se déconnecter" style={{ padding: '3px 8px', fontSize: '11px' }}>
                         <i className="fa-solid fa-right-from-bracket"></i> Déconnexion
@@ -908,10 +908,10 @@ function LoginView({ onLoginSubmit }) {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button type="button" onClick={selectAdmin} style={{ flex: 1, padding: '8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#09b1ba', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                            👑 Admin (Florencio)
+                            Admin (Florencio)
                         </button>
                         <button type="button" onClick={selectMuller} style={{ flex: 1, padding: '8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                            🧑‍💼 Agent (Muller)
+                            Agent (Muller)
                         </button>
                     </div>
                 </div>
@@ -1024,9 +1024,9 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                         <div className="form-group">
                             <label>Rôle</label>
                             <select value={isAdmin ? role : 'agent'} onChange={(e) => setRole(e.target.value)} disabled={!isAdmin}>
-                                {isAdmin && <option value="admin">👑 Administrateur</option>}
-                                {isAdmin && <option value="cadre">👔 Cadre / Manager</option>}
-                                <option value="agent">🧑‍💼 Agent de publication</option>
+                                {isAdmin && <option value="admin">Administrateur</option>}
+                                {isAdmin && <option value="cadre">Cadre / Manager</option>}
+                                <option value="agent">Agent de publication</option>
                             </select>
                         </div>
                     </div>
@@ -1088,7 +1088,7 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                                                 background: u.role === 'admin' ? '#9333ea' : (u.role === 'cadre' ? '#2563eb' : '#16a34a'),
                                                 color: 'white'
                                             }}>
-                                                {u.role === 'admin' ? '👑 Admin' : (u.role === 'cadre' ? '👔 Cadre' : '🧑‍💼 Agent')}
+                                                {u.role === 'admin' ? 'Admin' : (u.role === 'cadre' ? 'Cadre' : 'Agent')}
                                             </span>
                                         </td>
                                         <td><span className="badge badge-compte">{((organisations.find(o => o.id === u.organisationId) || {}).nom) || u.organisationId || 'Par défaut'}</span></td>
