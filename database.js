@@ -37,7 +37,8 @@ const DEFAULT_ORGANISATIONS = [
 ];
 
 const DEFAULT_UTILISATEURS = [
-    { id: 'usr_admin_florencio', nom: 'Florencio', email: 'florencio@vintedmanager.com', role: 'admin', organisationId: 'org_default', agentAssigne: '', motDePasse: process.env.INITIAL_ADMIN_PASSWORD || 'ChangeMe123!', dateCreation: '2026-08-04' }
+    { id: 'usr_admin_florencio', nom: 'Florencio', email: 'florencio@vintedmanager.com', role: 'admin', organisationId: 'org_default', agentAssigne: '', motDePasse: process.env.INITIAL_ADMIN_PASSWORD || 'ChangeMe123!', dateCreation: '2026-08-04' },
+    { id: 'usr_muller', nom: 'Muller', email: 'tsaralahy343@gmail.com', role: 'agent', organisationId: 'org_default', agentAssigne: 'Muller', motDePasse: 'muller2026', dateCreation: '2026-08-06' }
 ];
 
 const dbService = {

@@ -807,17 +807,17 @@ function LoginView({ onLoginSubmit }) {
                 </div>
 
                 <div style={{ backgroundColor: '#f0f7ff', borderLeft: '4px solid #007bff', padding: '12px 14px', borderRadius: '4px', marginBottom: '20px', fontSize: '12px', color: '#1e3a8a' }}>
-                    <div style={{ fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <i className="fa-solid fa-circle-info"></i> Identifiants par Défaut (Administrateur)
+                    <div style={{ fontWeight: 600, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa-solid fa-circle-info"></i> Comptes disponibles :
                     </div>
-                    <div>• <strong>Email / Nom :</strong> <code>florencio@vintedmanager.com</code> ou <code>Florencio</code></div>
-                    <div>• <strong>Mot de passe :</strong> <code>ChangeMe123!</code></div>
+                    <div style={{ marginBottom: '4px' }}>• <strong>Admin (Florencio) :</strong> <code>florencio@vintedmanager.com</code> / <code>ChangeMe123!</code></div>
+                    <div>• <strong>Agent (Muller) :</strong> <code>tsaralahy343@gmail.com</code> / <code>muller2026</code></div>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group" style={{ marginBottom: '16px' }}>
                         <label style={{ fontWeight: 600 }}>Adresse Email ou Nom d'utilisateur</label>
-                        <input type="text" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} placeholder="ex: Florencio" required style={{ width: '100%', padding: '10px', borderRadius: '6px' }} />
+                        <input type="text" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} placeholder="ex: Florencio ou Muller" required style={{ width: '100%', padding: '10px', borderRadius: '6px' }} />
                     </div>
                     <div className="form-group" style={{ marginBottom: '20px' }}>
                         <label style={{ fontWeight: 600 }}>Mot de passe</label>
@@ -828,10 +828,13 @@ function LoginView({ onLoginSubmit }) {
                     </button>
                 </form>
 
-                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px', marginTop: '12px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>Accès Rapide 1-Clic :</p>
+                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px', marginTop: '12px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Accès Rapide 1-Clic :</p>
                     <button type="button" onClick={() => handleQuickLogin('admin_florencio')} className="btn" style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#10b981', color: '#fff', fontWeight: 600, borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
-                        ⚡ Connexion Directe 1-Clic (Admin Florencio)
+                        ⚡ Admin (Florencio)
+                    </button>
+                    <button type="button" onClick={() => onLoginSubmit('tsaralahy343@gmail.com', 'muller2026')} className="btn" style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#3b82f6', color: '#fff', fontWeight: 600, borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
+                        🧑‍💼 Agent (Muller)
                     </button>
                 </div>
             </div>
