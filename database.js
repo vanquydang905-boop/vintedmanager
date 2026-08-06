@@ -5,14 +5,69 @@ const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_KEY || '';
 
 if (!supabaseUrl || !supabaseKey) {
-    console.warn('\n⚠️ [SUPABASE WARNING] SUPABASE_URL ou SUPABASE_KEY manquant dans le fichier .env !');
-    console.warn('⚠️ Mode persistance mémoire locale actif.\n');
+    console.warn('\n⚠️ [SUPABASE WARNING] SUPABASE_URL ou SUPABASE_KEY manquant dans les variables d\'environnement !\n');
 }
 
 const supabase = createClient(
     supabaseUrl || 'https://placeholder.supabase.co',
     supabaseKey || 'placeholder-key'
 );
+
+// Helpers de conversion CamelCase <-> Lowercase pour Supabase PostgreSQL
+const camelMap = {
+    organisationid: 'organisationId',
+    agentassigne: 'agentAssigne',
+    motdepasse: 'motDePasse',
+    datecreation: 'dateCreation',
+    compteid: 'compteId',
+    lienprofil: 'lienProfil',
+    heureprevue: 'heurePrevue',
+    datestatut: 'dateStatut',
+    heurestatut: 'heureStatut',
+    nbventesreposts: 'nbVentesReposts',
+    heuresventesreposts: 'heuresVentesReposts',
+    prochainrepost: 'prochainRepost',
+    dateblocage: 'dateBlocage',
+    heureblocage: 'heureBlocage',
+    nbpubs24h: 'nbPubs24h',
+    heurespubs24h: 'heuresPubs24h',
+    nbventesconnues: 'nbVentesConnues',
+    detailventes: 'detailVentes',
+    nbannoncesmasquees: 'nbAnnoncesMasquees',
+    skuannoncesmasquees: 'skuAnnoncesMasquees'
+};
+
+function toDbFormat(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    const dbObj = {};
+    for (const key of Object.keys(obj)) {
+        const lowerKey = key.toLowerCase();
+        let value = obj[key];
+        if (['heuresventesreposts', 'heurespubs24h', 'detailventes'].includes(lowerKey)) {
+            if (Array.isArray(value) || typeof value === 'object') {
+                value = JSON.stringify(value);
+            }
+        }
+        dbObj[lowerKey] = value;
+    }
+    return dbObj;
+}
+
+function fromDbFormat(dbObj) {
+    if (!dbObj || typeof dbObj !== 'object') return dbObj;
+    const res = {};
+    for (const key of Object.keys(dbObj)) {
+        const camelKey = camelMap[key.toLowerCase()] || key;
+        let value = dbObj[key];
+        if (['heuresVentesReposts', 'heuresPubs24h', 'detailVentes'].includes(camelKey)) {
+            if (typeof value === 'string') {
+                try { value = JSON.parse(value); } catch (e) { value = []; }
+            }
+        }
+        res[camelKey] = value;
+    }
+    return res;
+}
 
 let DEFAULT_PARAMETRES = {
     poidsScore: { vues: 0.1, likes: 1, favoris: 2, messages: 5, vente: 20 },
@@ -66,7 +121,7 @@ const dbService = {
             try {
                 const { data, error } = await supabase.from('organisations').select('*');
                 if (!error && Array.isArray(data)) {
-                    data.forEach(dbRow => {
+                    data.map(fromDbFormat).forEach(dbRow => {
                         const idx = list.findIndex(item => item.id === dbRow.id);
                         if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
                         else list.push(dbRow);
@@ -88,8 +143,9 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const { data, error } = await supabase.from('organisations').insert([payload]).select().single();
-                if (!error && data) return data;
+                const dbPayload = toDbFormat(payload);
+                const { data, error } = await supabase.from('organisations').upsert([dbPayload]).select();
+                if (!error && data && data.length) return fromDbFormat(data[0]);
             } catch (err) {}
         }
         return payload;
@@ -101,8 +157,9 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const { data, error } = await supabase.from('organisations').update(fields).eq('id', id).select().single();
-                if (!error && data) return data;
+                const dbFields = toDbFormat(fields);
+                const { data, error } = await supabase.from('organisations').update(dbFields).eq('id', id).select();
+                if (!error && data && data.length) return fromDbFormat(data[0]);
             } catch (err) {}
         }
         return { id, ...fields };
@@ -122,10 +179,11 @@ const dbService = {
     async getParametres(organisationId = 'org_default') {
         if (!supabaseUrl || !supabaseKey) return DEFAULT_PARAMETRES;
         try {
+            const dbOrgId = (organisationId || 'org_default').toLowerCase();
             const { data, error } = await supabase
                 .from('parametres')
                 .select('data')
-                .eq('organisationId', organisationId)
+                .eq('organisationid', dbOrgId)
                 .maybeSingle();
 
             if (error || !data) {
@@ -143,7 +201,7 @@ const dbService = {
         if (supabaseUrl && supabaseKey) {
             try {
                 const paramId = `param_${organisationId}`;
-                await supabase.from('parametres').upsert({ id: paramId, organisationId, data: paramsObj });
+                await supabase.from('parametres').upsert({ id: paramId, organisationid: organisationId, data: paramsObj });
             } catch (e) {}
         }
         return DEFAULT_PARAMETRES;
@@ -155,10 +213,10 @@ const dbService = {
         if (supabaseUrl && supabaseKey) {
             try {
                 let query = supabase.from('utilisateurs').select('*');
-                if (organisationId) query = query.eq('organisationId', organisationId);
+                if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
                 const { data, error } = await query;
                 if (!error && Array.isArray(data)) {
-                    data.forEach(dbRow => {
+                    data.map(fromDbFormat).forEach(dbRow => {
                         const idx = list.findIndex(item => item.id === dbRow.id);
                         if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
                         else list.push(dbRow);
@@ -185,8 +243,9 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const { data, error } = await supabase.from('utilisateurs').insert([payload]).select().single();
-                if (!error && data) return data;
+                const dbPayload = toDbFormat(payload);
+                const { data, error } = await supabase.from('utilisateurs').upsert([dbPayload]).select();
+                if (!error && data && data.length) return fromDbFormat(data[0]);
             } catch (err) {}
         }
         return payload;
@@ -198,8 +257,9 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const { data, error } = await supabase.from('utilisateurs').update(fields).eq('id', id).select().single();
-                if (!error && data) return data;
+                const dbFields = toDbFormat(fields);
+                const { data, error } = await supabase.from('utilisateurs').update(dbFields).eq('id', id).select();
+                if (!error && data && data.length) return fromDbFormat(data[0]);
             } catch (err) {}
         }
         return { id, ...fields };
@@ -221,10 +281,10 @@ const dbService = {
         if (supabaseUrl && supabaseKey) {
             try {
                 let query = supabase.from('comptes').select('*');
-                if (organisationId) query = query.eq('organisationId', organisationId);
+                if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
                 const { data, error } = await query;
                 if (!error && Array.isArray(data)) {
-                    data.forEach(dbRow => {
+                    data.map(fromDbFormat).forEach(dbRow => {
                         const idx = list.findIndex(item => item.id === dbRow.id);
                         if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
                         else list.push(dbRow);
@@ -253,8 +313,9 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const { data, error } = await supabase.from('comptes').insert([payload]).select().single();
-                if (!error && data) return data;
+                const dbPayload = toDbFormat(payload);
+                const { data, error } = await supabase.from('comptes').upsert([dbPayload]).select();
+                if (!error && data && data.length) return fromDbFormat(data[0]);
             } catch (err) {}
         }
         return payload;
@@ -266,7 +327,8 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const { data, error } = await supabase.from('comptes').update(fields).eq('id', id).select();
+                const dbFields = toDbFormat(fields);
+                await supabase.from('comptes').update(dbFields).eq('id', id).select();
             } catch (err) {}
         }
         if (fields.agent) {
@@ -285,7 +347,7 @@ const dbService = {
         if (supabaseUrl && supabaseKey) {
             try {
                 await supabase.from('comptes').delete().eq('id', id);
-                await supabase.from('calendrier').delete().eq('compteId', id);
+                await supabase.from('calendrier').delete().eq('compteid', id);
             } catch (err) {}
         }
         return targetCompte || { id, pseudo: id };
@@ -297,19 +359,13 @@ const dbService = {
         if (supabaseUrl && supabaseKey) {
             try {
                 let query = supabase.from('calendrier').select('*');
-                if (organisationId) query = query.eq('organisationId', organisationId);
+                if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
                 const { data, error } = await query;
                 if (!error && Array.isArray(data)) {
-                    data.forEach(dbRow => {
-                        const parsedRow = {
-                            ...dbRow,
-                            heuresVentesReposts: typeof dbRow.heuresVentesReposts === 'string'
-                                ? JSON.parse(dbRow.heuresVentesReposts)
-                                : (dbRow.heuresVentesReposts || [])
-                        };
-                        const idx = list.findIndex(item => item.id === parsedRow.id);
-                        if (idx >= 0) list[idx] = { ...list[idx], ...parsedRow };
-                        else list.push(parsedRow);
+                    data.map(fromDbFormat).forEach(dbRow => {
+                        const idx = list.findIndex(item => item.id === dbRow.id);
+                        if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
+                        else list.push(dbRow);
                     });
                 }
             } catch (e) {}
@@ -326,7 +382,7 @@ const dbService = {
         if (supabaseUrl && supabaseKey) {
             try {
                 const { data, error } = await supabase.from('calendrier').select('*').eq('id', id).maybeSingle();
-                if (!error && data) return data;
+                if (!error && data) return fromDbFormat(data);
             } catch (e) {}
         }
         return null;
@@ -345,8 +401,9 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const { data, error } = await supabase.from('calendrier').insert([payload]).select().single();
-                if (!error && data) return data;
+                const dbPayload = toDbFormat(payload);
+                const { data, error } = await supabase.from('calendrier').upsert([dbPayload]).select();
+                if (!error && data && data.length) return fromDbFormat(data[0]);
             } catch (err) {}
         }
         return payload;
@@ -358,7 +415,8 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                await supabase.from('calendrier').update(fields).eq('id', id);
+                const dbFields = toDbFormat(fields);
+                await supabase.from('calendrier').update(dbFields).eq('id', id);
             } catch (err) {}
         }
         return { id, ...fields };
@@ -380,18 +438,13 @@ const dbService = {
         if (supabaseUrl && supabaseKey) {
             try {
                 let query = supabase.from('incidents').select('*');
-                if (organisationId) query = query.eq('organisationId', organisationId);
+                if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
                 const { data, error } = await query;
                 if (!error && Array.isArray(data)) {
-                    data.forEach(dbRow => {
-                        const parsedRow = {
-                            ...dbRow,
-                            heuresPubs24h: typeof dbRow.heuresPubs24h === 'string' ? JSON.parse(dbRow.heuresPubs24h) : (dbRow.heuresPubs24h || []),
-                            detailVentes: typeof dbRow.detailVentes === 'string' ? JSON.parse(dbRow.detailVentes) : (dbRow.detailVentes || [])
-                        };
-                        const idx = list.findIndex(item => item.id === parsedRow.id);
-                        if (idx >= 0) list[idx] = { ...list[idx], ...parsedRow };
-                        else list.push(parsedRow);
+                    data.map(fromDbFormat).forEach(dbRow => {
+                        const idx = list.findIndex(item => item.id === dbRow.id);
+                        if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
+                        else list.push(dbRow);
                     });
                 }
             } catch (e) {}
@@ -413,7 +466,8 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                await supabase.from('incidents').insert([payload]);
+                const dbPayload = toDbFormat(payload);
+                await supabase.from('incidents').upsert([dbPayload]);
             } catch (err) {}
         }
         return payload;
@@ -425,10 +479,10 @@ const dbService = {
         if (supabaseUrl && supabaseKey) {
             try {
                 let query = supabase.from('journal').select('*').order('horodatage', { ascending: false });
-                if (organisationId) query = query.eq('organisationId', organisationId);
+                if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
                 const { data, error } = await query;
                 if (!error && Array.isArray(data)) {
-                    data.forEach(dbRow => {
+                    data.map(fromDbFormat).forEach(dbRow => {
                         const idx = list.findIndex(item => item.id === dbRow.id);
                         if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
                         else list.push(dbRow);
@@ -450,7 +504,8 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                await supabase.from('journal').insert([payload]);
+                const dbPayload = toDbFormat(payload);
+                await supabase.from('journal').upsert([dbPayload]);
             } catch (err) {}
         }
     },
@@ -474,10 +529,10 @@ const dbService = {
                 await supabase.from('incidents').delete().neq('id', '');
                 await supabase.from('journal').delete().neq('id', '');
 
-                if (organisations.length) await supabase.from('organisations').insert(organisations);
-                if (utilisateurs.length) await supabase.from('utilisateurs').insert(utilisateurs);
-                if (comptes.length) await supabase.from('comptes').insert(comptes);
-                if (calendrier.length) await supabase.from('calendrier').insert(calendrier);
+                if (organisations.length) await supabase.from('organisations').upsert(organisations.map(toDbFormat));
+                if (utilisateurs.length) await supabase.from('utilisateurs').upsert(utilisateurs.map(toDbFormat));
+                if (comptes.length) await supabase.from('comptes').upsert(comptes.map(toDbFormat));
+                if (calendrier.length) await supabase.from('calendrier').upsert(calendrier.map(toDbFormat));
             } catch (e) {}
         }
     }
