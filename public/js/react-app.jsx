@@ -31,8 +31,14 @@ function App() {
 
     const [currentOrgId, setCurrentOrgId] = useState('org_default');
     const [activeView, setActiveView] = useState('dashboard');
+    const [timeZone, setTimeZone] = useState(() => localStorage.getItem('vinted_timezone') || 'FR');
     const [toast, setToast] = useState({ visible: false, message: '', isError: false });
     const [loginError, setLoginError] = useState('');
+
+    const handleSwitchTZ = (tz) => {
+        setTimeZone(tz);
+        localStorage.setItem('vinted_timezone', tz);
+    };
 
     const [appState, setAppState] = useState({
         organisations: [],
@@ -332,27 +338,79 @@ function App() {
             />
 
             <main className="main-content">
-                {currentUser && currentUser.role === 'admin' && (
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '16px'
+                }}>
                     <div style={{
-                        display: 'flex',
-                        justifyContent: 'flex-end',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '10px',
-                        marginBottom: '16px'
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '20px',
+                        padding: '3px 4px',
+                        gap: '2px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                     }}>
-                        <button className="btn btn-secondary btn-sm" onClick={handleExportJSON} title="Exporter la base de données en JSON">
-                            <i className="fa-solid fa-download"></i> Exporter JSON
+                        <button
+                            type="button"
+                            onClick={() => handleSwitchTZ('FR')}
+                            style={{
+                                border: 'none',
+                                borderRadius: '16px',
+                                padding: '4px 10px',
+                                fontSize: '11.5px',
+                                fontWeight: timeZone === 'FR' ? 700 : 500,
+                                backgroundColor: timeZone === 'FR' ? 'var(--primary-color)' : 'transparent',
+                                color: timeZone === 'FR' ? '#fff' : '#64748b',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                            title="Fuseau Horaire France (Europe/Paris - UTC+2 / UTC+1)"
+                        >
+                            🇫🇷 FR (UTC+2)
                         </button>
-                        <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }} title="Importer la base de données depuis un fichier JSON">
-                            <i className="fa-solid fa-file-import"></i> Importer JSON
-                            <input type="file" accept=".json" onChange={handleImportJSON} style={{ display: 'none' }} />
-                        </label>
+                        <button
+                            type="button"
+                            onClick={() => handleSwitchTZ('MADA')}
+                            style={{
+                                border: 'none',
+                                borderRadius: '16px',
+                                padding: '4px 10px',
+                                fontSize: '11.5px',
+                                fontWeight: timeZone === 'MADA' ? 700 : 500,
+                                backgroundColor: timeZone === 'MADA' ? 'var(--primary-color)' : 'transparent',
+                                color: timeZone === 'MADA' ? '#fff' : '#64748b',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                            title="Fuseau Horaire Madagascar (Indian/Antananarivo - UTC+3)"
+                        >
+                            🇲🇬 MADA (UTC+3)
+                        </button>
                     </div>
-                )}
+
+                    {currentUser && currentUser.role === 'admin' && (
+                        <>
+                            <button className="btn btn-secondary btn-sm" onClick={handleExportJSON} title="Exporter la base de données en JSON">
+                                <i className="fa-solid fa-download"></i> Exporter JSON
+                            </button>
+                            <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }} title="Importer la base de données depuis un fichier JSON">
+                                <i className="fa-solid fa-file-import"></i> Importer JSON
+                                <input type="file" accept=".json" onChange={handleImportJSON} style={{ display: 'none' }} />
+                            </label>
+                        </>
+                    )}
+                </div>
+
                 {activeView === 'dashboard' && (
                     <DashboardView
                         appState={appState}
                         currentUser={currentUser}
+                        selectedTZ={timeZone}
                         onUpdateRow={handleUpdateRow}
                         onDeleteRow={handleDeleteRow}
                         onAddRowClick={handleAddRow}

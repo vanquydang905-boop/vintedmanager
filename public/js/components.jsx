@@ -120,8 +120,48 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
     );
 }
 
+function getTimeZoneOffsetMinutes(tzName, date = new Date()) {
+    try {
+        const format = new Intl.DateTimeFormat('en-US', { timeZone: tzName, timeZoneName: 'shortOffset' });
+        const parts = format.formatToParts(date);
+        const tzPart = parts.find(p => p.type === 'timeZoneName');
+        if (!tzPart) return tzName.includes('Antananarivo') ? 180 : 120;
+        const match = tzPart.value.match(/GMT([+-]\d+)(?::(\d+))?/);
+        if (!match) return tzName.includes('Antananarivo') ? 180 : 120;
+        const hours = parseInt(match[1], 10);
+        const minutes = match[2] ? parseInt(match[2], 10) : 0;
+        return hours * 60 + (hours < 0 ? -minutes : minutes);
+    } catch (e) {
+        return tzName.includes('Antananarivo') ? 180 : 120;
+    }
+}
+
+function convertHHMM(timeStr, dateStr, fromTZ, toTZ) {
+    if (!timeStr) return { time: timeStr, dayShift: 0 };
+    const parts = timeStr.split(':').map(Number);
+    const h = parts[0] || 0;
+    const m = parts[1] || 0;
+    const fromOffset = getTimeZoneOffsetMinutes(fromTZ === 'MADA' ? 'Indian/Antananarivo' : 'Europe/Paris');
+    const toOffset = getTimeZoneOffsetMinutes(toTZ === 'MADA' ? 'Indian/Antananarivo' : 'Europe/Paris');
+    const diff = toOffset - fromOffset;
+    
+    let totalMin = h * 60 + m + diff;
+    let dayShift = 0;
+    if (totalMin >= 1440) {
+        totalMin -= 1440;
+        dayShift = 1;
+    } else if (totalMin < 0) {
+        totalMin += 1440;
+        dayShift = -1;
+    }
+    
+    const finalH = String(Math.floor(totalMin / 60)).padStart(2, '0');
+    const finalM = String(totalMin % 60).padStart(2, '0');
+    return { time: `${finalH}:${finalM}`, dayShift };
+}
+
 // ------------------- VIEW: DASHBOARD / CALENDRIER -------------------
-function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick }) {
+function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick, selectedTZ = 'FR' }) {
     const [filterCompte, setFilterCompte] = useState('');
     const [filterAgent, setFilterAgent] = useState((currentUser && currentUser.role === 'agent') ? (currentUser.agentAssigne || '') : '');
     const [filterStatut, setFilterStatut] = useState('');
@@ -148,11 +188,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     const avgScore = useMemo(() => totalPubs > 0 ? (calendrier.reduce((sum, l) => sum + (l.score || 0), 0) / totalPubs).toFixed(1) : "0.0", [calendrier, totalPubs]);
     const winnersCount = useMemo(() => new Set(calendrier.filter(l => l.classification === 'Gagnant' && l.sku).map(l => l.sku)).size, [calendrier]);
 
-    const getComptePseudo = (compteId) => {
-        const c = comptes.find(comp => comp.id === compteId);
-        return c ? c.pseudo : 'Inconnu';
-    };
-
     return (
         <section className="view">
             <div className="header-actions">
@@ -167,88 +202,74 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                 )}
             </div>
 
-            {/* KPI CARDS METRICS GRID */}
+            {/* FILTRES & KPI METRIQUES */}
             <div className="metrics-grid">
                 <div className="metric-card">
-                    <div className="metric-icon teal">
-                        <i className="fa-solid fa-cart-shopping"></i>
-                    </div>
-                    <div>
-                        <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ventes Totales</div>
-                        <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>{totalVentes}</div>
+                    <div className="metric-icon teal"><i className="fa-solid fa-calendar-check"></i></div>
+                    <div className="metric-info">
+                        <h4>PUBLICATIONS FAITES</h4>
+                        <div className="value">{pubsFaite} / {totalPubs}</div>
                     </div>
                 </div>
-
                 <div className="metric-card">
-                    <div className="metric-icon blue">
-                        <i className="fa-solid fa-bolt"></i>
-                    </div>
-                    <div>
-                        <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pubs Réalisées</div>
-                        <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>{pubsFaite} / {totalPubs}</div>
+                    <div className="metric-icon green"><i className="fa-solid fa-bag-shopping"></i></div>
+                    <div className="metric-info">
+                        <h4>VENTES TOTALES</h4>
+                        <div className="value">{totalVentes}</div>
                     </div>
                 </div>
-
                 <div className="metric-card">
-                    <div className="metric-icon purple">
-                        <i className="fa-solid fa-chart-line"></i>
-                    </div>
-                    <div>
-                        <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Score Moyen</div>
-                        <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>{avgScore}</div>
+                    <div className="metric-icon blue"><i className="fa-solid fa-star"></i></div>
+                    <div className="metric-info">
+                        <h4>SCORE MOYEN</h4>
+                        <div className="value">{avgScore}</div>
                     </div>
                 </div>
-
                 <div className="metric-card">
-                    <div className="metric-icon amber">
-                        <i className="fa-solid fa-crown"></i>
-                    </div>
-                    <div>
-                        <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Produits Gagnants</div>
-                        <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>{winnersCount}</div>
+                    <div className="metric-icon purple"><i className="fa-solid fa-trophy"></i></div>
+                    <div className="metric-info">
+                        <h4>PRODUITS GAGNANTS</h4>
+                        <div className="value">{winnersCount}</div>
                     </div>
                 </div>
             </div>
 
-            {/* FILTRES BAR */}
+            {/* FILTRES */}
             <div className="card" style={{ marginBottom: '24px' }}>
-                <div className="filters">
-                    <div>
-                        <label>Compte</label>
-                        <select value={filterCompte} onChange={(e) => setFilterCompte(e.target.value)}>
-                            <option value="">Tous les comptes</option>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ minWidth: '160px', flex: 1 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Compte</label>
+                        <select className="input" value={filterCompte} onChange={(e) => setFilterCompte(e.target.value)}>
+                            <option value="">Tous les comptes ({comptes.length})</option>
                             {comptes.map(c => (
                                 <option key={c.id} value={c.id}>{c.pseudo}</option>
                             ))}
                         </select>
                     </div>
-
-                    <div>
-                        <label>Agent</label>
-                        <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)} disabled={currentUser && currentUser.role === 'agent'}>
+                    <div style={{ minWidth: '160px', flex: 1 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Agent</label>
+                        <select className="input" value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)} disabled={currentUser && currentUser.role === 'agent'}>
                             <option value="">Tous les agents</option>
                             {agentsUnique.map(a => (
                                 <option key={a} value={a}>{a}</option>
                             ))}
                         </select>
                     </div>
-
-                    <div>
-                        <label>Statut Publication</label>
-                        <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)}>
+                    <div style={{ minWidth: '140px', flex: 1 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Statut</label>
+                        <select className="input" value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)}>
                             <option value="">Tous les statuts</option>
                             <option value="Non fait">Non fait</option>
                             <option value="Fait">Fait</option>
                         </select>
                     </div>
-
-                    <div>
-                        <label>Classification</label>
-                        <select value={filterClassif} onChange={(e) => setFilterClassif(e.target.value)}>
+                    <div style={{ minWidth: '140px', flex: 1 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Classification</label>
+                        <select className="input" value={filterClassif} onChange={(e) => setFilterClassif(e.target.value)}>
                             <option value="">Toutes</option>
                             <option value="Gagnant">Gagnant</option>
-                            <option value="Écarté">Écarté</option>
                             <option value="À retester">À retester</option>
+                            <option value="Écarté">Écarté</option>
                         </select>
                     </div>
                 </div>
@@ -264,9 +285,10 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th>Jour</th>
                                 <th>Compte</th>
                                 <th>Agent</th>
-                                <th>Heure</th>
+                                <th>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
                                 <th>SKU</th>
                                 <th>Vues</th>
+                                <th>Likes</th>
                                 <th>Favoris</th>
                                 <th>Msgs</th>
                                 <th>Vente</th>
@@ -300,7 +322,27 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 ))}
                                             </select>
                                         </td>
-                                        <td><b>{l.heurePrevue}</b></td>
+                                        <td>
+                                            {(() => {
+                                                const conv = convertHHMM(l.heurePrevue, l.date, 'FR', 'MADA');
+                                                const displayTime = selectedTZ === 'MADA' ? conv.time : l.heurePrevue;
+                                                const otherFlag = selectedTZ === 'MADA' ? '🇫🇷' : '🇲🇬';
+                                                const otherTime = selectedTZ === 'MADA' ? l.heurePrevue : conv.time;
+                                                const shiftTag = selectedTZ === 'MADA' 
+                                                    ? (conv.dayShift === 1 ? '-1j' : (conv.dayShift === -1 ? '+1j' : ''))
+                                                    : (conv.dayShift === 1 ? '+1j' : (conv.dayShift === -1 ? '-1j' : ''));
+
+                                                return (
+                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                        <b style={{ fontSize: '13.5px' }}>{displayTime}</b>
+                                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', whiteSpace: 'nowrap' }} title={`Heure équivalente (${selectedTZ === 'MADA' ? 'France' : 'Madagascar'})`}>
+                                                            {otherFlag} {otherTime}
+                                                            {shiftTag && <span style={{ color: '#d97706', fontWeight: 700, marginLeft: '3px' }}>{shiftTag}</span>}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </td>
                                         <td>
                                             <input type="text" className="input-table" value={l.sku || ''} placeholder="SKU"
                                                 onChange={(e) => onUpdateRow(l.id, { sku: e.target.value })} />
