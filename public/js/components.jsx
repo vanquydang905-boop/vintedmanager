@@ -825,53 +825,110 @@ function LoginView({ onLoginSubmit }) {
         onLoginSubmit('', '', role);
     };
 
-    const handleFillDefaults = () => {
+    const selectAdmin = () => {
         setLoginInput('florencio@vintedmanager.com');
         setPassword('ChangeMe123!');
     };
 
+    const selectMuller = () => {
+        setLoginInput('tsaralahy343@gmail.com');
+        setPassword('muller2026');
+    };
+
     return (
-        <section className="view" style={{ display: 'block', padding: '20px 0' }}>
-            <div className="card" style={{ maxWidth: '440px', width: '100%', margin: '30px auto', padding: '32px', borderTop: '5px solid var(--primary-color)', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f766e 100%)',
+            zIndex: 99999,
+            padding: '20px',
+            boxSizing: 'border-box',
+            overflowY: 'auto'
+        }}>
+            <div style={{
+                maxWidth: '440px',
+                width: '100%',
+                backgroundColor: '#ffffff',
+                borderRadius: '16px',
+                padding: '36px 32px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                borderTop: '6px solid var(--primary-color)',
+                margin: 'auto'
+            }}>
                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                    <div className="brand-logo" style={{ margin: '0 auto 12px auto', width: '50px', height: '50px', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>V</div>
-                    <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-main)' }}>Connexion Vinted Manager</h2>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>Connectez-vous pour accéder au tableau de bord</p>
+                    <div style={{
+                        margin: '0 auto 16px auto',
+                        width: '56px',
+                        height: '56px',
+                        fontSize: '26px',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--primary-gradient)',
+                        color: '#fff',
+                        borderRadius: '14px',
+                        boxShadow: '0 8px 20px rgba(9, 177, 186, 0.35)'
+                    }}>V</div>
+                    <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>Vinted Manager</h2>
+                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Connectez-vous pour accéder au tableau de bord</p>
                 </div>
 
-                <div style={{ backgroundColor: '#f0f7ff', borderLeft: '4px solid #007bff', padding: '12px 14px', borderRadius: '4px', marginBottom: '20px', fontSize: '12px', color: '#1e3a8a' }}>
-                    <div style={{ fontWeight: 600, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <i className="fa-solid fa-circle-info"></i> Comptes disponibles :
+                <div style={{
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    padding: '14px',
+                    borderRadius: '10px',
+                    marginBottom: '20px',
+                    fontSize: '12px',
+                    color: '#0369a1'
+                }}>
+                    <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa-solid fa-users"></i> Choix rapide du compte :
                     </div>
-                    <div style={{ marginBottom: '4px' }}>• <strong>Admin (Florencio) :</strong> <code>florencio@vintedmanager.com</code> / <code>ChangeMe123!</code></div>
-                    <div>• <strong>Agent (Muller) :</strong> <code>tsaralahy343@gmail.com</code> / <code>muller2026</code></div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button type="button" onClick={selectAdmin} style={{ flex: 1, padding: '8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#09b1ba', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                            👑 Admin (Florencio)
+                        </button>
+                        <button type="button" onClick={selectMuller} style={{ flex: 1, padding: '8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                            🧑‍💼 Agent (Muller)
+                        </button>
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group" style={{ marginBottom: '16px' }}>
-                        <label style={{ fontWeight: 600 }}>Adresse Email ou Nom d'utilisateur</label>
-                        <input type="text" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} placeholder="ex: Florencio ou Muller" required style={{ width: '100%', padding: '10px', borderRadius: '6px' }} />
+                        <label style={{ fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px', fontSize: '13px' }}>Adresse Email ou Nom d'utilisateur</label>
+                        <input type="text" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} placeholder="ex: Florencio ou Muller" required style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }} />
                     </div>
-                    <div className="form-group" style={{ marginBottom: '20px' }}>
-                        <label style={{ fontWeight: 600 }}>Mot de passe</label>
-                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required style={{ width: '100%', padding: '10px', borderRadius: '6px' }} />
+                    <div className="form-group" style={{ marginBottom: '22px' }}>
+                        <label style={{ fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px', fontSize: '13px' }}>Mot de passe</label>
+                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }} />
                     </div>
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '15px', fontWeight: 600, marginBottom: '12px' }}>
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, borderRadius: '8px', backgroundColor: 'var(--primary-color)', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(9, 177, 186, 0.3)' }}>
                         <i className="fa-solid fa-right-to-bracket" style={{ marginRight: '8px' }}></i> Se connecter
                     </button>
                 </form>
 
-                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px', marginTop: '12px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Accès Rapide 1-Clic :</p>
-                    <button type="button" onClick={() => handleQuickLogin('admin_florencio')} className="btn" style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#10b981', color: '#fff', fontWeight: 600, borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
-                        ⚡ Admin (Florencio)
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '18px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 4px 0' }}>Connexion Instantanée 1-Clic :</p>
+                    <button type="button" onClick={() => handleQuickLogin('admin_florencio')} style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#10b981', color: '#fff', fontWeight: 600, borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
+                        ⚡ Entrée 1-Clic (Admin Florencio)
                     </button>
-                    <button type="button" onClick={() => onLoginSubmit('tsaralahy343@gmail.com', 'muller2026')} className="btn" style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#3b82f6', color: '#fff', fontWeight: 600, borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
-                        🧑‍💼 Agent (Muller)
+                    <button type="button" onClick={() => onLoginSubmit('tsaralahy343@gmail.com', 'muller2026')} style={{ width: '100%', padding: '10px', fontSize: '13px', backgroundColor: '#6366f1', color: '#fff', fontWeight: 600, borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
+                        ⚡ Entrée 1-Clic (Agent Muller)
                     </button>
                 </div>
             </div>
-        </section>
+        </div>
     );
 }
 
