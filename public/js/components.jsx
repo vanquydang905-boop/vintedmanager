@@ -136,7 +136,7 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
 // ------------------- VIEW: DASHBOARD / CALENDRIER -------------------
 function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick }) {
     const [filterCompte, setFilterCompte] = useState('');
-    const [filterAgent, setFilterAgent] = useState(currentUser?.role === 'agent' ? (currentUser.agentAssigne || '') : '');
+    const [filterAgent, setFilterAgent] = useState((currentUser && currentUser.role === 'agent') ? (currentUser.agentAssigne || '') : '');
     const [filterStatut, setFilterStatut] = useState('');
     const [filterClassif, setFilterClassif] = useState('');
 
@@ -173,7 +173,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                     <h2 className="page-title">Tableau de Bord & Calendrier</h2>
                     <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Suivi temps réel des publications, scores et réinterventions</p>
                 </div>
-                {currentUser?.role !== 'agent' && (
+                {(currentUser && currentUser.role !== 'agent') && (
                     <button className="btn btn-primary" onClick={onAddRowClick}>
                         <i className="fa-solid fa-plus"></i> Ajouter une ligne
                     </button>
@@ -238,7 +238,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
                     <div>
                         <label>Agent</label>
-                        <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)} disabled={currentUser?.role === 'agent'}>
+                        <select value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)} disabled={currentUser && currentUser.role === 'agent'}>
                             <option value="">Tous les agents</option>
                             {agentsUnique.map(a => (
                                 <option key={a} value={a}>{a}</option>
@@ -286,7 +286,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th>Score</th>
                                 <th>Classif.</th>
                                 <th>Statut</th>
-                                {currentUser?.role !== 'agent' && <th>Actions</th>}
+                                {(currentUser && currentUser.role !== 'agent') && <th>Actions</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -332,7 +332,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 {l.statut === 'Fait' ? '✓ Fait' : '⌛ Non fait'}
                                             </button>
                                         </td>
-                                        {currentUser?.role !== 'agent' && (
+                                        {(currentUser && currentUser.role !== 'agent') && (
                                             <td>
                                                 <button className="btn btn-danger btn-sm" title="Supprimer" onClick={() => onDeleteRow(l.id)}>
                                                     <i className="fa-solid fa-trash"></i>
@@ -507,7 +507,7 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
 
 // ------------------- VIEW: PLANNING GENERATION -------------------
 function PlanningView({ appState, onGeneratePlanning }) {
-    const [nbJours, setNbJours] = useState(appState.parametres?.nbJoursPlanningParDefaut || 7);
+    const [nbJours, setNbJours] = useState((appState.parametres && appState.parametres.nbJoursPlanningParDefaut) || 7);
     const [loading, setLoading] = useState(false);
 
     const activeComptes = useMemo(() => (appState.comptes || []).filter(c => c.statut === 'Actif'), [appState.comptes]);
@@ -689,14 +689,14 @@ function ParametresView({ appState, onSaveParametres }) {
     const [decalage, setDecalage] = useState(p.decalageMinutesEntreComptes || 60);
     const [margeAleatoire, setMargeAleatoire] = useState(p.margeAleatoireMinutes !== undefined ? p.margeAleatoireMinutes : 15);
 
-    const [poidsVues, setPoidsVues] = useState(p.poidsScore?.vues || 0.1);
-    const [poidsLikes, setPoidsLikes] = useState(p.poidsScore?.likes || 1);
-    const [poidsFavoris, setPoidsFavoris] = useState(p.poidsScore?.favoris || 2);
-    const [poidsMessages, setPoidsMessages] = useState(p.poidsScore?.messages || 5);
-    const [poidsVente, setPoidsVente] = useState(p.poidsScore?.vente || 20);
+    const [poidsVues, setPoidsVues] = useState((p.poidsScore && p.poidsScore.vues) || 0.1);
+    const [poidsLikes, setPoidsLikes] = useState((p.poidsScore && p.poidsScore.likes) || 1);
+    const [poidsFavoris, setPoidsFavoris] = useState((p.poidsScore && p.poidsScore.favoris) || 2);
+    const [poidsMessages, setPoidsMessages] = useState((p.poidsScore && p.poidsScore.messages) || 5);
+    const [poidsVente, setPoidsVente] = useState((p.poidsScore && p.poidsScore.vente) || 20);
 
-    const [seuilEcarte, setSeuilEcarte] = useState(p.seuils?.ecarte || 15);
-    const [seuilGagnant, setSeuilGagnant] = useState(p.seuils?.gagnant || 40);
+    const [seuilEcarte, setSeuilEcarte] = useState((p.seuils && p.seuils.ecarte) || 15);
+    const [seuilGagnant, setSeuilGagnant] = useState((p.seuils && p.seuils.gagnant) || 40);
     const [creneaux, setCreneaux] = useState(p.creneauxParJour || 3);
     const [delaiRepost, setDelaiRepost] = useState(p.delaiProchainRepostMinutes || 30);
     const [joursDefaut, setJoursDefaut] = useState(p.nbJoursPlanningParDefaut || 7);
@@ -973,7 +973,7 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
                                                 {u.role === 'admin' ? '👑 Admin' : (u.role === 'cadre' ? '👔 Cadre' : '🧑‍💼 Agent')}
                                             </span>
                                         </td>
-                                        <td><span className="badge badge-compte">{organisations.find(o => o.id === u.organisationId)?.nom || u.organisationId || 'Par défaut'}</span></td>
+                                        <td><span className="badge badge-compte">{((organisations.find(o => o.id === u.organisationId) || {}).nom) || u.organisationId || 'Par défaut'}</span></td>
                                         <td>{u.agentAssigne || u.nom}</td>
                                         <td>{u.dateCreation || '-'}</td>
                                         <td>
