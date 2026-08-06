@@ -295,8 +295,24 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                     <tr key={l.id} style={{ opacity: l.statut === 'Fait' ? 0.85 : 1 }}>
                                         <td>{l.date}</td>
                                         <td><b>{l.jour}</b></td>
-                                        <td><span className="badge badge-compte">{getComptePseudo(l.compteId)}</span></td>
-                                        <td><span className="badge badge-agent">{l.agent}</span></td>
+                                        <td>
+                                            <select className="input-table" value={l.compteId || ''} onChange={(e) => {
+                                                const selCompte = comptes.find(c => c.id === e.target.value);
+                                                onUpdateRow(l.id, { compteId: e.target.value, agent: selCompte ? selCompte.agent : l.agent });
+                                            }}>
+                                                {comptes.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.pseudo}</option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select className="input-table" value={l.agent || ''} onChange={(e) => onUpdateRow(l.id, { agent: e.target.value })}>
+                                                <option value="">Sélectionner...</option>
+                                                {agentsUnique.map(a => (
+                                                    <option key={a} value={a}>{a}</option>
+                                                ))}
+                                            </select>
+                                        </td>
                                         <td><b>{l.heurePrevue}</b></td>
                                         <td>
                                             <input type="text" className="input-table" value={l.sku || ''} placeholder="SKU"
@@ -362,10 +378,12 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
     const [pseudo, setPseudo] = useState('');
     const [agent, setAgent] = useState('');
     const [statut, setStatut] = useState('Actif');
+    const [organisationId, setOrganisationId] = useState('org_default');
     const [notes, setNotes] = useState('');
 
     const comptes = appState.comptes || [];
     const utilisateurs = appState.utilisateurs || [];
+    const organisations = appState.organisations || [];
     const agentsList = useMemo(() => utilisateurs.filter(u => u.role === 'agent' || u.agentAssigne), [utilisateurs]);
 
     const handleEdit = (c) => {
@@ -373,6 +391,7 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
         setPseudo(c.pseudo);
         setAgent(c.agent);
         setStatut(c.statut);
+        setOrganisationId(c.organisationId || 'org_default');
         setNotes(c.notes || '');
     };
 
@@ -381,12 +400,13 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
         setPseudo('');
         setAgent('');
         setStatut('Actif');
+        setOrganisationId('org_default');
         setNotes('');
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSaveCompte({ id: compteId, pseudo, agent, statut, notes });
+        onSaveCompte({ id: compteId, pseudo, agent, statut, organisationId, notes });
         handleReset();
     };
 
@@ -395,7 +415,7 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
             <div className="header-actions">
                 <div>
                     <h2 className="page-title">Gestion des Comptes Vinted</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Gérez les comptes Vinted et affectez leurs agents référents</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Gérez les comptes Vinted, affectez leurs agents référents et organisations</p>
                 </div>
             </div>
 
@@ -425,6 +445,17 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
                         </div>
 
                         <div className="form-group">
+                            <label>Organisation</label>
+                            <select value={organisationId} onChange={(e) => setOrganisationId(e.target.value)}>
+                                {organisations.map(o => (
+                                    <option key={o.id} value={o.id}>{o.nom}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid-2" style={{ marginBottom: '16px' }}>
+                        <div className="form-group">
                             <label>Statut du compte</label>
                             <select value={statut} onChange={(e) => setStatut(e.target.value)}>
                                 <option value="Actif">Actif</option>
@@ -432,11 +463,11 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
                                 <option value="Banni">Banni</option>
                             </select>
                         </div>
-                    </div>
 
-                    <div className="form-group">
-                        <label>Notes / Observations</label>
-                        <textarea rows="2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="IP, proxy, détails du compte..."></textarea>
+                        <div className="form-group">
+                            <label>Notes / Observations</label>
+                            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="IP, proxy, détails du compte..." />
+                        </div>
                     </div>
 
                     <div style={{ display: 'flex', gap: '10px' }}>
@@ -452,13 +483,14 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
 
             {/* LISTE COMPTES */}
             <div className="card">
-                <h3 className="card-title">Liste des Comptes enregistrés</h3>
+                <h3 className="card-title">Liste des Comptes enregistrés ({comptes.length})</h3>
                 <div className="table-container">
                     <table>
                         <thead>
                             <tr>
                                 <th>Pseudo</th>
                                 <th>Agent</th>
+                                <th>Organisation</th>
                                 <th>Statut</th>
                                 <th>Date Création</th>
                                 <th>Notes</th>
@@ -471,6 +503,7 @@ function ComptesView({ appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentM
                                     <tr key={c.id}>
                                         <td><b>{c.pseudo}</b></td>
                                         <td><span className="badge badge-agent">{c.agent}</span></td>
+                                        <td><span className="badge badge-compte">{((organisations.find(o => o.id === c.organisationId) || {}).nom) || c.organisationId || 'Principale'}</span></td>
                                         <td>
                                             <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite')}`}>
                                                 {c.statut}
@@ -1008,14 +1041,29 @@ function UtilisateursView({ appState, onSaveUser, onDeleteUser }) {
 
 // ------------------- VIEW: ORGANISATIONS -------------------
 function OrganisationsView({ appState, onSaveOrg, onDeleteOrg }) {
+    const [orgId, setOrgId] = useState('');
     const [nom, setNom] = useState('');
     const organisations = appState.organisations || [];
+
+    const handleEdit = (o) => {
+        setOrgId(o.id);
+        setNom(o.nom);
+    };
+
+    const handleReset = () => {
+        setOrgId('');
+        setNom('');
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!nom) return;
-        onSaveOrg({ id: 'org_' + Date.now(), nom, dateCreation: new Date().toISOString().split('T')[0] });
-        setNom('');
+        if (orgId) {
+            onSaveOrg({ id: orgId, nom, isEdit: true });
+        } else {
+            onSaveOrg({ id: 'org_' + Date.now(), nom, dateCreation: new Date().toISOString().split('T')[0] });
+        }
+        handleReset();
     };
 
     return (
@@ -1023,20 +1071,23 @@ function OrganisationsView({ appState, onSaveOrg, onDeleteOrg }) {
             <h2 className="page-title" style={{ marginBottom: '20px' }}>Gestion des Organisations Multi-Tenancy</h2>
 
             <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 className="card-title">Ajouter une nouvelle organisation</h3>
+                <h3 className="card-title">{orgId ? 'Modifier l\'organisation' : 'Ajouter une nouvelle organisation'}</h3>
                 <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
                     <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                         <label>Nom de l'organisation</label>
                         <input type="text" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="ex: Agence Lyon" required />
                     </div>
                     <button type="submit" className="btn btn-primary">
-                        <i className="fa-solid fa-building-circle-check"></i> Créer Organisation
+                        <i className="fa-solid fa-floppy-disk"></i> {orgId ? 'Enregistrer Modification' : 'Créer Organisation'}
                     </button>
+                    {orgId && (
+                        <button type="button" className="btn btn-secondary" onClick={handleReset}>Annuler</button>
+                    )}
                 </form>
             </div>
 
             <div className="card">
-                <h3 className="card-title">Organisations Actives</h3>
+                <h3 className="card-title">Organisations Actives ({organisations.length})</h3>
                 <div className="table-container">
                     <table>
                         <thead>
@@ -1054,11 +1105,16 @@ function OrganisationsView({ appState, onSaveOrg, onDeleteOrg }) {
                                     <td><b>{o.nom}</b></td>
                                     <td>{o.dateCreation || '-'}</td>
                                     <td>
-                                        {o.id !== 'org_default' && (
-                                            <button className="btn btn-danger btn-sm" onClick={() => onDeleteOrg(o.id)}>
-                                                <i className="fa-solid fa-trash"></i>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button className="btn btn-primary btn-sm" onClick={() => handleEdit(o)} title="Éditer le nom">
+                                                <i className="fa-solid fa-pen"></i>
                                             </button>
-                                        )}
+                                            {o.id !== 'org_default' && (
+                                                <button className="btn btn-danger btn-sm" onClick={() => onDeleteOrg(o.id)} title="Supprimer">
+                                                    <i className="fa-solid fa-trash"></i>
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

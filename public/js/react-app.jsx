@@ -217,11 +217,16 @@ function App() {
 
     const handleSaveOrg = async (orgData) => {
         try {
-            await API.createOrganisation(orgData);
-            showToast("Organisation créée avec succès");
+            if (orgData.isEdit) {
+                await API.updateOrganisation(orgData.id, { nom: orgData.nom });
+                showToast("Organisation mise à jour");
+            } else {
+                await API.createOrganisation(orgData);
+                showToast("Organisation créée avec succès");
+            }
             await loadData();
         } catch (err) {
-            showToast("Erreur lors de la création de l'organisation", true);
+            showToast("Erreur lors de l'enregistrement de l'organisation", true);
         }
     };
 
