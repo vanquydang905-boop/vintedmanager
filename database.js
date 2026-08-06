@@ -116,21 +116,7 @@ function verifyPassword(inputPassword, storedHash) {
 
 let DEFAULT_ORGANISATIONS = [];
 let DEFAULT_UTILISATEURS = [];
-let DEFAULT_COMPTES = [
-    { id: 'compte_3', numeroCompte: '3', pseudo: 'marie_sdm963', telephone: '', email: '', motDePasse: '', gereParInitiales: '', agent: 'Ricardo', statut: 'Actif', dateStatutCompte: '', notes: '', organisationId: 'org_default' },
-    { id: 'compte_14', numeroCompte: '14', pseudo: 'lola_ver', telephone: '', email: '', motDePasse: '', gereParInitiales: '', agent: 'Ricardo', statut: 'Actif', dateStatutCompte: '', notes: '', organisationId: 'org_default' },
-    { id: 'compte_16', numeroCompte: '16', pseudo: 'lisa_llc', telephone: '', email: '', motDePasse: '', gereParInitiales: '', agent: 'Juliana', statut: 'Actif', dateStatutCompte: '', notes: '', organisationId: 'org_default' },
-    { id: 'compte_18', numeroCompte: '18', pseudo: 'elsa_vay', telephone: '', email: '', motDePasse: '', gereParInitiales: '', agent: 'Muller', statut: 'Actif', dateStatutCompte: '', notes: '', organisationId: 'org_default' },
-    { id: 'compte_20', numeroCompte: '20', pseudo: 'julia_rent', telephone: '', email: '', motDePasse: '', gereParInitiales: '', agent: 'Ricardo', statut: 'Actif', dateStatutCompte: '', notes: '', organisationId: 'org_default' },
-    { id: 'compte_47', numeroCompte: '47', pseudo: 'elina_sor', telephone: '', email: 'mmanjudj2@gmail.com', motDePasse: 'ymdrc4EWE0t6ws1', gereParInitiales: '', agent: 'Muller', statut: 'Actif', dateStatutCompte: '', notes: '', organisationId: 'org_default' },
-    { id: 'compte_48', numeroCompte: '48', pseudo: 'isis_mlf', telephone: '06 33 40 86 06', email: 'juyjgj26@gmail.com', motDePasse: 'Vinted009&*', gereParInitiales: 'TD', agent: 'Muller', statut: 'Actif', dateStatutCompte: '28/07/2026', notes: '', organisationId: 'org_default' },
-    { id: 'compte_49', numeroCompte: '49', pseudo: 'naya_sky', telephone: '06 33 43 85 51', email: 'ee010010@outlook.fr', motDePasse: 'Vinted009&*', gereParInitiales: 'TD', agent: 'Lova', statut: 'Actif', dateStatutCompte: '31/07/2026', notes: 'connecté à Adspower le 05/08/26', organisationId: 'org_default' },
-    { id: 'compte_50', numeroCompte: '50', pseudo: 'elya_soc', telephone: '06 33 43 94 35', email: 'ciel2azur123@gmail.com', motDePasse: 'ciel2azur*', gereParInitiales: 'EG', agent: 'Florencio', statut: 'Actif', dateStatutCompte: '31/07/2026', notes: '', organisationId: 'org_default' },
-    { id: 'compte_51', numeroCompte: '51', pseudo: 'lina_mya8', telephone: '06 33 43 89 34', email: 'ee010020@outlook.fr', motDePasse: 'Vinted009&*', gereParInitiales: 'EG', agent: 'Lova', statut: 'Banni', dateStatutCompte: '01/08/2026', notes: 'Vinted bloqué dès l’ouverture', organisationId: 'org_default' },
-    { id: 'compte_52', numeroCompte: '52', pseudo: 'maia_lysa', telephone: '06 33 43 38 18', email: 'ee010030@outlook.fr', motDePasse: 'Vinted009&*', gereParInitiales: 'EG', agent: 'Rindra', statut: 'Actif', dateStatutCompte: '02/08/2026', notes: '1 article en vente | connecté à Adspower le 05/08/26', organisationId: 'org_default' },
-    { id: 'compte_53', numeroCompte: '53', pseudo: 'nona_lia', telephone: '06 33 43 49 54', email: 'terre2azur123@gmail.com', motDePasse: 'Vinted009&*', gereParInitiales: 'EG', agent: 'Tita', statut: 'Actif', dateStatutCompte: '02/08/2026', notes: '1 article en vente', organisationId: 'org_default' },
-    { id: 'compte_54', numeroCompte: '54', pseudo: 'milla_sia', telephone: '06 33 43 44 78', email: 'ee010040@outlook.fr', motDePasse: 'Vinted054&*', gereParInitiales: 'EG', agent: 'Fitia', statut: 'Actif', dateStatutCompte: '03/08/2026', notes: '1 article en vente | connecté à Adspower le 05/08/26', organisationId: 'org_default' }
-];
+let DEFAULT_COMPTES = [];
 let DEFAULT_CALENDRIER = [];
 let DEFAULT_INCIDENTS = [];
 let DEFAULT_JOURNAL = [];
