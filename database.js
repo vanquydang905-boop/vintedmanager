@@ -29,7 +29,12 @@ const camelMap = {
     nbannoncesmasquees: 'nbAnnoncesMasquees',
     skuannoncesmasquees: 'skuAnnoncesMasquees',
     contacttype: 'contactType',
-    contactnumero: 'contactNumero'
+    contactnumero: 'contactNumero',
+    numerocompte: 'numeroCompte',
+    telephone: 'telephone',
+    email: 'email',
+    gereparinitiales: 'gereParInitiales',
+    datestatutcompte: 'dateStatutCompte'
 };
 
 function toDbFormat(obj) {

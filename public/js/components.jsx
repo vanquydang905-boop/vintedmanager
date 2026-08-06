@@ -549,12 +549,22 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const userOrgId = (currentUser && currentUser.organisationId) || 'org_default';
 
     const [compteId, setCompteId] = useState('');
+    const [numeroCompte, setNumeroCompte] = useState('');
     const [pseudo, setPseudo] = useState('');
+    const [telephone, setTelephone] = useState('');
+    const [email, setEmail] = useState('');
+    const [motDePasse, setMotDePasse] = useState('');
+    const [gereParInitiales, setGereParInitiales] = useState('');
     const [agent, setAgent] = useState('');
     const [statut, setStatut] = useState('Actif');
+    const [dateStatutCompte, setDateStatutCompte] = useState('');
     const [organisationId, setOrganisationId] = useState(userOrgId);
     const [notes, setNotes] = useState('');
     const [selectedCompteIds, setSelectedCompteIds] = useState([]);
+    
+    // Quick Text Import Modal State
+    const [showTextModal, setShowTextModal] = useState(false);
+    const [rawImportText, setRawImportText] = useState('');
 
     const comptes = appState.comptes || [];
     const utilisateurs = appState.utilisateurs || [];
@@ -567,8 +577,8 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     }, [utilisateurs, isAdmin, userOrgId]);
 
     const visibleComptes = useMemo(() => {
-        if (isAdmin) return comptes;
-        return comptes.filter(c => (c.organisationId || 'org_default') === userOrgId);
+        let list = isAdmin ? comptes : comptes.filter(c => (c.organisationId || 'org_default') === userOrgId);
+        return list.sort((a, b) => (parseInt(a.numeroCompte) || 0) - (parseInt(b.numeroCompte) || 0));
     }, [comptes, isAdmin, userOrgId]);
 
     const isAllComptesSelected = useMemo(() => {
@@ -600,26 +610,130 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
 
     const handleEdit = (c) => {
         setCompteId(c.id);
-        setPseudo(c.pseudo);
-        setAgent(c.agent);
-        setStatut(c.statut);
+        setNumeroCompte(c.numeroCompte || '');
+        setPseudo(c.pseudo || '');
+        setTelephone(c.telephone || '');
+        setEmail(c.email || '');
+        setMotDePasse(c.motDePasse || '');
+        setGereParInitiales(c.gereParInitiales || '');
+        setAgent(c.agent || '');
+        setStatut(c.statut || 'Actif');
+        setDateStatutCompte(c.dateStatutCompte || '');
         setOrganisationId(isAdmin ? (c.organisationId || 'org_default') : userOrgId);
         setNotes(c.notes || '');
     };
 
     const handleReset = () => {
         setCompteId('');
+        setNumeroCompte('');
         setPseudo('');
+        setTelephone('');
+        setEmail('');
+        setMotDePasse('');
+        setGereParInitiales('');
         setAgent('');
         setStatut('Actif');
+        setDateStatutCompte('');
         setOrganisationId(userOrgId);
         setNotes('');
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSaveCompte({ id: compteId, pseudo, agent, statut, organisationId: isAdmin ? organisationId : userOrgId, notes });
+        onSaveCompte({
+            id: compteId,
+            numeroCompte,
+            pseudo,
+            telephone,
+            email,
+            motDePasse,
+            gereParInitiales,
+            agent: agent || (agentsList[0] ? (agentsList[0].agentAssigne || agentsList[0].nom) : 'Agent'),
+            statut,
+            dateStatutCompte,
+            organisationId: isAdmin ? organisationId : userOrgId,
+            notes
+        });
         handleReset();
+    };
+
+    // Helper text parser for bulk pasted accounts text
+    const handleParseAndImportText = async () => {
+        if (!rawImportText.trim()) return;
+        const blocks = rawImportText.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+        let count = 0;
+
+        for (const block of blocks) {
+            const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+            if (lines.length < 2) continue;
+
+            let num = '';
+            let pseudoStr = '';
+            let tel = '';
+            let emailStr = '';
+            let mp = '';
+            let initiales = '';
+            let statutStr = 'Actif';
+            let dateStatut = '';
+            let notesArr = [];
+
+            let idx = 0;
+            if (/^\d+$/.test(lines[idx])) {
+                num = lines[idx];
+                idx++;
+            }
+
+            if (idx < lines.length) {
+                pseudoStr = lines[idx];
+                idx++;
+            }
+
+            while (idx < lines.length) {
+                const line = lines[idx];
+                if (!tel && (/^0\d/i.test(line) || /\d{2}\s*\d{2}/.test(line))) {
+                    tel = line;
+                } else if (!emailStr && (line.includes('@') || line.includes('.'))) {
+                    emailStr = line;
+                } else if (!initiales && (line.length <= 4 && /^[A-Z]{2,4}$/.test(line))) {
+                    initiales = line;
+                } else if (!mp && (line.includes('*') || line.includes('&') || line.length >= 6) && !line.toLowerCase().includes('actif') && !line.toLowerCase().includes('bloqué') && !line.toLowerCase().includes('connecté')) {
+                    mp = line;
+                } else if (line.toLowerCase().includes('actif') || line.toLowerCase().includes('bloqué') || line.toLowerCase().includes('banni') || line.toLowerCase().includes('limité')) {
+                    if (line.toLowerCase().includes('bloqué') || line.toLowerCase().includes('banni')) statutStr = 'Banni';
+                    else if (line.toLowerCase().includes('limité') || line.toLowerCase().includes('restreint')) statutStr = 'Limité';
+                    else statutStr = 'Actif';
+
+                    const dateMatch = line.match(/\d{2}\/\d{2}\/\d{4}/) || line.match(/\d{2}\/\d{2}\/\d{2}/);
+                    if (dateMatch) dateStatut = dateMatch[0];
+
+                    const restOfLine = line.replace(/actif|bloqué|banni|limité|restreint|\d{2}\/\d{2}\/\d{2,4}/gi, '').trim();
+                    if (restOfLine) notesArr.push(restOfLine);
+                } else {
+                    notesArr.push(line);
+                }
+                idx++;
+            }
+
+            const cId = `compte_${num || Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+            await onSaveCompte({
+                id: cId,
+                numeroCompte: num,
+                pseudo: pseudoStr,
+                telephone: tel,
+                email: emailStr,
+                motDePasse: mp,
+                gereParInitiales: initiales,
+                agent: agentsList[0] ? (agentsList[0].agentAssigne || agentsList[0].nom) : 'Muller',
+                statut: statutStr,
+                dateStatutCompte: dateStatut,
+                organisationId: userOrgId,
+                notes: notesArr.join(' | ')
+            });
+            count++;
+        }
+
+        setShowTextModal(false);
+        setRawImportText('');
     };
 
     return (
@@ -627,20 +741,79 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             <div className="header-actions">
                 <div>
                     <h2 className="page-title">Gestion des Comptes Vinted</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Gérez les comptes Vinted, affectez leurs agents référents et organisations</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Gérez les comptes Vinted (N°, pseudo, tél, email, mot de passe, géré par, statut et date)</p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowTextModal(true)}>
+                        <i className="fa-solid fa-file-import"></i> Importer par Copier/Coller Texte
+                    </button>
                 </div>
             </div>
 
+            {/* MODAL COPIER/COLLER TEXTE */}
+            {showTextModal && (
+                <div className="modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div className="modal-content card" style={{ maxWidth: '650px', width: '100%', backgroundColor: '#fff', borderRadius: '12px', padding: '24px' }}>
+                        <h3 className="card-title" style={{ marginBottom: '12px' }}>
+                            <i className="fa-solid fa-paste" style={{ color: 'var(--primary)', marginRight: '8px' }}></i>
+                            Importation Rapide de Comptes en Masse (Format Texte)
+                        </h3>
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                            Collez simplement votre liste de comptes au format brut (N°, Pseudo, Téléphone, Email, Mot de passe, Initiales, Statut & Date). Le système va tout déduire et créer automatiquement les comptes !
+                        </p>
+                        <textarea
+                            className="input"
+                            rows="10"
+                            style={{ width: '100%', fontFamily: 'monospace', fontSize: '12.5px', marginBottom: '16px', padding: '12px' }}
+                            value={rawImportText}
+                            onChange={(e) => setRawImportText(e.target.value)}
+                            placeholder={`Exemple à copier :\n48\nisis_mlf\n06 33 40 86 06\njuyjgj26@gmail.com\nVinted009&*\nTD\nactif 28/07/2026\n\n49\nnaya_sky\n06 33 43 85 51\nee010010@outlook.fr\nVinted009&*\nTD\nactif 31/07/2026\nconnecté à Adspower le 05/08/26`}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button type="button" className="btn btn-secondary" onClick={() => setShowTextModal(false)}>Annuler</button>
+                            <button type="button" className="btn btn-primary" onClick={handleParseAndImportText}>
+                                <i className="fa-solid fa-rocket"></i> Importer & Enregistrer les Comptes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* FORMULAIRE COMPTE */}
             <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 className="card-title">{compteId ? 'Modifier le compte' : 'Ajouter un nouveau compte'}</h3>
+                <h3 className="card-title">{compteId ? 'Modifier le compte' : 'Ajouter un nouveau compte Vinted'}</h3>
                 <form onSubmit={handleSubmit}>
-                    <div className="grid-3">
+                    <div className="grid-3" style={{ marginBottom: '12px' }}>
+                        <div className="form-group">
+                            <label>N° Compte (Index)</label>
+                            <input type="text" value={numeroCompte} onChange={(e) => setNumeroCompte(e.target.value)} placeholder="ex: 48" />
+                        </div>
                         <div className="form-group">
                             <label>Pseudo Vinted</label>
-                            <input type="text" value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="ex: vintage_store_99" required />
+                            <input type="text" value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="ex: isis_mlf" required />
                         </div>
+                        <div className="form-group">
+                            <label>N° Téléphone</label>
+                            <input type="text" value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="ex: 06 33 40 86 06" />
+                        </div>
+                    </div>
 
+                    <div className="grid-3" style={{ marginBottom: '12px' }}>
+                        <div className="form-group">
+                            <label>Adresse Email</label>
+                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ex: juyjgj26@gmail.com" />
+                        </div>
+                        <div className="form-group">
+                            <label>Mot de Passe Vinted</label>
+                            <input type="text" value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)} placeholder="ex: Vinted009&*" />
+                        </div>
+                        <div className="form-group">
+                            <label>Géré par (Initiales)</label>
+                            <input type="text" value={gereParInitiales} onChange={(e) => setGereParInitiales(e.target.value)} placeholder="ex: TD, EG" />
+                        </div>
+                    </div>
+
+                    <div className="grid-3" style={{ marginBottom: '12px' }}>
                         <div className="form-group">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                                 <label style={{ marginBottom: 0 }}>Agent Responsable</label>
@@ -648,7 +821,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                     <i className="fa-solid fa-user-plus"></i> + Créer Agent
                                 </button>
                             </div>
-                            <select value={agent} onChange={(e) => setAgent(e.target.value)} required>
+                            <select value={agent} onChange={(e) => setAgent(e.target.value)}>
                                 <option value="">Sélectionner un agent...</option>
                                 {agentsList.map(a => (
                                     <option key={a.id} value={a.agentAssigne || a.nom}>{a.nom} ({a.agentAssigne || a.role})</option>
@@ -657,6 +830,22 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                         </div>
 
                         <div className="form-group">
+                            <label>Statut du compte</label>
+                            <select value={statut} onChange={(e) => setStatut(e.target.value)}>
+                                <option value="Actif">Actif</option>
+                                <option value="Limité">Limité / Restreint</option>
+                                <option value="Banni">Banni / Bloqué</option>
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Date du Statut</label>
+                            <input type="text" value={dateStatutCompte} onChange={(e) => setDateStatutCompte(e.target.value)} placeholder="ex: 28/07/2026" />
+                        </div>
+                    </div>
+
+                    <div className="grid-2" style={{ marginBottom: '16px' }}>
+                        <div className="form-group">
                             <label>Organisation</label>
                             <select value={isAdmin ? organisationId : userOrgId} onChange={(e) => setOrganisationId(e.target.value)} disabled={!isAdmin}>
                                 {organisations.map(o => (
@@ -664,21 +853,10 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 ))}
                             </select>
                         </div>
-                    </div>
-
-                    <div className="grid-2" style={{ marginBottom: '16px' }}>
-                        <div className="form-group">
-                            <label>Statut du compte</label>
-                            <select value={statut} onChange={(e) => setStatut(e.target.value)}>
-                                <option value="Actif">Actif</option>
-                                <option value="Limité">Limité</option>
-                                <option value="Banni">Banni</option>
-                            </select>
-                        </div>
 
                         <div className="form-group">
-                            <label>Notes / Observations</label>
-                            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="IP, proxy, détails du compte..." />
+                            <label>Notes & Observations (Adspower, Ventes, etc.)</label>
+                            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ex: connecté à Adspower le 05/08/26, 1 article en vente" />
                         </div>
                     </div>
 
@@ -750,12 +928,15 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 <th style={{ width: '40px', textAlign: 'center' }}>
                                     <input type="checkbox" checked={isAllComptesSelected} onChange={toggleSelectAllComptes} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                 </th>
+                                <th>N°</th>
                                 <th>Pseudo</th>
+                                <th>Téléphone</th>
+                                <th>Email</th>
+                                <th>Mot de passe</th>
+                                <th>Géré par</th>
                                 <th>Agent</th>
-                                <th>Organisation</th>
-                                <th>Statut</th>
-                                <th>Date Création</th>
-                                <th>Notes</th>
+                                <th>Statut & Date</th>
+                                <th>Notes & Observations</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -766,16 +947,20 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                         <td style={{ textAlign: 'center' }}>
                                             <input type="checkbox" checked={selectedCompteIds.includes(c.id)} onChange={() => toggleSelectCompte(c.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                         </td>
+                                        <td><b style={{ color: 'var(--primary)' }}>{c.numeroCompte || '-'}</b></td>
                                         <td><b>{c.pseudo}</b></td>
+                                        <td>{c.telephone || '-'}</td>
+                                        <td><span style={{ fontSize: '12px' }}>{c.email || '-'}</span></td>
+                                        <td><code style={{ fontSize: '11px', backgroundColor: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{c.motDePasse || '-'}</code></td>
+                                        <td>{c.gereParInitiales ? <span className="badge" style={{ backgroundColor: '#475569', color: '#fff' }}>{c.gereParInitiales}</span> : '-'}</td>
                                         <td><span className="badge badge-agent">{c.agent}</span></td>
-                                        <td><span className="badge badge-compte">{((organisations.find(o => o.id === c.organisationId) || {}).nom) || c.organisationId || 'Principale'}</span></td>
                                         <td>
                                             <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite')}`}>
                                                 {c.statut}
                                             </span>
+                                            {c.dateStatutCompte && <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>{c.dateStatutCompte}</span>}
                                         </td>
-                                        <td>{c.dateCreation || '-'}</td>
-                                        <td>{c.notes || '-'}</td>
+                                        <td style={{ fontSize: '12px', maxWidth: '200px' }}>{c.notes || '-'}</td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '6px' }}>
                                                 <button className="btn btn-primary btn-sm" onClick={() => handleEdit(c)} title="Éditer">
@@ -790,7 +975,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="11" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                                         Aucun compte Vinted enregistré.
                                     </td>
                                 </tr>
