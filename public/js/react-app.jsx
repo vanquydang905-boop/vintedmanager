@@ -334,25 +334,16 @@ function App() {
             <main className="main-content">
                 {currentUser && currentUser.role === 'admin' && (
                     <div style={{
-                        position: 'fixed',
-                        top: '18px',
-                        right: '24px',
-                        zIndex: 1000,
                         display: 'flex',
+                        justifyContent: 'flex-end',
                         alignItems: 'center',
-                        gap: '8px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.92)',
-                        backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)',
-                        padding: '6px 10px',
-                        borderRadius: '10px',
-                        border: '1px solid var(--border)',
-                        boxShadow: 'var(--shadow-md)'
+                        gap: '10px',
+                        marginBottom: '16px'
                     }}>
-                        <button className="btn btn-secondary btn-sm" onClick={handleExportJSON} title="Exporter la base de données en JSON" style={{ fontSize: '12px', padding: '5px 10px' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={handleExportJSON} title="Exporter la base de données en JSON">
                             <i className="fa-solid fa-download"></i> Exporter JSON
                         </button>
-                        <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, fontSize: '12px', padding: '5px 10px' }} title="Importer la base de données depuis un fichier JSON">
+                        <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }} title="Importer la base de données depuis un fichier JSON">
                             <i className="fa-solid fa-file-import"></i> Importer JSON
                             <input type="file" accept=".json" onChange={handleImportJSON} style={{ display: 'none' }} />
                         </label>
