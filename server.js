@@ -830,13 +830,23 @@ app.post('/api/extension/sync', async (req, res) => {
     }
 });
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`================================================`);
-    console.log(`  Vinted Manager Server running on port ${PORT}`);
-    console.log(`  Moteur de base de données : Supabase (Cloud)`);
-    console.log(`  Architecture : Multi-Organisation (Multi-Tenancy)`);
-    console.log(`  Gestion des rôles : Admin, Cadre, Agent`);
-    console.log(`  Local URL: http://localhost:${PORT}`);
-    console.log(`================================================`);
+// SPA Fallback Route
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Start Server
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`================================================`);
+        console.log(`  Vinted Manager Server running on port ${PORT}`);
+        console.log(`  Moteur de base de données : Supabase (Cloud)`);
+        console.log(`  Architecture : Multi-Organisation (Multi-Tenancy)`);
+        console.log(`  Gestion des rôles : Admin, Cadre, Agent`);
+        console.log(`  Local URL: http://localhost:${PORT}`);
+        console.log(`================================================`);
+    });
+}
+
+module.exports = app;
+
