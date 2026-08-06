@@ -116,19 +116,6 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                     </button>
                 )}
             </nav>
-
-            {/* Import / Export JSON */}
-            {isAdmin && (
-                <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <button className="btn btn-secondary btn-sm" onClick={onExportJSON} style={{ width: '100%', justifyContent: 'center' }}>
-                        <i className="fa-solid fa-download"></i> Exporter JSON
-                    </button>
-                    <label className="btn btn-secondary btn-sm" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer' }}>
-                        <i className="fa-solid fa-upload"></i> Importer JSON
-                        <input type="file" accept=".json" onChange={onImportJSON} style={{ display: 'none' }} />
-                    </label>
-                </div>
-            )}
         </aside>
     );
 }
