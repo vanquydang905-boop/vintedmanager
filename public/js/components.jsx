@@ -289,9 +289,9 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
                                 <th>SKU</th>
                                 <th>Vues</th>
-                                <th>Likes</th>
+                                {/* <th>Likes</th> */}
                                 <th>Favoris</th>
-                                <th>Msgs</th>
+                                {/* <th>Msgs</th> */}
                                 <th>Vente</th>
                                 <th>Score</th>
                                 <th>Classif.</th>
@@ -352,18 +352,18 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             <input type="number" className="input-table" style={{ width: '60px' }} value={l.vues || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { vues: parseInt(e.target.value) || 0 })} />
                                         </td>
-                                        <td>
+                                        {/* <td>
                                             <input type="number" className="input-table" style={{ width: '60px' }} value={l.likes || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { likes: parseInt(e.target.value) || 0 })} />
-                                        </td>
+                                        </td> */}
                                         <td>
                                             <input type="number" className="input-table" style={{ width: '60px' }} value={l.favoris || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { favoris: parseInt(e.target.value) || 0 })} />
                                         </td>
-                                        <td>
+                                        {/* <td>
                                             <input type="number" className="input-table" style={{ width: '60px' }} value={l.messages || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { messages: parseInt(e.target.value) || 0 })} />
-                                        </td>
+                                        </td> */}
                                         <td style={{ textAlign: 'center' }}>
                                             <button className={`btn btn-sm ${l.vente === 1 ? 'btn-success' : 'btn-secondary'}`}
                                                 onClick={() => onUpdateRow(l.id, { vente: l.vente === 1 ? 0 : 1 })}>
@@ -960,10 +960,10 @@ function ParametresView({ appState, onSaveParametres }) {
                     <h3 className="card-title">📊 Pondération du Score & Seuils de Classification</h3>
                     <div className="grid-2">
                         <div className="form-group"><label>Poids : Vues</label><input type="number" step="0.1" value={poidsVues} onChange={(e) => setPoidsVues(e.target.value)} /></div>
-                        <div className="form-group"><label>Poids : Favoris / Likes</label><input type="number" step="0.1" value={poidsFavoris} onChange={(e) => setPoidsFavoris(e.target.value)} /></div>
+                        <div className="form-group"><label>Poids : Favoris</label><input type="number" step="0.1" value={poidsFavoris} onChange={(e) => setPoidsFavoris(e.target.value)} /></div>
                     </div>
                     <div className="grid-2">
-                        <div className="form-group"><label>Poids : Messages</label><input type="number" step="0.1" value={poidsMessages} onChange={(e) => setPoidsMessages(e.target.value)} /></div>
+                        {/* <div className="form-group"><label>Poids : Messages</label><input type="number" step="0.1" value={poidsMessages} onChange={(e) => setPoidsMessages(e.target.value)} /></div> */}
                         <div className="form-group"><label>Poids : Vente Directe</label><input type="number" step="0.1" value={poidsVente} onChange={(e) => setPoidsVente(e.target.value)} /></div>
                     </div>
 

@@ -22,12 +22,14 @@ function getLocalDateString(d = new Date()) {
 }
 
 function calcScore(item, params) {
-    const p = params.poidsScore || { vues: 0.1, likes: 1, favoris: 2, messages: 5, vente: 20 };
-    const favCount = (item.favoris || 0) + (item.likes || 0);
-    const weightFav = p.favoris || p.likes || 2.0;
+    const p = params.poidsScore || { vues: 0.1, favoris: 2, vente: 20 };
+    // Likes et Messages désactivés temporairement
+    // const favCount = (item.favoris || 0) + (item.likes || 0);
+    const favCount = (item.favoris || 0);
+    const weightFav = p.favoris || 2.0;
     return (item.vues || 0) * (p.vues || 0) +
         favCount * weightFav +
-        (item.messages || 0) * (p.messages || 0) +
+        // (item.messages || 0) * (p.messages || 0) +
         (item.vente || 0) * (p.vente || 0);
 }
 
