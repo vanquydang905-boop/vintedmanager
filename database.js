@@ -312,7 +312,34 @@ const dbService = {
                 if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
                 const { data, error } = await query;
                 if (!error && Array.isArray(data)) {
-                    data.map(fromDbFormat).forEach(dbRow => {
+                    data.map(dbRow => {
+                        let extra = {};
+                        if (dbRow.notes) {
+                            try {
+                                extra = JSON.parse(dbRow.notes);
+                                if (typeof extra !== 'object' || extra === null) extra = {};
+                            } catch (e) {
+                                extra = { userNotes: dbRow.notes };
+                            }
+                        }
+
+                        return {
+                            id: dbRow.id,
+                            organisationId: dbRow.organisationid || 'org_default',
+                            pseudo: dbRow.pseudo || '',
+                            agent: dbRow.agent || '',
+                            lienProfil: dbRow.lienprofil || '',
+                            statut: dbRow.statut || 'Actif',
+                            dateCreation: dbRow.datecreation || '',
+                            numeroCompte: extra.numeroCompte || dbRow.numerocompte || '',
+                            telephone: extra.telephone || dbRow.telephone || '',
+                            email: extra.email || dbRow.email || '',
+                            motDePasse: extra.motDePasse || dbRow.motdepasse || '',
+                            gereParInitiales: extra.gereParInitiales || dbRow.gereparinitiales || '',
+                            dateStatutCompte: extra.dateStatutCompte || dbRow.datestatutcompte || '',
+                            notes: extra.userNotes !== undefined ? extra.userNotes : (dbRow.notes || '')
+                        };
+                    }).forEach(dbRow => {
                         const idx = list.findIndex(item => item.id === dbRow.id);
                         if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
                         else list.push(dbRow);
@@ -341,9 +368,31 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const dbPayload = toDbFormat(payload);
+                const extraMeta = {
+                    numeroCompte: payload.numeroCompte || '',
+                    telephone: payload.telephone || '',
+                    email: payload.email || '',
+                    motDePasse: payload.motDePasse || '',
+                    gereParInitiales: payload.gereParInitiales || '',
+                    dateStatutCompte: payload.dateStatutCompte || '',
+                    userNotes: payload.notes || ''
+                };
+
+                const dbPayload = {
+                    id: payload.id,
+                    organisationid: (payload.organisationId || 'org_default').toLowerCase(),
+                    pseudo: payload.pseudo || '',
+                    agent: payload.agent || '',
+                    lienprofil: payload.lienProfil || '',
+                    statut: payload.statut || 'Actif',
+                    datecreation: payload.dateCreation || getLocalDateString(),
+                    notes: JSON.stringify(extraMeta)
+                };
+
                 const { data, error } = await supabase.from('comptes').upsert([dbPayload]).select();
-                if (!error && data && data.length) return fromDbFormat(data[0]);
+                if (!error && data && data.length) {
+                    return payload;
+                }
             } catch (err) {}
         }
         return payload;
@@ -351,11 +400,31 @@ const dbService = {
 
     async updateCompte(id, fields) {
         const idx = DEFAULT_COMPTES.findIndex(c => c.id === id);
-        if (idx >= 0) DEFAULT_COMPTES[idx] = { ...DEFAULT_COMPTES[idx], ...fields };
+        let existingCompte = idx >= 0 ? DEFAULT_COMPTES[idx] : { id };
+        const updatedCompte = { ...existingCompte, ...fields };
+
+        if (idx >= 0) DEFAULT_COMPTES[idx] = updatedCompte;
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const dbFields = toDbFormat(fields);
+                const extraMeta = {
+                    numeroCompte: updatedCompte.numeroCompte || '',
+                    telephone: updatedCompte.telephone || '',
+                    email: updatedCompte.email || '',
+                    motDePasse: updatedCompte.motDePasse || '',
+                    gereParInitiales: updatedCompte.gereParInitiales || '',
+                    dateStatutCompte: updatedCompte.dateStatutCompte || '',
+                    userNotes: updatedCompte.notes || ''
+                };
+
+                const dbFields = {
+                    organisationid: (updatedCompte.organisationId || 'org_default').toLowerCase(),
+                    pseudo: updatedCompte.pseudo || '',
+                    agent: updatedCompte.agent || '',
+                    statut: updatedCompte.statut || 'Actif',
+                    notes: JSON.stringify(extraMeta)
+                };
+
                 await supabase.from('comptes').update(dbFields).eq('id', id).select();
             } catch (err) {}
         }
@@ -364,7 +433,7 @@ const dbService = {
                 if (l.compteId === id) l.agent = fields.agent;
             });
         }
-        return { id, ...fields };
+        return updatedCompte;
     },
 
     async deleteCompte(id) {
