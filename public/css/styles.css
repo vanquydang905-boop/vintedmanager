@@ -512,6 +512,12 @@ input:focus, select:focus, textarea:focus {
     border: 1px solid var(--warning-border);
 }
 
+.badge-nouveau {
+    background-color: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+}
+
 .badge-actif { background-color: var(--success-bg); color: #047857; }
 .badge-limite { background-color: var(--warning-bg); color: #b45309; }
 .badge-banni { background-color: var(--danger-bg); color: #b91c1c; }

@@ -31,11 +31,47 @@ function calcScore(item, params) {
         (item.vente || 0) * (p.vente || 0);
 }
 
-function getClassification(score, vente, params) {
+function getClassification(itemOrScore, allOrgLinesOrVente = [], paramsObj = {}) {
+    let item = {};
+    let allOrgLines = [];
+    let params = {};
+
+    if (typeof itemOrScore === 'object' && itemOrScore !== null) {
+        item = itemOrScore;
+        allOrgLines = Array.isArray(allOrgLinesOrVente) ? allOrgLinesOrVente : [];
+        params = paramsObj || {};
+    } else {
+        item = {
+            score: typeof itemOrScore === 'number' ? itemOrScore : 0,
+            vente: typeof allOrgLinesOrVente === 'number' ? allOrgLinesOrVente : 0
+        };
+        params = paramsObj || {};
+        allOrgLines = arguments[3] && Array.isArray(arguments[3]) ? arguments[3] : [];
+        if (arguments[4] && typeof arguments[4] === 'string') {
+            item.sku = arguments[4];
+        }
+    }
+
     const s = params.seuils || { ecarte: 15, gagnant: 40 };
+    const score = item.score || 0;
+    const vente = item.vente || 0;
+
     if (vente === 1 || score >= s.gagnant) return "Gagnant";
-    if (score < s.ecarte) return "Écarté";
-    return "À retester";
+    if (score > 0 && score < s.ecarte) return "Écarté";
+
+    const sku = (item.sku || '').trim().toLowerCase();
+    if (sku) {
+        const otherWithSameSKU = (allOrgLines || []).filter(l => 
+            l.id !== item.id && 
+            l.sku && 
+            l.sku.trim().toLowerCase() === sku
+        );
+        if (otherWithSameSKU.length > 0) {
+            return "À retester";
+        }
+    }
+
+    return "Nouveau produit";
 }
 
 // ==========================================
@@ -342,8 +378,9 @@ app.post('/api/calendrier', async (req, res) => {
             prochainRepost: null
         };
 
+        const allCal = await dbService.getCalendrier(orgId);
         newLine.score = calcScore(newLine, params);
-        newLine.classification = getClassification(newLine.score, newLine.vente, params);
+        newLine.classification = getClassification(newLine, allCal, params);
 
         const created = await dbService.createCalendrierRow(newLine);
         await dbService.logAction("Calendrier", `Ajout manuel d'une ligne SKU ${newLine.sku}`, "Succès", orgId);
@@ -368,7 +405,7 @@ app.put('/api/calendrier/:id', async (req, res) => {
         if (field === 'statut') {
             updated.statut = value;
             if (value === 'Fait') {
-                updated.dateStatut = new Date().toISOString().split('T')[0];
+                updated.dateStatut = getLocalDateString();
                 updated.heureStatut = new Date().toTimeString().split(' ')[0].substring(0, 5);
                 await dbService.logAction("Statut Calendrier", `Ligne ${id} marquée comme Faite`, "Succès", orgId);
             }
@@ -390,9 +427,9 @@ app.put('/api/calendrier/:id', async (req, res) => {
             updated[field] = value;
         }
 
-        // Recalcul du score et classification
+        const allCal = await dbService.getCalendrier(orgId);
         updated.score = calcScore(updated, params);
-        updated.classification = getClassification(updated.score, updated.vente, params);
+        updated.classification = getClassification(updated, allCal, params);
 
         const saved = await dbService.updateCalendrierRow(id, updated);
 

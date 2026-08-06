@@ -267,9 +267,10 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                         <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Classification</label>
                         <select className="input" value={filterClassif} onChange={(e) => setFilterClassif(e.target.value)}>
                             <option value="">Toutes</option>
-                            <option value="Gagnant">Gagnant</option>
-                            <option value="À retester">À retester</option>
-                            <option value="Écarté">Écarté</option>
+                            <option value="Nouveau produit">🆕 Nouveau produit</option>
+                            <option value="À retester">🔄 À retester</option>
+                            <option value="Gagnant">🏆 Gagnant</option>
+                            <option value="Écarté">❌ Écarté</option>
                         </select>
                     </div>
                 </div>
@@ -352,8 +353,12 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 onChange={(e) => onUpdateRow(l.id, { vues: parseInt(e.target.value) || 0 })} />
                                         </td>
                                         <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.likes || l.favoris || 0}
-                                                onChange={(e) => onUpdateRow(l.id, { likes: parseInt(e.target.value) || 0, favoris: parseInt(e.target.value) || 0 })} />
+                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.likes || 0}
+                                                onChange={(e) => onUpdateRow(l.id, { likes: parseInt(e.target.value) || 0 })} />
+                                        </td>
+                                        <td>
+                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.favoris || 0}
+                                                onChange={(e) => onUpdateRow(l.id, { favoris: parseInt(e.target.value) || 0 })} />
                                         </td>
                                         <td>
                                             <input type="number" className="input-table" style={{ width: '60px' }} value={l.messages || 0}
@@ -367,8 +372,13 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         </td>
                                         <td><b>{(l.score || 0).toFixed(1)}</b></td>
                                         <td>
-                                            <span className={`badge ${l.classification === 'Gagnant' ? 'badge-gagnant' : (l.classification === 'Écarté' ? 'badge-ecarte' : 'badge-retester')}`}>
-                                                {l.classification || 'À retester'}
+                                            <span className={`badge ${
+                                                l.classification === 'Gagnant' ? 'badge-gagnant' :
+                                                l.classification === 'Écarté' ? 'badge-ecarte' :
+                                                l.classification === 'Nouveau produit' ? 'badge-nouveau' :
+                                                'badge-retester'
+                                            }`}>
+                                                {l.classification || 'Nouveau produit'}
                                             </span>
                                         </td>
                                         <td>
