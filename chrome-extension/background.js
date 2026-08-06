@@ -7,7 +7,7 @@ console.log("[Vinted Manager Extension] Background Service Worker initialized.")
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "SYNC_TO_SERVER") {
         const { serverUrl, payload } = request;
-        const targetUrl = (serverUrl || "http://localhost:3000").replace(/\/$/, '') + "/api/extension/sync";
+        const targetUrl = (serverUrl || "https://vintedmanager-bkgg.vercel.app").replace(/\/$/, '') + "/api/extension/sync";
 
         fetch(targetUrl, {
             method: 'POST',

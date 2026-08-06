@@ -25,6 +25,6 @@ Cette extension Chrome officielle permet d'extraire automatiquement les métriqu
 
 1. Connectez-vous à votre compte **Vinted** sur [vinted.fr](https://www.vinted.fr).
 2. Cliquez sur l'icône de l'extension **Vinted Manager** dans la barre d'outils Chrome.
-3. Vérifiez l'URL du serveur (par défaut `http://localhost:3000`).
+3. Vérifiez l'URL du serveur (par défaut `https://vintedmanager-bkgg.vercel.app`).
 4. Cliquez sur **⚡ Scraper & Synchroniser**.
 5. Les métriques (vues, likes, messages, ventes) sont instantanément envoyées à Vinted Manager et les scores du calendrier sont recalculés !

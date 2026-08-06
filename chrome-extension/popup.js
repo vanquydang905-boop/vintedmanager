@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statusMsg.innerText = "⏳ Extraction des données Dotb...";
         statusMsg.className = "status-msg";
 
-        const serverUrl = serverUrlInput.value.trim() || "http://localhost:3000";
+        const serverUrl = serverUrlInput.value.trim() || "https://vintedmanager-bkgg.vercel.app";
         const pseudoOverride = pseudoOverrideInput.value.trim();
 
         // Récupérer l'onglet actif
