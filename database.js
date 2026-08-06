@@ -82,17 +82,17 @@ let DEFAULT_PARAMETRES = {
 };
 
 let DEFAULT_ORGANISATIONS = [
-    { id: 'org_default', nom: 'Organisation Principale', dateCreation: '2026-08-04' },
-    { id: 'org_paris', nom: 'Agence Vinted Paris', dateCreation: '2026-08-04' }
+    { id: 'org_default', nom: 'Organisation Principale', dateCreation: '2026-08-07' },
+    { id: 'org_paris', nom: 'Agence Vinted Paris', dateCreation: '2026-08-07' }
 ];
 
 let DEFAULT_UTILISATEURS = [
-    { id: 'usr_admin_florencio', nom: 'Florencio', email: 'florencio@vintedmanager.com', role: 'admin', organisationId: 'org_default', agentAssigne: '', motDePasse: process.env.INITIAL_ADMIN_PASSWORD || 'ChangeMe123!', dateCreation: '2026-08-04' },
-    { id: 'usr_muller', nom: 'Muller', email: 'tsaralahy343@gmail.com', role: 'agent', organisationId: 'org_default', agentAssigne: 'Muller', motDePasse: 'muller2026', dateCreation: '2026-08-06' }
+    { id: 'usr_admin_florencio', nom: 'Florencio', email: 'florencio@vintedmanager.com', role: 'admin', organisationId: 'org_default', agentAssigne: '', motDePasse: process.env.INITIAL_ADMIN_PASSWORD || 'ChangeMe123!', dateCreation: '2026-08-07' },
+    { id: 'usr_muller', nom: 'Muller', email: 'tsaralahy343@gmail.com', role: 'agent', organisationId: 'org_default', agentAssigne: 'Muller', motDePasse: 'muller2026', dateCreation: '2026-08-07' }
 ];
 
 let DEFAULT_COMPTES = [
-    { id: 'compte_demo1', organisationId: 'org_default', pseudo: 'vinted_boutique_fr', agent: 'Muller', statut: 'Actif', dateCreation: '2026-08-04', notes: 'Compte principal' }
+    { id: 'compte_demo1', organisationId: 'org_default', pseudo: 'vinted_boutique_fr', agent: 'Muller', statut: 'Actif', dateCreation: '2026-08-07', notes: 'Compte principal' }
 ];
 
 let DEFAULT_CALENDRIER = [];
