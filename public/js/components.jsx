@@ -963,6 +963,8 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
     const [organisationId, setOrganisationId] = useState(userOrgId);
     const [agentAssigne, setAgentAssigne] = useState('');
     const [motDePasse, setMotDePasse] = useState('123456');
+    const [contactType, setContactType] = useState('WhatsApp');
+    const [contactNumero, setContactNumero] = useState('');
 
     const utilisateurs = appState.utilisateurs || [];
     const organisations = appState.organisations || [];
@@ -980,6 +982,8 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
         setOrganisationId(isAdmin ? (u.organisationId || 'org_default') : userOrgId);
         setAgentAssigne(u.agentAssigne || '');
         setMotDePasse(u.motDePasse || '');
+        setContactType(u.contactType || 'WhatsApp');
+        setContactNumero(u.contactNumero || '');
     };
 
     const handleReset = () => {
@@ -990,6 +994,8 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
         setOrganisationId(userOrgId);
         setAgentAssigne('');
         setMotDePasse('123456');
+        setContactType('WhatsApp');
+        setContactNumero('');
     };
 
     const handleSubmit = (e) => {
@@ -1001,7 +1007,9 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
             role: isAdmin ? role : 'agent',
             organisationId: isAdmin ? organisationId : userOrgId,
             agentAssigne: agentAssigne || nom,
-            motDePasse
+            motDePasse,
+            contactType,
+            contactNumero
         });
         handleReset();
     };
@@ -1057,6 +1065,21 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                         </div>
                     </div>
 
+                    <div className="grid-2">
+                        <div className="form-group">
+                            <label>Canal de Contact Direct</label>
+                            <select value={contactType} onChange={(e) => setContactType(e.target.value)}>
+                                <option value="WhatsApp">WhatsApp Messenger / Business</option>
+                                <option value="Signal">Signal Private Messenger</option>
+                                <option value="Telegram">Telegram</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Numéro ou Pseudo ({contactType})</label>
+                            <input type="text" value={contactNumero} onChange={(e) => setContactNumero(e.target.value)} placeholder={contactType === 'Telegram' ? '@mon_pseudo ou +33612345678' : '+33612345678'} />
+                        </div>
+                    </div>
+
                     <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                         <button type="submit" className="btn btn-primary">
                             <i className="fa-solid fa-user-plus"></i> Enregistrer l'agent
@@ -1079,6 +1102,7 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                                 <th>Email</th>
                                 <th>Rôle</th>
                                 <th>Organisation</th>
+                                <th>Contact Direct</th>
                                 <th>Agent Assigné</th>
                                 <th>Date Création</th>
                                 <th>Actions</th>
@@ -1099,6 +1123,39 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                                             </span>
                                         </td>
                                         <td><span className="badge badge-compte">{((organisations.find(o => o.id === u.organisationId) || {}).nom) || u.organisationId || 'Par défaut'}</span></td>
+                                        <td>
+                                            {u.contactNumero ? (
+                                                <a
+                                                    href={
+                                                        u.contactType === 'Telegram'
+                                                            ? (u.contactNumero.startsWith('@') ? `https://t.me/${u.contactNumero.replace('@', '')}` : `https://t.me/${u.contactNumero.replace(/\s+/g, '')}`)
+                                                            : (u.contactType === 'WhatsApp' ? `https://wa.me/${u.contactNumero.replace(/[^0-9]/g, '')}` : `tel:${u.contactNumero}`)
+                                                    }
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="badge"
+                                                    style={{
+                                                        background: u.contactType === 'WhatsApp' ? '#25d366' : (u.contactType === 'Telegram' ? '#0088cc' : '#3a76f0'),
+                                                        color: 'white',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '5px',
+                                                        textDecoration: 'none',
+                                                        fontWeight: 600,
+                                                        fontSize: '11px',
+                                                        padding: '3px 8px'
+                                                    }}
+                                                    title={`Ouvrir dans ${u.contactType || 'WhatsApp'}`}
+                                                >
+                                                    <i className={
+                                                        u.contactType === 'WhatsApp' ? 'fa-brands fa-whatsapp' : (u.contactType === 'Telegram' ? 'fa-brands fa-telegram' : 'fa-solid fa-comment-dots')
+                                                    }></i>
+                                                    {u.contactNumero}
+                                                </a>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
+                                            )}
+                                        </td>
                                         <td>{u.agentAssigne || u.nom}</td>
                                         <td>{u.dateCreation || '-'}</td>
                                         <td>
