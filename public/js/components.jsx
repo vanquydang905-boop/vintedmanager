@@ -65,18 +65,18 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
             {/* Menu Nav Links */}
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
                 <button className={`nav-btn ${activeView === 'dashboard' ? 'active' : ''}`} onClick={() => onSelectView('dashboard')}>
-                    <i className="fa-solid fa-chart-line"></i> Calendrier
+                    <i className="fa-solid fa-calendar-days"></i> Calendrier
                 </button>
 
                 {isCadre && (
                     <button className={`nav-btn ${activeView === 'comptes' ? 'active' : ''}`} onClick={() => onSelectView('comptes')}>
-                        <i className="fa-solid fa-users"></i> Comptes
+                        <i className="fa-solid fa-store"></i> Comptes
                     </button>
                 )}
 
                 {isCadre && (
                     <button className={`nav-btn ${activeView === 'planning' ? 'active' : ''}`} onClick={() => onSelectView('planning')}>
-                        <i className="fa-solid fa-sliders"></i> Génération
+                        <i className="fa-solid fa-wand-magic-sparkles"></i> Génération
                     </button>
                 )}
 
@@ -85,7 +85,7 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                 </button>
 
                 <button className={`nav-btn ${activeView === 'gagnants' ? 'active' : ''}`} onClick={() => onSelectView('gagnants')}>
-                    <i className="fa-solid fa-star"></i> Suggestions
+                    <i className="fa-solid fa-lightbulb"></i> Suggestions
                 </button>
 
                 <button className={`nav-btn ${activeView === 'incidents' ? 'active' : ''}`} onClick={() => onSelectView('incidents')}>
@@ -94,25 +94,25 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
 
                 {isAdmin && (
                     <button className={`nav-btn ${activeView === 'organisations' ? 'active' : ''}`} onClick={() => onSelectView('organisations')}>
-                        <i className="fa-solid fa-building"></i> Organisations
+                        <i className="fa-solid fa-sitemap"></i> Organisations
                     </button>
                 )}
 
                 {isCadre && (
                     <button className={`nav-btn ${activeView === 'utilisateurs' ? 'active' : ''}`} onClick={() => onSelectView('utilisateurs')}>
-                        <i className="fa-solid fa-user-gear"></i> Utilisateurs
+                        <i className="fa-solid fa-users-gear"></i> Utilisateurs
                     </button>
                 )}
 
                 {isCadre && (
                     <button className={`nav-btn ${activeView === 'parametres' ? 'active' : ''}`} onClick={() => onSelectView('parametres')}>
-                        <i className="fa-solid fa-gear"></i> Paramètres
+                        <i className="fa-solid fa-sliders"></i> Paramètres
                     </button>
                 )}
 
                 {isCadre && (
                     <button className={`nav-btn ${activeView === 'journal' ? 'active' : ''}`} onClick={() => onSelectView('journal')}>
-                        <i className="fa-solid fa-book"></i> Journal
+                        <i className="fa-solid fa-clock-rotate-left"></i> Journal
                     </button>
                 )}
             </nav>
@@ -1095,18 +1095,14 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                                         <td>{u.agentAssigne || u.nom}</td>
                                         <td>{u.dateCreation || '-'}</td>
                                         <td>
-                                            {(isAdmin || u.role === 'agent') ? (
-                                                <div style={{ display: 'flex', gap: '6px' }}>
-                                                    <button className="btn btn-primary btn-sm" onClick={() => handleEdit(u)} title="Éditer">
-                                                        <i className="fa-solid fa-pen"></i>
-                                                    </button>
-                                                    <button className="btn btn-danger btn-sm" onClick={() => onDeleteUser(u.id)} title="Supprimer">
-                                                        <i className="fa-solid fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Protégé (Admin)</span>
-                                            )}
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <button className="btn btn-primary btn-sm" onClick={() => handleEdit(u)} title="Éditer">
+                                                    <i className="fa-solid fa-pen"></i>
+                                                </button>
+                                                <button className="btn btn-danger btn-sm" onClick={() => onDeleteUser(u.id)} title="Supprimer">
+                                                    <i className="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))

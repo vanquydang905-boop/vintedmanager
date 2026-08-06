@@ -280,6 +280,16 @@ body {
     color: var(--info);
 }
 
+.metric-icon.purple {
+    background: #f3e8ff;
+    color: #9333ea;
+}
+
+.metric-icon.amber {
+    background: #fffbeb;
+    color: #d97706;
+}
+
 .metric-info {
     min-width: 0;
     flex: 1;
