@@ -161,11 +161,12 @@ function convertHHMM(timeStr, dateStr, fromTZ, toTZ) {
 }
 
 // ------------------- VIEW: DASHBOARD / CALENDRIER -------------------
-function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick, selectedTZ = 'FR' }) {
+function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick, onBulkUpdateCalendrier, onBulkDeleteCalendrier, selectedTZ = 'FR' }) {
     const [filterCompte, setFilterCompte] = useState('');
     const [filterAgent, setFilterAgent] = useState((currentUser && currentUser.role === 'agent') ? (currentUser.agentAssigne || '') : '');
     const [filterStatut, setFilterStatut] = useState('');
     const [filterClassif, setFilterClassif] = useState('');
+    const [selectedIds, setSelectedIds] = useState([]);
 
     const comptes = appState.comptes || [];
     const calendrier = appState.calendrier || [];
@@ -181,6 +182,42 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
             return true;
         }).sort((a, b) => new Date(`${a.date}T${a.heurePrevue}`) - new Date(`${b.date}T${b.heurePrevue}`));
     }, [calendrier, filterCompte, filterAgent, filterStatut, filterClassif]);
+
+    const isAllSelected = useMemo(() => {
+        return filteredLines.length > 0 && filteredLines.every(l => selectedIds.includes(l.id));
+    }, [filteredLines, selectedIds]);
+
+    const toggleSelectAll = () => {
+        if (isAllSelected) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredLines.map(l => l.id));
+        }
+    };
+
+    const toggleSelectRow = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+    };
+
+    const handleBulkStatut = async (newStatut) => {
+        if (selectedIds.length === 0 || !onBulkUpdateCalendrier) return;
+        await onBulkUpdateCalendrier(selectedIds, { statut: newStatut });
+        setSelectedIds([]);
+    };
+
+    const handleBulkAgent = async (newAgent) => {
+        if (selectedIds.length === 0 || !newAgent || !onBulkUpdateCalendrier) return;
+        await onBulkUpdateCalendrier(selectedIds, { agent: newAgent });
+        setSelectedIds([]);
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0 || !onBulkDeleteCalendrier) return;
+        if (window.confirm(`Voulez-vous vraiment supprimer ces ${selectedIds.length} lignes sélectionnées ?`)) {
+            await onBulkDeleteCalendrier(selectedIds);
+            setSelectedIds([]);
+        }
+    };
 
     const totalVentes = useMemo(() => calendrier.reduce((sum, l) => sum + (l.vente || 0), 0), [calendrier]);
     const pubsFaite = useMemo(() => calendrier.filter(l => l.statut === 'Fait').length, [calendrier]);
@@ -276,12 +313,79 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                 </div>
             </div>
 
+            {/* FLOATING BULK ACTIONS BAR */}
+            {selectedIds.length > 0 && (
+                <div style={{
+                    position: 'sticky',
+                    top: '10px',
+                    zIndex: 1000,
+                    backgroundColor: '#0f172a',
+                    color: '#ffffff',
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600, fontSize: '13.5px' }}>
+                        <span style={{ backgroundColor: '#09b1ba', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', color: '#fff' }}>
+                            ✓ {selectedIds.length} sélectionné{selectedIds.length > 1 ? 's' : ''}
+                        </span>
+                        <span>Actions en masse :</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <button type="button" className="btn btn-sm" style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkStatut('Fait')}>
+                            ✓ Marquer Fait
+                        </button>
+                        <button type="button" className="btn btn-sm" style={{ backgroundColor: '#f59e0b', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkStatut('Non fait')}>
+                            ⌛ Marquer Non fait
+                        </button>
+
+                        {agentsUnique.length > 0 && (
+                            <select
+                                className="input-table"
+                                style={{ width: 'auto', backgroundColor: '#334155', color: '#fff', border: '1px solid #475569', padding: '5px 10px', fontSize: '12px' }}
+                                onChange={(e) => {
+                                    if (e.target.value) {
+                                        handleBulkAgent(e.target.value);
+                                        e.target.value = '';
+                                    }
+                                }}
+                            >
+                                <option value="">👤 Affecter Agent...</option>
+                                {agentsUnique.map(a => (
+                                    <option key={a} value={a}>{a}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        {(currentUser && currentUser.role !== 'agent') && (
+                            <button type="button" className="btn btn-sm btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleBulkDelete}>
+                                <i className="fa-solid fa-trash" style={{ marginRight: '4px' }}></i> Supprimer ({selectedIds.length})
+                            </button>
+                        )}
+
+                        <button type="button" className="btn btn-sm btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setSelectedIds([])}>
+                            Annuler
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* TABLEAU CALENDRIER */}
             <div className="card">
                 <div className="table-container">
                     <table>
                         <thead>
                             <tr>
+                                <th style={{ width: '40px', textAlign: 'center' }}>
+                                    <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} style={{ width: '16px', height: '16px', cursor: 'pointer' }} title="Tout sélectionner / Tout désélectionner" />
+                                </th>
                                 <th>Date</th>
                                 <th>Jour</th>
                                 <th>Compte</th>
@@ -302,7 +406,10 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                         <tbody>
                             {filteredLines.length > 0 ? (
                                 filteredLines.map(l => (
-                                    <tr key={l.id} style={{ opacity: l.statut === 'Fait' ? 0.85 : 1 }}>
+                                    <tr key={l.id} style={{ opacity: l.statut === 'Fait' ? 0.85 : 1, backgroundColor: selectedIds.includes(l.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <input type="checkbox" checked={selectedIds.includes(l.id)} onChange={() => toggleSelectRow(l.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                        </td>
                                         <td>{l.date}</td>
                                         <td><b>{l.jour}</b></td>
                                         <td>
@@ -412,7 +519,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 }
 
 // ------------------- VIEW: COMPTES -------------------
-function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOpenQuickAgentModal }) {
+function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBulkUpdateComptes, onBulkDeleteComptes, onOpenQuickAgentModal }) {
     const isAdmin = currentUser && currentUser.role === 'admin';
     const userOrgId = (currentUser && currentUser.organisationId) || 'org_default';
 
@@ -422,10 +529,12 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOp
     const [statut, setStatut] = useState('Actif');
     const [organisationId, setOrganisationId] = useState(userOrgId);
     const [notes, setNotes] = useState('');
+    const [selectedCompteIds, setSelectedCompteIds] = useState([]);
 
     const comptes = appState.comptes || [];
     const utilisateurs = appState.utilisateurs || [];
     const organisations = appState.organisations || [];
+
     const agentsList = useMemo(() => {
         let base = utilisateurs.filter(u => u.role === 'agent' || u.agentAssigne);
         if (!isAdmin) base = base.filter(u => (u.organisationId || 'org_default') === userOrgId);
@@ -436,6 +545,33 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOp
         if (isAdmin) return comptes;
         return comptes.filter(c => (c.organisationId || 'org_default') === userOrgId);
     }, [comptes, isAdmin, userOrgId]);
+
+    const isAllComptesSelected = useMemo(() => {
+        return visibleComptes.length > 0 && visibleComptes.every(c => selectedCompteIds.includes(c.id));
+    }, [visibleComptes, selectedCompteIds]);
+
+    const toggleSelectAllComptes = () => {
+        if (isAllComptesSelected) setSelectedCompteIds([]);
+        else setSelectedCompteIds(visibleComptes.map(c => c.id));
+    };
+
+    const toggleSelectCompte = (id) => {
+        setSelectedCompteIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const handleBulkCompteStatut = async (newStatut) => {
+        if (selectedCompteIds.length === 0 || !onBulkUpdateComptes) return;
+        await onBulkUpdateComptes(selectedCompteIds, { statut: newStatut });
+        setSelectedCompteIds([]);
+    };
+
+    const handleBulkDeleteComptesAction = async () => {
+        if (selectedCompteIds.length === 0 || !onBulkDeleteComptes) return;
+        if (window.confirm(`Voulez-vous vraiment supprimer ces ${selectedCompteIds.length} comptes sélectionnés ?`)) {
+            await onBulkDeleteComptes(selectedCompteIds);
+            setSelectedCompteIds([]);
+        }
+    };
 
     const handleEdit = (c) => {
         setCompteId(c.id);
@@ -532,6 +668,53 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOp
                 </form>
             </div>
 
+            {/* BULK ACTIONS FOR COMPTES */}
+            {selectedCompteIds.length > 0 && (
+                <div style={{
+                    position: 'sticky',
+                    top: '10px',
+                    zIndex: 1000,
+                    backgroundColor: '#0f172a',
+                    color: '#ffffff',
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600, fontSize: '13.5px' }}>
+                        <span style={{ backgroundColor: '#09b1ba', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', color: '#fff' }}>
+                            ✓ {selectedCompteIds.length} compte{selectedCompteIds.length > 1 ? 's' : ''}
+                        </span>
+                        <span>Actions en masse :</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <button type="button" className="btn btn-sm" style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkCompteStatut('Actif')}>
+                            Statut Actif
+                        </button>
+                        <button type="button" className="btn btn-sm" style={{ backgroundColor: '#f59e0b', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkCompteStatut('Limité')}>
+                            Statut Limité
+                        </button>
+                        <button type="button" className="btn btn-sm" style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkCompteStatut('Banni')}>
+                            Statut Banni
+                        </button>
+
+                        <button type="button" className="btn btn-sm btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleBulkDeleteComptesAction}>
+                            <i className="fa-solid fa-trash" style={{ marginRight: '4px' }}></i> Supprimer ({selectedCompteIds.length})
+                        </button>
+
+                        <button type="button" className="btn btn-sm btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setSelectedCompteIds([])}>
+                            Annuler
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* LISTE COMPTES */}
             <div className="card">
                 <h3 className="card-title">Liste des Comptes enregistrés ({visibleComptes.length})</h3>
@@ -539,6 +722,9 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOp
                     <table>
                         <thead>
                             <tr>
+                                <th style={{ width: '40px', textAlign: 'center' }}>
+                                    <input type="checkbox" checked={isAllComptesSelected} onChange={toggleSelectAllComptes} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                </th>
                                 <th>Pseudo</th>
                                 <th>Agent</th>
                                 <th>Organisation</th>
@@ -551,7 +737,10 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onOp
                         <tbody>
                             {visibleComptes.length > 0 ? (
                                 visibleComptes.map(c => (
-                                    <tr key={c.id}>
+                                    <tr key={c.id} style={{ backgroundColor: selectedCompteIds.includes(c.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <input type="checkbox" checked={selectedCompteIds.includes(c.id)} onChange={() => toggleSelectCompte(c.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                        </td>
                                         <td><b>{c.pseudo}</b></td>
                                         <td><span className="badge badge-agent">{c.agent}</span></td>
                                         <td><span className="badge badge-compte">{((organisations.find(o => o.id === c.organisationId) || {}).nom) || c.organisationId || 'Principale'}</span></td>
@@ -753,15 +942,47 @@ function PlanningView({ appState, onGeneratePlanning }) {
 }
 
 // ------------------- VIEW: INCIDENTS -------------------
-function IncidentsView({ appState, onSaveIncident }) {
+function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
+    const todayDateTimeStr = useMemo(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }, []);
+
     const [compteId, setCompteId] = useState('');
     const [type, setType] = useState('Limitation');
-    const [dateHeure, setDateHeure] = useState(new Date().toISOString().substring(0, 16));
+    const [dateHeure, setDateHeure] = useState(todayDateTimeStr);
     const [nbAnnonces, setNbAnnonces] = useState('');
     const [skuAnnonces, setSkuAnnonces] = useState('');
+    const [selectedIncidentIds, setSelectedIncidentIds] = useState([]);
 
     const comptes = appState.comptes || [];
     const incidents = appState.incidents || [];
+
+    const isAllIncidentsSelected = useMemo(() => {
+        return incidents.length > 0 && incidents.every(i => selectedIncidentIds.includes(i.id));
+    }, [incidents, selectedIncidentIds]);
+
+    const toggleSelectAllIncidents = () => {
+        if (isAllIncidentsSelected) setSelectedIncidentIds([]);
+        else setSelectedIncidentIds(incidents.map(i => i.id));
+    };
+
+    const toggleSelectIncident = (id) => {
+        setSelectedIncidentIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+    };
+
+    const handleBulkDeleteIncidentsAction = async () => {
+        if (selectedIncidentIds.length === 0 || !onBulkDeleteIncidents) return;
+        if (window.confirm(`Voulez-vous vraiment supprimer ces ${selectedIncidentIds.length} incidents sélectionnés ?`)) {
+            await onBulkDeleteIncidents(selectedIncidentIds);
+            setSelectedIncidentIds([]);
+        }
+    };
 
     const getComptePseudo = (cId) => {
         const c = comptes.find(comp => comp.id === cId);
@@ -840,6 +1061,43 @@ function IncidentsView({ appState, onSaveIncident }) {
                 </form>
             </div>
 
+            {/* BULK ACTIONS FOR INCIDENTS */}
+            {selectedIncidentIds.length > 0 && (
+                <div style={{
+                    position: 'sticky',
+                    top: '10px',
+                    zIndex: 1000,
+                    backgroundColor: '#0f172a',
+                    color: '#ffffff',
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600, fontSize: '13.5px' }}>
+                        <span style={{ backgroundColor: '#09b1ba', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', color: '#fff' }}>
+                            ✓ {selectedIncidentIds.length} incident{selectedIncidentIds.length > 1 ? 's' : ''}
+                        </span>
+                        <span>Actions en masse :</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <button type="button" className="btn btn-sm btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleBulkDeleteIncidentsAction}>
+                            <i className="fa-solid fa-trash" style={{ marginRight: '4px' }}></i> Supprimer ({selectedIncidentIds.length})
+                        </button>
+
+                        <button type="button" className="btn btn-sm btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setSelectedIncidentIds([])}>
+                            Annuler
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* HISTORIQUE INCIDENTS */}
             <div className="card">
                 <h3 className="card-title">Historique des Incidents</h3>
@@ -847,6 +1105,9 @@ function IncidentsView({ appState, onSaveIncident }) {
                     <table>
                         <thead>
                             <tr>
+                                <th style={{ width: '40px', textAlign: 'center' }}>
+                                    <input type="checkbox" checked={isAllIncidentsSelected} onChange={toggleSelectAllIncidents} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                </th>
                                 <th>Date & Heure</th>
                                 <th>Compte</th>
                                 <th>Type</th>
@@ -864,7 +1125,10 @@ function IncidentsView({ appState, onSaveIncident }) {
                                         : `${inc.nbVentesConnues || 0} ventes (${(inc.detailVentes || []).join(', ')})`;
 
                                     return (
-                                        <tr key={inc.id}>
+                                        <tr key={inc.id} style={{ backgroundColor: selectedIncidentIds.includes(inc.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <input type="checkbox" checked={selectedIncidentIds.includes(inc.id)} onChange={() => toggleSelectIncident(inc.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                            </td>
                                             <td><b>{inc.dateBlocage}</b> {inc.heureBlocage}</td>
                                             <td><span className="badge badge-compte">{getComptePseudo(inc.compteId)}</span></td>
                                             <td><span className={`badge ${badgeClass}`}>{inc.type}</span></td>
@@ -1081,7 +1345,7 @@ function LoginView({ onLoginSubmit, loginError }) {
 }
 
 // ------------------- VIEW: UTILISATEURS -------------------
-function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
+function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onBulkDeleteUsers }) {
     const isAdmin = currentUser && currentUser.role === 'admin';
     const userOrgId = (currentUser && currentUser.organisationId) || 'org_default';
 
@@ -1094,6 +1358,7 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
     const [motDePasse, setMotDePasse] = useState('123456');
     const [contactType, setContactType] = useState('WhatsApp');
     const [contactNumero, setContactNumero] = useState('');
+    const [selectedUserIds, setSelectedUserIds] = useState([]);
 
     const utilisateurs = appState.utilisateurs || [];
     const organisations = appState.organisations || [];
@@ -1102,6 +1367,27 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
         if (isAdmin) return utilisateurs;
         return utilisateurs.filter(u => (u.organisationId || 'org_default') === userOrgId);
     }, [utilisateurs, isAdmin, userOrgId]);
+
+    const isAllUsersSelected = useMemo(() => {
+        return visibleUsers.length > 0 && visibleUsers.every(u => selectedUserIds.includes(u.id));
+    }, [visibleUsers, selectedUserIds]);
+
+    const toggleSelectAllUsers = () => {
+        if (isAllUsersSelected) setSelectedUserIds([]);
+        else setSelectedUserIds(visibleUsers.map(u => u.id));
+    };
+
+    const toggleSelectUser = (id) => {
+        setSelectedUserIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const handleBulkDeleteUsersAction = async () => {
+        if (selectedUserIds.length === 0 || !onBulkDeleteUsers) return;
+        if (window.confirm(`Voulez-vous vraiment supprimer ces ${selectedUserIds.length} utilisateurs sélectionnés ?`)) {
+            await onBulkDeleteUsers(selectedUserIds);
+            setSelectedUserIds([]);
+        }
+    };
 
     const handleEdit = (u) => {
         setUserId(u.id);
@@ -1220,6 +1506,43 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                 </form>
             </div>
 
+            {/* BULK ACTIONS FOR USERS */}
+            {selectedUserIds.length > 0 && (
+                <div style={{
+                    position: 'sticky',
+                    top: '10px',
+                    zIndex: 1000,
+                    backgroundColor: '#0f172a',
+                    color: '#ffffff',
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600, fontSize: '13.5px' }}>
+                        <span style={{ backgroundColor: '#09b1ba', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', color: '#fff' }}>
+                            ✓ {selectedUserIds.length} utilisateur{selectedUserIds.length > 1 ? 's' : ''}
+                        </span>
+                        <span>Actions en masse :</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <button type="button" className="btn btn-sm btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleBulkDeleteUsersAction}>
+                            <i className="fa-solid fa-trash" style={{ marginRight: '4px' }}></i> Supprimer ({selectedUserIds.length})
+                        </button>
+
+                        <button type="button" className="btn btn-sm btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setSelectedUserIds([])}>
+                            Annuler
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* TABLEAU DES UTILISATEURS */}
             <div className="card">
                 <h3 className="card-title">Liste des Utilisateurs / Agents ({visibleUsers.length})</h3>
@@ -1227,6 +1550,9 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                     <table>
                         <thead>
                             <tr>
+                                <th style={{ width: '40px', textAlign: 'center' }}>
+                                    <input type="checkbox" checked={isAllUsersSelected} onChange={toggleSelectAllUsers} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                </th>
                                 <th>Nom</th>
                                 <th>Email</th>
                                 <th>Rôle</th>
@@ -1240,7 +1566,10 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser }) {
                         <tbody>
                             {visibleUsers.length > 0 ? (
                                 visibleUsers.map(u => (
-                                    <tr key={u.id}>
+                                    <tr key={u.id} style={{ backgroundColor: selectedUserIds.includes(u.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <input type="checkbox" checked={selectedUserIds.includes(u.id)} onChange={() => toggleSelectUser(u.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                        </td>
                                         <td><b>{u.nom}</b></td>
                                         <td>{u.email}</td>
                                         <td>

@@ -455,6 +455,74 @@ const dbService = {
         return true;
     },
 
+    async bulkUpdateCalendrierRows(ids, fields) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.map(l => ids.includes(l.id) ? { ...l, ...fields } : l);
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const dbFields = toDbFormat(fields);
+                await supabase.from('calendrier').update(dbFields).in('id', ids);
+            } catch (err) {}
+        }
+        return true;
+    },
+
+    async bulkDeleteCalendrierRows(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.filter(l => !ids.includes(l.id));
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('calendrier').delete().in('id', ids);
+            } catch (err) {}
+        }
+        return true;
+    },
+
+    async bulkUpdateComptes(ids, fields) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        DEFAULT_COMPTES = DEFAULT_COMPTES.map(c => ids.includes(c.id) ? { ...c, ...fields } : c);
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const dbFields = toDbFormat(fields);
+                await supabase.from('comptes').update(dbFields).in('id', ids);
+            } catch (err) {}
+        }
+        return true;
+    },
+
+    async bulkDeleteComptes(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        DEFAULT_COMPTES = DEFAULT_COMPTES.filter(c => !ids.includes(c.id));
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('comptes').delete().in('id', ids);
+            } catch (err) {}
+        }
+        return true;
+    },
+
+    async bulkDeleteUtilisateurs(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        DEFAULT_UTILISATEURS = DEFAULT_UTILISATEURS.filter(u => !ids.includes(u.id));
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('utilisateurs').delete().in('id', ids);
+            } catch (err) {}
+        }
+        return true;
+    },
+
+    async bulkDeleteIncidents(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        DEFAULT_INCIDENTS = DEFAULT_INCIDENTS.filter(i => !ids.includes(i.id));
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('incidents').delete().in('id', ids);
+            } catch (err) {}
+        }
+        return true;
+    },
+
     // ------------------- INCIDENTS -------------------
     async getIncidents(organisationId = null) {
         let list = [...DEFAULT_INCIDENTS];

@@ -207,5 +207,25 @@ const API = {
     async getJournal(organisationId = null) {
         const query = organisationId ? `?organisationId=${encodeURIComponent(organisationId)}` : '';
         return this.fetchJSON(`/api/journal${query}`);
+    },
+
+    // BULK CRUD
+    async bulkUpdateCalendrier(ids, fields) {
+        return this.fetchJSON('/api/calendrier/bulk-update', { method: 'POST', body: JSON.stringify({ ids, fields }) });
+    },
+    async bulkDeleteCalendrier(ids) {
+        return this.fetchJSON('/api/calendrier/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+    },
+    async bulkUpdateComptes(ids, fields) {
+        return this.fetchJSON('/api/comptes/bulk-update', { method: 'POST', body: JSON.stringify({ ids, fields }) });
+    },
+    async bulkDeleteComptes(ids) {
+        return this.fetchJSON('/api/comptes/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+    },
+    async bulkDeleteUsers(ids) {
+        return this.fetchJSON('/api/users/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+    },
+    async bulkDeleteIncidents(ids) {
+        return this.fetchJSON('/api/incidents/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
     }
 };

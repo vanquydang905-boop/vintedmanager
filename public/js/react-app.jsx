@@ -213,6 +213,66 @@ function App() {
         }
     };
 
+    const handleBulkUpdateCalendrier = async (ids, fields) => {
+        try {
+            await API.bulkUpdateCalendrier(ids, fields);
+            showToast(`${ids.length} ligne(s) mise(s) à jour en masse !`);
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la mise à jour en masse", true);
+        }
+    };
+
+    const handleBulkDeleteCalendrier = async (ids) => {
+        try {
+            await API.bulkDeleteCalendrier(ids);
+            showToast(`${ids.length} ligne(s) supprimée(s) en masse !`);
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la suppression en masse", true);
+        }
+    };
+
+    const handleBulkUpdateComptes = async (ids, fields) => {
+        try {
+            await API.bulkUpdateComptes(ids, fields);
+            showToast(`${ids.length} compte(s) mis à jour en masse !`);
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la mise à jour des comptes en masse", true);
+        }
+    };
+
+    const handleBulkDeleteComptes = async (ids) => {
+        try {
+            await API.bulkDeleteComptes(ids);
+            showToast(`${ids.length} compte(s) supprimé(s) en masse !`);
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la suppression des comptes en masse", true);
+        }
+    };
+
+    const handleBulkDeleteUsers = async (ids) => {
+        try {
+            await API.bulkDeleteUsers(ids);
+            showToast(`${ids.length} utilisateur(s) supprimé(s) en masse !`);
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la suppression des utilisateurs en masse", true);
+        }
+    };
+
+    const handleBulkDeleteIncidents = async (ids) => {
+        try {
+            await API.bulkDeleteIncidents(ids);
+            showToast(`${ids.length} incident(s) supprimé(s) en masse !`);
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la suppression des incidents en masse", true);
+        }
+    };
+
     const handleSaveUser = async (userData) => {
         try {
             const finalData = { ...userData };
@@ -414,6 +474,8 @@ function App() {
                         onUpdateRow={handleUpdateRow}
                         onDeleteRow={handleDeleteRow}
                         onAddRowClick={handleAddRow}
+                        onBulkUpdateCalendrier={handleBulkUpdateCalendrier}
+                        onBulkDeleteCalendrier={handleBulkDeleteCalendrier}
                     />
                 )}
 
@@ -423,6 +485,8 @@ function App() {
                         appState={appState}
                         onSaveCompte={handleSaveCompte}
                         onDeleteCompte={handleDeleteCompte}
+                        onBulkUpdateComptes={handleBulkUpdateComptes}
+                        onBulkDeleteComptes={handleBulkDeleteComptes}
                         onOpenQuickAgentModal={() => setActiveView('utilisateurs')}
                     />
                 )}
@@ -438,6 +502,7 @@ function App() {
                     <IncidentsView
                         appState={appState}
                         onSaveIncident={handleSaveIncident}
+                        onBulkDeleteIncidents={handleBulkDeleteIncidents}
                     />
                 )}
 
@@ -454,6 +519,7 @@ function App() {
                         appState={appState}
                         onSaveUser={handleSaveUser}
                         onDeleteUser={handleDeleteUser}
+                        onBulkDeleteUsers={handleBulkDeleteUsers}
                     />
                 )}
 

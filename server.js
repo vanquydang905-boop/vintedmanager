@@ -459,6 +459,67 @@ app.delete('/api/calendrier/:id', async (req, res) => {
     }
 });
 
+// ------------------- BULK CRUD OPERATIONS -------------------
+app.post('/api/calendrier/bulk-update', async (req, res) => {
+    try {
+        const { ids, fields } = req.body;
+        await dbService.bulkUpdateCalendrierRows(ids, fields);
+        res.json({ success: true, count: ids ? ids.length : 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/calendrier/bulk-delete', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        await dbService.bulkDeleteCalendrierRows(ids);
+        res.json({ success: true, count: ids ? ids.length : 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/comptes/bulk-update', async (req, res) => {
+    try {
+        const { ids, fields } = req.body;
+        await dbService.bulkUpdateComptes(ids, fields);
+        res.json({ success: true, count: ids ? ids.length : 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/comptes/bulk-delete', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        await dbService.bulkDeleteComptes(ids);
+        res.json({ success: true, count: ids ? ids.length : 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/users/bulk-delete', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        await dbService.bulkDeleteUtilisateurs(ids);
+        res.json({ success: true, count: ids ? ids.length : 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/incidents/bulk-delete', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        await dbService.bulkDeleteIncidents(ids);
+        res.json({ success: true, count: ids ? ids.length : 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Génération automatique du planning
 app.post('/api/calendrier/generate', async (req, res) => {
     try {
