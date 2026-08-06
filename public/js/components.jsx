@@ -811,7 +811,7 @@ function ParametresView({ appState, onSaveParametres }) {
 }
 
 // ------------------- VIEW: LOGIN -------------------
-function LoginView({ onLoginSubmit }) {
+function LoginView({ onLoginSubmit, loginError }) {
     const [loginInput, setLoginInput] = useState('florencio@vintedmanager.com');
     const [password, setPassword] = useState('ChangeMe123!');
 
@@ -880,6 +880,26 @@ function LoginView({ onLoginSubmit }) {
                     <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>Vinted Manager</h2>
                     <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Connectez-vous pour accéder au tableau de bord</p>
                 </div>
+
+                {loginError && (
+                    <div style={{
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fca5a5',
+                        color: '#b91c1c',
+                        padding: '12px 14px',
+                        borderRadius: '10px',
+                        marginBottom: '20px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        boxShadow: '0 2px 6px rgba(239, 68, 68, 0.15)'
+                    }}>
+                        <i className="fa-solid fa-circle-exclamation" style={{ fontSize: '18px', color: '#ef4444' }}></i>
+                        <span>{loginError}</span>
+                    </div>
+                )}
 
                 <div style={{
                     backgroundColor: '#f0f9ff',

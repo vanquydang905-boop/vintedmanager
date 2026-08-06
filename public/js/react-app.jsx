@@ -32,6 +32,7 @@ function App() {
     const [currentOrgId, setCurrentOrgId] = useState('org_default');
     const [activeView, setActiveView] = useState('dashboard');
     const [toast, setToast] = useState({ visible: false, message: '', isError: false });
+    const [loginError, setLoginError] = useState('');
 
     const [appState, setAppState] = useState({
         organisations: [],
@@ -75,6 +76,7 @@ function App() {
     }, [currentUser, currentOrgId, loadData]);
 
     const handleLoginSubmit = async (loginInput, password, role = null) => {
+        setLoginError('');
         try {
             const payload = role ? { role } : { email: loginInput, motDePasse: password };
             const user = await API.login(payload);
@@ -85,7 +87,9 @@ function App() {
             }
             showToast(`Bienvenue, ${user.nom} !`);
         } catch (err) {
-            showToast("Identifiants incorrects. Veuillez réessayer.", true);
+            const errorMsg = "Identifiant ou mot de passe incorrect. Veuillez réessayer.";
+            setLoginError(errorMsg);
+            showToast(errorMsg, true);
         }
     };
 
@@ -307,7 +311,7 @@ function App() {
     if (!currentUser) {
         return (
             <div className="app-container">
-                <LoginView onLoginSubmit={handleLoginSubmit} />
+                <LoginView onLoginSubmit={handleLoginSubmit} loginError={loginError} />
                 <Toast toast={toast} />
             </div>
         );
