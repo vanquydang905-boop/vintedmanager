@@ -553,15 +553,6 @@ app.post('/api/calendrier/generate', async (req, res) => {
             }
         }
 
-        const allHours = [...params.heuresParPeriode.matin, ...params.heuresParPeriode.midi, ...params.heuresParPeriode.soir];
-        const decalageMs = (params.decalageMinutesEntreComptes || 60) * 60000;
-        const margeAleatoireMin = params.margeAleatoireMinutes !== undefined 
-            ? parseInt(params.margeAleatoireMinutes) 
-            : (params.modePlanification === 'aleatoire' ? 15 : 0);
-
-        let generated = 0;
-        const existingAll = await dbService.getCalendrier(orgId);
-
         const slotsPerAccount = req.body.creneauxParJour ? parseInt(req.body.creneauxParJour) : (params.creneauxParJour || 6);
         const margeAleatoireMin = params.margeAleatoireMinutes !== undefined 
             ? parseInt(params.margeAleatoireMinutes) 
