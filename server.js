@@ -91,8 +91,53 @@ app.get('/api/db', async (req, res) => {
         const calendrier = await dbService.getCalendrier(orgId);
         const incidents = await dbService.getIncidents(orgId);
         const journal = await dbService.getJournal(orgId);
+        const corbeille = await dbService.getCorbeille(orgId);
 
-        res.json({ organisations, parametres, utilisateurs, comptes, calendrier, incidents, journal });
+        res.json({ organisations, parametres, utilisateurs, comptes, calendrier, incidents, journal, corbeille });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ------------------- CORBEILLE API -------------------
+app.get('/api/corbeille', async (req, res) => {
+    try {
+        const orgId = req.query.organisationId || null;
+        const list = await dbService.getCorbeille(orgId);
+        res.json(list);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/corbeille/restore/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const restoredData = await dbService.restoreCorbeilleItem(id);
+        await dbService.logAction("Restauration Corbeille", `Restauration de l'élément ${id}`, "Succès");
+        res.json({ message: "Élément restauré avec succès", restoredData });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/corbeille/empty', async (req, res) => {
+    try {
+        const orgId = req.query.organisationId || null;
+        await dbService.emptyCorbeille(orgId);
+        await dbService.logAction("Purge Corbeille", `Vidage de la corbeille ${orgId ? 'pour org ' + orgId : 'complète'}`, "Succès");
+        res.json({ message: "Corbeille vidée avec succès" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/corbeille/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await dbService.deleteCorbeilleItem(id);
+        await dbService.logAction("Purge Corbeille", `Suppression définitive de l'élément ${id} de la corbeille`, "Succès");
+        res.json({ message: "Élément supprimé définitivement de la corbeille" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -536,16 +581,30 @@ app.post('/api/incidents/bulk-delete', async (req, res) => {
     }
 });
 
+function getComptesActifsEtAttribues(comptes = [], selectedAgents = null) {
+    return (comptes || []).filter(c => {
+        const isActif = c && c.statut === 'Actif';
+        const isAttribue = c && c.agent && String(c.agent).trim() !== '' && String(c.agent) !== 'À attribuer';
+        if (!isActif || !isAttribue) return false;
+        if (Array.isArray(selectedAgents) && selectedAgents.length > 0) {
+            return selectedAgents.includes(c.agent);
+        }
+        return true;
+    });
+}
+
 // Génération automatique du planning
 app.post('/api/calendrier/generate', async (req, res) => {
     try {
         const orgId = req.body.organisationId || 'org_default';
-        const params = await dbService.getParametres(orgId);
         const comptes = await dbService.getComptes(orgId);
-        const activeComptes = comptes.filter(c => c.statut === 'Actif');
+        const selectedAgents = req.body.selectedAgents;
+
+        // Exclusivité stricte : Seuls les comptes au statut Actif ET attribués à un agent réel
+        const activeComptes = getComptesActifsEtAttribues(comptes, selectedAgents);
 
         if (activeComptes.length === 0) {
-            return res.status(400).json({ error: "Aucun compte actif !" });
+            return res.status(400).json({ error: "Aucun compte au statut Actif et attribué à un agent sélectionné trouvé !" });
         }
 
         let datesList = [];

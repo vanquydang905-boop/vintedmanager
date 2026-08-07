@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS comptes CASCADE;
 DROP TABLE IF EXISTS utilisateurs CASCADE;
 DROP TABLE IF EXISTS parametres CASCADE;
 DROP TABLE IF EXISTS organisations CASCADE;
+DROP TABLE IF EXISTS corbeille CASCADE;
 
 -- 1. Table des Organisations (Multi-Tenancy)
 CREATE TABLE organisations (
@@ -104,6 +105,19 @@ CREATE TABLE journal (
     resultat TEXT NOT NULL
 );
 
+-- 8. Table de la Corbeille de Sauvegarde (Format JSON Chiffré)
+CREATE TABLE corbeille (
+    id TEXT PRIMARY KEY,
+    organisationId TEXT NOT NULL DEFAULT 'org_default',
+    typeEntite TEXT NOT NULL,
+    idEntite TEXT NOT NULL,
+    action TEXT NOT NULL,
+    nomElement TEXT DEFAULT '',
+    donneesChiffrees TEXT NOT NULL,
+    dateAction TEXT NOT NULL,
+    auteur TEXT DEFAULT 'Système'
+);
+
 -- Désactivation de la sécurité RLS pour autoriser les requêtes API Directes de l'application
 ALTER TABLE organisations DISABLE ROW LEVEL SECURITY;
 ALTER TABLE parametres DISABLE ROW LEVEL SECURITY;
@@ -112,6 +126,7 @@ ALTER TABLE comptes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE calendrier DISABLE ROW LEVEL SECURITY;
 ALTER TABLE incidents DISABLE ROW LEVEL SECURITY;
 ALTER TABLE journal DISABLE ROW LEVEL SECURITY;
+ALTER TABLE corbeille DISABLE ROW LEVEL SECURITY;
 
 -- Initialisation des organisations par défaut
 INSERT INTO organisations (id, nom, dateCreation) VALUES

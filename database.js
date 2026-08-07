@@ -34,7 +34,12 @@ const camelMap = {
     telephone: 'telephone',
     email: 'email',
     gereparinitiales: 'gereParInitiales',
-    datestatutcompte: 'dateStatutCompte'
+    datestatutcompte: 'dateStatutCompte',
+    typeentite: 'typeEntite',
+    identite: 'idEntite',
+    nomelement: 'nomElement',
+    donneeschiffrees: 'donneesChiffrees',
+    dateaction: 'dateAction'
 };
 
 function toDbFormat(obj) {
@@ -114,17 +119,120 @@ function verifyPassword(inputPassword, storedHash) {
     return hashedInput === storedHash;
 }
 
+// Clé de sécurité maîtresse cachée dérivée via HMAC-SHA512 + SHA-256
+function getAESKey() {
+    const envSecret = process.env.CORBEILLE_SECRET || process.env.SUPABASE_KEY || 'vinted_manager_master_sec_key_2026_99a8b7';
+    const hiddenSalt = 'vinted_manager_hidden_salt_c8f93a2b7e10c49d5a6b8c9d0e1f2a3b4c5d6e7f8';
+    const masterSecret = crypto.createHmac('sha512', hiddenSalt).update(envSecret).digest();
+    return crypto.createHash('sha256').update(masterSecret).digest(); // Exact 32 bytes AES-256 key
+}
+
+function encryptString(text) {
+    if (text === null || text === undefined) return '';
+    const str = String(text);
+    if (!str) return '';
+    try {
+        const key = getAESKey();
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+        let encrypted = cipher.update(str, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        return iv.toString('hex') + ':' + encrypted;
+    } catch (e) {
+        return str;
+    }
+}
+
+function decryptString(encryptedText) {
+    if (!encryptedText) return '';
+    if (!encryptedText.includes(':')) return encryptedText;
+    try {
+        const parts = encryptedText.split(':');
+        if (parts.length !== 2) return encryptedText;
+        const iv = Buffer.from(parts[0], 'hex');
+        const encrypted = parts[1];
+        const key = getAESKey();
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (e) {
+        return encryptedText;
+    }
+}
+
+function encryptJSON(data) {
+    if (!data) return '';
+    try {
+        const jsonString = typeof data === 'string' ? data : JSON.stringify(data);
+        const key = getAESKey();
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+        let encrypted = cipher.update(jsonString, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        return iv.toString('hex') + ':' + encrypted;
+    } catch (e) {
+        console.error('[Corbeille Encrypt Error]', e);
+        return '';
+    }
+}
+
+function decryptJSON(encryptedText) {
+    if (!encryptedText) return null;
+    try {
+        const parts = encryptedText.split(':');
+        if (parts.length !== 2) return null;
+        const iv = Buffer.from(parts[0], 'hex');
+        const encrypted = parts[1];
+        const key = getAESKey();
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return JSON.parse(decrypted);
+    } catch (err) {
+        console.error('[Corbeille Decrypt Error]', err);
+        return null;
+    }
+}
+
+function getNomElement(typeEntite, data) {
+    if (!data) return typeEntite;
+    if (typeEntite === 'calendrier') {
+        const skuPart = data.sku ? `SKU: ${data.sku}` : '';
+        const prodPart = data.produit ? `${data.produit}` : '';
+        return (skuPart && prodPart ? `${skuPart} - ${prodPart}` : skuPart || prodPart) || `Créneau ID ${data.id}`;
+    }
+    if (typeEntite === 'comptes') {
+        return data.pseudo ? `Compte @${data.pseudo}` : `Compte ID ${data.id}`;
+    }
+    if (typeEntite === 'utilisateurs') {
+        return data.nom ? `Utilisateur ${data.nom}` : `Utilisateur ID ${data.id}`;
+    }
+    if (typeEntite === 'organisations') {
+        return data.nom ? `Organisation ${data.nom}` : `Organisation ID ${data.id}`;
+    }
+    if (typeEntite === 'incidents') {
+        return data.type ? `Incident ${data.type}` : `Incident ID ${data.id}`;
+    }
+    return `Élément ID ${data.id || ''}`;
+}
+
 let DEFAULT_ORGANISATIONS = [];
 let DEFAULT_UTILISATEURS = [];
 let DEFAULT_COMPTES = [];
 let DEFAULT_CALENDRIER = [];
 let DEFAULT_INCIDENTS = [];
 let DEFAULT_JOURNAL = [];
+let DEFAULT_CORBEILLE = [];
 
 const dbService = {
     supabase,
     hashPassword,
     verifyPassword,
+    encryptJSON,
+    decryptJSON,
+    encryptString,
+    decryptString,
     DEFAULT_PARAMETRES,
     DEFAULT_ORGANISATIONS,
     DEFAULT_UTILISATEURS,
@@ -132,6 +240,128 @@ const dbService = {
     DEFAULT_CALENDRIER,
     DEFAULT_INCIDENTS,
     DEFAULT_JOURNAL,
+    DEFAULT_CORBEILLE,
+
+    // ------------------- CORBEILLE (SAUVEGARDE & CHIFFREMENT) -------------------
+    async saveToCorbeille(typeEntite, idEntite, action, originalData, customNomElement = null, organisationId = null, auteur = 'Système') {
+        if (!originalData) return null;
+        const orgId = organisationId || originalData.organisationId || 'org_default';
+        const rawNomElem = customNomElement || getNomElement(typeEntite, originalData);
+        
+        // Tout chiffrer en base de données, y compris l'étiquette / SKU !
+        const nomElementChiffre = encryptString(rawNomElem);
+        const donneesChiffrees = encryptJSON(originalData);
+        const auteurChiffre = encryptString(auteur);
+
+        const item = {
+            id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            organisationId: orgId,
+            typeEntite,
+            idEntite: String(idEntite),
+            action,
+            nomElement: nomElementChiffre,
+            donneesChiffrees,
+            dateAction: new Date().toISOString(),
+            auteur: auteurChiffre
+        };
+
+        const idx = DEFAULT_CORBEILLE.findIndex(c => c.id === item.id);
+        if (idx >= 0) DEFAULT_CORBEILLE[idx] = item;
+        else DEFAULT_CORBEILLE.unshift(item);
+
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const dbPayload = toDbFormat(item);
+                await supabase.from('corbeille').upsert([dbPayload]);
+            } catch (e) {
+                console.error('[Corbeille Save Error]', e);
+            }
+        }
+        return item;
+    },
+
+    async getCorbeille(organisationId = null) {
+        let list = [...DEFAULT_CORBEILLE];
+        if (supabaseUrl && supabaseKey) {
+            try {
+                let query = supabase.from('corbeille').select('*');
+                if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
+                const { data, error } = await query;
+                if (!error && Array.isArray(data)) {
+                    data.map(fromDbFormat).forEach(dbRow => {
+                        const idx = list.findIndex(item => item.id === dbRow.id);
+                        if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
+                        else list.push(dbRow);
+                    });
+                }
+            } catch (e) {}
+        }
+        if (organisationId) {
+            list = list.filter(c => c.organisationId === organisationId);
+        }
+        return list.map(item => ({
+            ...item,
+            nomElement: decryptString(item.nomElement),
+            auteur: decryptString(item.auteur),
+            donneesOriginales: decryptJSON(item.donneesChiffrees)
+        }));
+    },
+
+    async restoreCorbeilleItem(id) {
+        const list = await this.getCorbeille();
+        const item = list.find(c => c.id === id);
+        if (!item) throw new Error("Élément introuvable dans la corbeille");
+
+        const originalData = item.donneesOriginales || decryptJSON(item.donneesChiffrees);
+        if (!originalData) throw new Error("Impossible de déchiffrer les données de sauvegarde");
+
+        const { typeEntite } = item;
+        if (typeEntite === 'organisations') {
+            await this.createOrganisation(originalData);
+        } else if (typeEntite === 'utilisateurs') {
+            await this.createUtilisateur(originalData);
+        } else if (typeEntite === 'comptes') {
+            await this.createCompte(originalData);
+        } else if (typeEntite === 'calendrier') {
+            await this.createCalendrierRow(originalData);
+        } else if (typeEntite === 'incidents') {
+            await this.createIncident(originalData);
+        } else {
+            throw new Error(`Type d'entité non pris en charge pour la restauration: ${typeEntite}`);
+        }
+
+        await this.deleteCorbeilleItem(id);
+        return originalData;
+    },
+
+    async deleteCorbeilleItem(id) {
+        DEFAULT_CORBEILLE = DEFAULT_CORBEILLE.filter(c => c.id !== id);
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('corbeille').delete().eq('id', id);
+            } catch (err) {}
+        }
+        return true;
+    },
+
+    async emptyCorbeille(organisationId = null) {
+        if (organisationId) {
+            DEFAULT_CORBEILLE = DEFAULT_CORBEILLE.filter(c => c.organisationId !== organisationId);
+        } else {
+            DEFAULT_CORBEILLE = [];
+        }
+
+        if (supabaseUrl && supabaseKey) {
+            try {
+                if (organisationId) {
+                    await supabase.from('corbeille').delete().eq('organisationid', organisationId.toLowerCase());
+                } else {
+                    await supabase.from('corbeille').delete().neq('id', '');
+                }
+            } catch (err) {}
+        }
+        return true;
+    },
 
     // ------------------- ORGANISATIONS -------------------
     async getOrganisations() {
@@ -172,7 +402,11 @@ const dbService = {
 
     async updateOrganisation(id, fields) {
         const idx = DEFAULT_ORGANISATIONS.findIndex(o => o.id === id);
-        if (idx >= 0) DEFAULT_ORGANISATIONS[idx] = { ...DEFAULT_ORGANISATIONS[idx], ...fields };
+        if (idx >= 0) {
+            const snapshot = { ...DEFAULT_ORGANISATIONS[idx] };
+            await this.saveToCorbeille('organisations', id, 'UPDATE', snapshot, snapshot.nom);
+            DEFAULT_ORGANISATIONS[idx] = { ...DEFAULT_ORGANISATIONS[idx], ...fields };
+        }
 
         if (supabaseUrl && supabaseKey) {
             try {
@@ -185,6 +419,10 @@ const dbService = {
     },
 
     async deleteOrganisation(id) {
+        const targetOrg = DEFAULT_ORGANISATIONS.find(o => o.id === id);
+        if (targetOrg) {
+            await this.saveToCorbeille('organisations', id, 'DELETE', targetOrg, targetOrg.nom);
+        }
         DEFAULT_ORGANISATIONS = DEFAULT_ORGANISATIONS.filter(o => o.id !== id);
         if (supabaseUrl && supabaseKey) {
             try {
@@ -281,7 +519,11 @@ const dbService = {
         }
 
         const idx = DEFAULT_UTILISATEURS.findIndex(u => u.id === id);
-        if (idx >= 0) DEFAULT_UTILISATEURS[idx] = { ...DEFAULT_UTILISATEURS[idx], ...updatedFields };
+        if (idx >= 0) {
+            const snapshot = { ...DEFAULT_UTILISATEURS[idx] };
+            await this.saveToCorbeille('utilisateurs', id, 'UPDATE', snapshot, snapshot.nom);
+            DEFAULT_UTILISATEURS[idx] = { ...DEFAULT_UTILISATEURS[idx], ...updatedFields };
+        }
 
         if (supabaseUrl && supabaseKey) {
             try {
@@ -294,6 +536,10 @@ const dbService = {
     },
 
     async deleteUtilisateur(id) {
+        const targetUser = DEFAULT_UTILISATEURS.find(u => u.id === id);
+        if (targetUser) {
+            await this.saveToCorbeille('utilisateurs', id, 'DELETE', targetUser, targetUser.nom);
+        }
         DEFAULT_UTILISATEURS = DEFAULT_UTILISATEURS.filter(u => u.id !== id);
         if (supabaseUrl && supabaseKey) {
             try {
@@ -401,6 +647,9 @@ const dbService = {
     async updateCompte(id, fields) {
         const idx = DEFAULT_COMPTES.findIndex(c => c.id === id);
         let existingCompte = idx >= 0 ? DEFAULT_COMPTES[idx] : { id };
+        if (idx >= 0) {
+            await this.saveToCorbeille('comptes', id, 'UPDATE', { ...existingCompte }, existingCompte.pseudo ? `@${existingCompte.pseudo}` : id);
+        }
         const updatedCompte = { ...existingCompte, ...fields };
 
         if (idx >= 0) DEFAULT_COMPTES[idx] = updatedCompte;
@@ -438,6 +687,9 @@ const dbService = {
 
     async deleteCompte(id) {
         const targetCompte = DEFAULT_COMPTES.find(c => c.id === id);
+        if (targetCompte) {
+            await this.saveToCorbeille('comptes', id, 'DELETE', targetCompte, targetCompte.pseudo ? `@${targetCompte.pseudo}` : id);
+        }
         DEFAULT_COMPTES = DEFAULT_COMPTES.filter(c => c.id !== id);
         DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.filter(l => l.compteId !== id);
 
@@ -508,7 +760,11 @@ const dbService = {
 
     async updateCalendrierRow(id, fields) {
         const idx = DEFAULT_CALENDRIER.findIndex(l => l.id === id);
-        if (idx >= 0) DEFAULT_CALENDRIER[idx] = { ...DEFAULT_CALENDRIER[idx], ...fields };
+        if (idx >= 0) {
+            const oldRow = { ...DEFAULT_CALENDRIER[idx] };
+            await this.saveToCorbeille('calendrier', id, 'UPDATE', oldRow);
+            DEFAULT_CALENDRIER[idx] = { ...DEFAULT_CALENDRIER[idx], ...fields };
+        }
 
         if (supabaseUrl && supabaseKey) {
             try {
@@ -520,6 +776,10 @@ const dbService = {
     },
 
     async deleteCalendrierRow(id) {
+        const targetRow = DEFAULT_CALENDRIER.find(l => l.id === id);
+        if (targetRow) {
+            await this.saveToCorbeille('calendrier', id, 'DELETE', targetRow);
+        }
         DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.filter(l => l.id !== id);
         if (supabaseUrl && supabaseKey) {
             try {
@@ -531,6 +791,10 @@ const dbService = {
 
     async bulkUpdateCalendrierRows(ids, fields) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
+        for (const id of ids) {
+            const item = DEFAULT_CALENDRIER.find(l => l.id === id);
+            if (item) await this.saveToCorbeille('calendrier', id, 'UPDATE', { ...item });
+        }
         DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.map(l => ids.includes(l.id) ? { ...l, ...fields } : l);
         if (supabaseUrl && supabaseKey) {
             try {
@@ -543,6 +807,10 @@ const dbService = {
 
     async bulkDeleteCalendrierRows(ids) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
+        for (const id of ids) {
+            const item = DEFAULT_CALENDRIER.find(l => l.id === id);
+            if (item) await this.saveToCorbeille('calendrier', id, 'DELETE', item);
+        }
         DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.filter(l => !ids.includes(l.id));
         if (supabaseUrl && supabaseKey) {
             try {
@@ -554,6 +822,10 @@ const dbService = {
 
     async bulkUpdateComptes(ids, fields) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
+        for (const id of ids) {
+            const item = DEFAULT_COMPTES.find(c => c.id === id);
+            if (item) await this.saveToCorbeille('comptes', id, 'UPDATE', { ...item }, item.pseudo ? `@${item.pseudo}` : id);
+        }
         DEFAULT_COMPTES = DEFAULT_COMPTES.map(c => ids.includes(c.id) ? { ...c, ...fields } : c);
         if (supabaseUrl && supabaseKey) {
             try {
@@ -566,6 +838,10 @@ const dbService = {
 
     async bulkDeleteComptes(ids) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
+        for (const id of ids) {
+            const item = DEFAULT_COMPTES.find(c => c.id === id);
+            if (item) await this.saveToCorbeille('comptes', id, 'DELETE', item, item.pseudo ? `@${item.pseudo}` : id);
+        }
         DEFAULT_COMPTES = DEFAULT_COMPTES.filter(c => !ids.includes(c.id));
         if (supabaseUrl && supabaseKey) {
             try {
@@ -577,6 +853,10 @@ const dbService = {
 
     async bulkDeleteUtilisateurs(ids) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
+        for (const id of ids) {
+            const item = DEFAULT_UTILISATEURS.find(u => u.id === id);
+            if (item) await this.saveToCorbeille('utilisateurs', id, 'DELETE', item, item.nom);
+        }
         DEFAULT_UTILISATEURS = DEFAULT_UTILISATEURS.filter(u => !ids.includes(u.id));
         if (supabaseUrl && supabaseKey) {
             try {
@@ -588,6 +868,10 @@ const dbService = {
 
     async bulkDeleteIncidents(ids) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
+        for (const id of ids) {
+            const item = DEFAULT_INCIDENTS.find(i => i.id === id);
+            if (item) await this.saveToCorbeille('incidents', id, 'DELETE', item);
+        }
         DEFAULT_INCIDENTS = DEFAULT_INCIDENTS.filter(i => !ids.includes(i.id));
         if (supabaseUrl && supabaseKey) {
             try {

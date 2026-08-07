@@ -16,6 +16,7 @@ const {
     ClassementView,
     GagnantsView,
     JournalView,
+    CorbeilleView,
     LoginView
 } = window.ReactComponents;
 
@@ -47,7 +48,8 @@ function App() {
         comptes: [],
         calendrier: [],
         incidents: [],
-        journal: []
+        journal: [],
+        corbeille: []
     });
 
     const showToast = useCallback((message, isError = false) => {
@@ -226,9 +228,9 @@ function App() {
         }
     };
 
-    const handleGeneratePlanning = async (dateDebut, dateFin, creneauxParJour, heureDebut, heureFin) => {
+    const handleGeneratePlanning = async (dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents) => {
         try {
-            const res = await API.generatePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, currentOrgId);
+            const res = await API.generatePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents, currentOrgId);
             showToast(res.message || "Planning généré avec succès");
             await loadData();
         } catch (err) {
@@ -417,6 +419,38 @@ function App() {
         }
     };
 
+    const handleRestoreCorbeilleItem = async (id) => {
+        try {
+            await API.restoreCorbeilleItem(id);
+            showToast("Élément restauré avec succès dans sa table d'origine !");
+            await loadData();
+        } catch (err) {
+            showToast("Erreur de restauration : " + (err.message || "Impossible de restaurer l'élément"), true);
+        }
+    };
+
+    const handleDeleteCorbeilleItem = async (id) => {
+        if (!confirm("Voulez-vous vraiment supprimer définitivement cet élément de la corbeille ?")) return;
+        try {
+            await API.deleteCorbeilleItem(id);
+            showToast("Élément purgé définitivement de la corbeille");
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la purge de l'élément", true);
+        }
+    };
+
+    const handleEmptyCorbeille = async () => {
+        if (!confirm("Êtes-vous sûr de vouloir VIDER COMPLÈTEMENT la corbeille ? Cette action est irréversible !")) return;
+        try {
+            await API.emptyCorbeille(currentOrgId);
+            showToast("Corbeille vidée avec succès");
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors du vidage de la corbeille", true);
+        }
+    };
+
     if (!currentUser) {
         return (
             <div className="app-container">
@@ -438,6 +472,7 @@ function App() {
                 onLogout={handleLogout}
                 onExportJSON={handleExportJSON}
                 onImportJSON={handleImportJSON}
+                corbeilleCount={(appState.corbeille || []).length}
             />
 
             <main className="main-content">
@@ -590,6 +625,16 @@ function App() {
                 {activeView === 'journal' && (
                     <JournalView
                         appState={appState}
+                    />
+                )}
+
+                {activeView === 'corbeille' && (
+                    <CorbeilleView
+                        corbeille={appState.corbeille || []}
+                        onRestoreItem={handleRestoreCorbeilleItem}
+                        onDeleteItem={handleDeleteCorbeilleItem}
+                        onEmptyCorbeille={handleEmptyCorbeille}
+                        onRefresh={() => loadData()}
                     />
                 )}
             </main>

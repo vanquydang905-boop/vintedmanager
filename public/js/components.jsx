@@ -16,7 +16,7 @@ function Toast({ toast }) {
 }
 
 // ------------------- SIDEBAR NAVIGATION -------------------
-function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON }) {
+function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0 }) {
     if (!currentUser) return null;
 
     const isAdmin = currentUser.role === 'admin';
@@ -105,6 +105,17 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                 )}
 
                 {isCadre && (
+                    <button className={`nav-btn ${activeView === 'corbeille' ? 'active' : ''}`} onClick={() => onSelectView('corbeille')}>
+                        <i className="fa-solid fa-trash-can"></i> Corbeille
+                        {corbeilleCount > 0 && (
+                            <span className="badge" style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '10px' }}>
+                                {corbeilleCount}
+                            </span>
+                        )}
+                    </button>
+                )}
+
+                {isCadre && (
                     <button className={`nav-btn ${activeView === 'parametres' ? 'active' : ''}`} onClick={() => onSelectView('parametres')}>
                         <i className="fa-solid fa-sliders"></i> Paramètres
                     </button>
@@ -126,7 +137,7 @@ function getTimeZoneOffsetMinutes(tzName, date = new Date()) {
         const parts = format.formatToParts(date);
         const tzPart = parts.find(p => p.type === 'timeZoneName');
         if (!tzPart) return tzName.includes('Antananarivo') ? 180 : 120;
-        const match = tzPart.value.match(/GMT([+-]\d+)(?::(\d+))?/);
+        const match = tzPart.value.match(/(?:GMT|UTC)?([+-]\d+)(?::(\d+))?/);
         if (!match) return tzName.includes('Antananarivo') ? 180 : 120;
         const hours = parseInt(match[1], 10);
         const minutes = match[2] ? parseInt(match[2], 10) : 0;
@@ -544,12 +555,23 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         </td>
                                         <td>
                                             {(() => {
-                                                const conv = convertHHMM(l.heurePrevue, l.date, 'FR', 'MADA');
+                                                const convMada = convertHHMM(l.heurePrevue, l.date, 'FR', 'MADA');
+                                                const displayedTime = selectedTZ === 'MADA' ? (convMada.time || l.heurePrevue) : (l.heurePrevue || '');
                                                 const otherFlag = selectedTZ === 'MADA' ? '🇫🇷' : '🇲🇬';
-                                                const otherTime = selectedTZ === 'MADA' ? l.heurePrevue : conv.time;
+                                                const otherTime = selectedTZ === 'MADA' ? (l.heurePrevue || '') : convMada.time;
                                                 const shiftTag = selectedTZ === 'MADA' 
-                                                    ? (conv.dayShift === 1 ? '-1j' : (conv.dayShift === -1 ? '+1j' : ''))
-                                                    : (conv.dayShift === 1 ? '+1j' : (conv.dayShift === -1 ? '-1j' : ''));
+                                                    ? (convMada.dayShift === 1 ? '-1j' : (convMada.dayShift === -1 ? '+1j' : ''))
+                                                    : (convMada.dayShift === 1 ? '+1j' : (convMada.dayShift === -1 ? '-1j' : ''));
+
+                                                const handleTimeChange = (e) => {
+                                                    const val = e.target.value;
+                                                    if (selectedTZ === 'MADA') {
+                                                        const convFR = convertHHMM(val, l.date, 'MADA', 'FR');
+                                                        onUpdateRow(l.id, { heurePrevue: convFR.time });
+                                                    } else {
+                                                        onUpdateRow(l.id, { heurePrevue: val });
+                                                    }
+                                                };
 
                                                 return (
                                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -557,9 +579,9 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                             type="time"
                                                             className="input-table"
                                                             style={{ fontWeight: 700, width: '92px', fontSize: '13px', padding: '2px 4px' }}
-                                                            value={l.heurePrevue || ''}
-                                                            onChange={(e) => onUpdateRow(l.id, { heurePrevue: e.target.value })}
-                                                            title="Cliquer pour modifier le créneau horaire"
+                                                            value={displayedTime || ''}
+                                                            onChange={handleTimeChange}
+                                                            title={`Modifier l'heure en ${selectedTZ === 'MADA' ? 'Madagascar' : 'France'}`}
                                                         />
                                                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', whiteSpace: 'nowrap' }} title={`Heure équivalente (${selectedTZ === 'MADA' ? 'France' : 'Madagascar'})`}>
                                                             {otherFlag} {otherTime}
@@ -1112,6 +1134,19 @@ function getLocalDateString(d = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
+// Helper pour filtrer exclusivement les comptes au statut Actif ET attribués à un agent réel
+function getComptesActifsEtAttribues(comptes = [], selectedAgents = null) {
+    return (comptes || []).filter(c => {
+        const isActif = c && c.statut === 'Actif';
+        const isAttribue = c && c.agent && String(c.agent).trim() !== '' && String(c.agent) !== 'À attribuer';
+        if (!isActif || !isAttribue) return false;
+        if (Array.isArray(selectedAgents) && selectedAgents.length > 0) {
+            return selectedAgents.includes(c.agent);
+        }
+        return true;
+    });
+}
+
 // ------------------- VIEW: PLANNING GENERATION -------------------
 function PlanningView({ appState, onGeneratePlanning }) {
     const todayStr = useMemo(() => getLocalDateString(), []);
@@ -1129,7 +1164,46 @@ function PlanningView({ appState, onGeneratePlanning }) {
     const [loading, setLoading] = useState(false);
 
     const comptes = appState.comptes || [];
-    const activeComptes = useMemo(() => comptes.filter(c => c.statut === 'Actif'), [comptes]);
+    // Exclusivité stricte : Seuls les comptes au statut Actif ET attribués à un agent réel
+    const activeComptes = useMemo(() => getComptesActifsEtAttribues(comptes), [comptes]);
+
+    // Liste unique des agents attribués ayant au moins un compte actif
+    const availableAgents = useMemo(() => {
+        const set = new Set();
+        activeComptes.forEach(c => {
+            if (c.agent && String(c.agent).trim() !== '' && String(c.agent) !== 'À attribuer') {
+                set.add(c.agent);
+            }
+        });
+        return Array.from(set);
+    }, [activeComptes]);
+
+    const [selectedAgents, setSelectedAgents] = useState([]);
+    const [initializedAgents, setInitializedAgents] = useState(false);
+
+    // Par défaut : Tous les agents sont sélectionnés
+    useEffect(() => {
+        if (availableAgents.length > 0 && (!initializedAgents || selectedAgents.length === 0)) {
+            setSelectedAgents(availableAgents);
+            setInitializedAgents(true);
+        }
+    }, [availableAgents, initializedAgents]);
+
+    const toggleAgent = (agentName) => {
+        setSelectedAgents(prev => {
+            if (prev.includes(agentName)) {
+                return prev.filter(a => a !== agentName);
+            } else {
+                return [...prev, agentName];
+            }
+        });
+    };
+
+    const selectAllAgents = () => setSelectedAgents([...availableAgents]);
+    const deselectAllAgents = () => setSelectedAgents([]);
+
+    // Comptes actifs filtrés par la sélection d'agents (excluant les pauses/congés)
+    const filteredActiveComptes = useMemo(() => getComptesActifsEtAttribues(comptes, selectedAgents), [comptes, selectedAgents]);
 
     const totalDays = useMemo(() => {
         if (!dateDebut || !dateFin) return 0;
@@ -1141,8 +1215,8 @@ function PlanningView({ appState, onGeneratePlanning }) {
     }, [dateDebut, dateFin]);
 
     const totalEstimatedSlots = useMemo(() => {
-        return totalDays * activeComptes.length * creneauxParJour;
-    }, [totalDays, activeComptes.length, creneauxParJour]);
+        return totalDays * filteredActiveComptes.length * creneauxParJour;
+    }, [totalDays, filteredActiveComptes.length, creneauxParJour]);
 
     const setPreset = (days) => {
         const start = new Date();
@@ -1153,11 +1227,11 @@ function PlanningView({ appState, onGeneratePlanning }) {
     };
 
     const handleGenerate = async () => {
-        if (activeComptes.length === 0) return;
+        if (filteredActiveComptes.length === 0) return;
         if (!dateDebut || !dateFin || totalDays <= 0) return;
         setLoading(true);
         try {
-            await onGeneratePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin);
+            await onGeneratePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents);
         } finally {
             setLoading(false);
         }
@@ -1170,11 +1244,90 @@ function PlanningView({ appState, onGeneratePlanning }) {
             <div className="card" style={{ marginBottom: '24px' }}>
                 <h3 className="card-title">
                     <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--primary)', marginRight: '8px' }}></i>
-                    Génération Anti-Collision Multi-Comptes
+                    Génération Anti-Collision Multi-Comptes & Multi-Agents
                 </h3>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
-                    Le moteur calcule automatiquement la répartition optimale des créneaux horaires pour l'ensemble des <b>{activeComptes.length} comptes au statut Actif</b>, en appliquant les règles d'espacement et la marge d'intervalle aléatoire.
+                    Le moteur calcule automatiquement la répartition optimale des créneaux horaires pour l'ensemble des <b>{filteredActiveComptes.length} comptes au statut Actif et attribués à un agent</b>, en appliquant les règles d'espacement et la marge d'intervalle aléatoire.
                 </p>
+
+                {/* SÉLECTION DES AGENTS CONCERNÉS (PAUSE / CONGÉ) */}
+                <div style={{
+                    background: 'rgba(9, 177, 186, 0.04)',
+                    border: '1px solid rgba(9, 177, 186, 0.2)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    marginBottom: '20px'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                                <i className="fa-solid fa-users-gear" style={{ color: 'var(--primary)' }}></i>
+                                Agents Concernés (Gestion Pause / Congé)
+                            </h4>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Décocher un agent le passe en <b>Pause / Congé</b> pour exclure ses comptes de cette génération de planning. Par défaut, tous les agents sont sélectionnés.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={selectAllAgents} style={{ fontSize: '11px', padding: '4px 8px' }}>
+                                <i className="fa-solid fa-check-double" style={{ marginRight: '4px' }}></i> Tout sélectionner
+                            </button>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={deselectAllAgents} style={{ fontSize: '11px', padding: '4px 8px' }}>
+                                <i className="fa-solid fa-xmark" style={{ marginRight: '4px' }}></i> Tout décocher
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {availableAgents.length === 0 ? (
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Aucun agent actif trouvé.</span>
+                        ) : availableAgents.map(agentName => {
+                            const isSelected = selectedAgents.includes(agentName);
+                            const agentComptesCount = activeComptes.filter(c => (c.agent || 'À attribuer') === agentName).length;
+                            return (
+                                <label
+                                    key={agentName}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '8px 14px',
+                                        borderRadius: '20px',
+                                        border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}`,
+                                        background: isSelected ? 'rgba(9, 177, 186, 0.1)' : 'var(--bg-card)',
+                                        color: isSelected ? 'var(--primary-dark)' : 'var(--text-muted)',
+                                        fontWeight: isSelected ? 600 : 400,
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        userSelect: 'none'
+                                    }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => toggleAgent(agentName)}
+                                        style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: '16px', height: '16px' }}
+                                    />
+                                    <span>{agentName}</span>
+                                    <span className="badge" style={{
+                                        background: isSelected ? 'var(--primary)' : '#94a3b8',
+                                        color: '#fff',
+                                        fontSize: '11px',
+                                        padding: '1px 6px',
+                                        borderRadius: '10px'
+                                    }}>
+                                        {agentComptesCount} compte{agentComptesCount > 1 ? 's' : ''}
+                                    </span>
+                                    {!isSelected && (
+                                        <span style={{ fontSize: '11px', fontStyle: 'italic', color: '#ef4444', fontWeight: 600 }}>
+                                            (Pause / Congé)
+                                        </span>
+                                    )}
+                                </label>
+                            );
+                        })}
+                    </div>
+                </div>
 
                 <div className="grid-3" style={{ marginBottom: '18px' }}>
                     <div className="form-group">
@@ -1270,7 +1423,7 @@ function PlanningView({ appState, onGeneratePlanning }) {
                         <i className="fa-solid fa-calendar-days" style={{ fontSize: '16px' }}></i>
                         <span>
                             Période : du <b>{dateDebut}</b> au <b>{dateFin}</b> ({totalDays} jour{totalDays > 1 ? 's' : ''}) — 
-                            <b> {creneauxParJour} pub{creneauxParJour > 1 ? 's' : ''}/compte/jour</b> pour {activeComptes.length} compte(s) actif(s) 
+                            <b> {creneauxParJour} pub{creneauxParJour > 1 ? 's' : ''}/compte/jour</b> pour {filteredActiveComptes.length} compte(s) au statut Actif et attribué(s) à un agent ({selectedAgents.length} agent(s) sélectionné(s)) 
                             (soit <b>{totalEstimatedSlots} publication{totalEstimatedSlots > 1 ? 's' : ''} au total</b>)
                         </span>
                     </div>
@@ -1289,10 +1442,25 @@ function PlanningView({ appState, onGeneratePlanning }) {
                     </div>
                 )}
 
+                {filteredActiveComptes.length === 0 && (
+                    <div style={{
+                        backgroundColor: '#fffbebf',
+                        border: '1px solid #fde68a',
+                        color: '#b45309',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        marginBottom: '20px',
+                        fontSize: '13px',
+                        fontWeight: 600
+                    }}>
+                        ⚠️ Aucun compte actif disponible pour la sélection d'agents courante (tous les agents sont décochés ou en pause/congé).
+                    </div>
+                )}
+
                 <button
                     className="btn btn-primary"
                     onClick={handleGenerate}
-                    disabled={loading || totalDays <= 0}
+                    disabled={loading || totalDays <= 0 || filteredActiveComptes.length === 0}
                     style={{ padding: '12px 24px', fontSize: '15px' }}
                 >
                     {loading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> : <i className="fa-solid fa-bolt" style={{ marginRight: '8px' }}></i>}
@@ -2314,6 +2482,227 @@ function JournalView({ appState }) {
     );
 }
 
+// ------------------- CORBEILLE VIEW -------------------
+function CorbeilleView({ corbeille = [], onRestoreItem, onDeleteItem, onEmptyCorbeille, onRefresh }) {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterType, setFilterType] = useState('ALL');
+    const [filterAction, setFilterAction] = useState('ALL');
+    const [expandedId, setExpandedId] = useState(null);
+
+    const filteredList = useMemo(() => {
+        return (corbeille || []).filter(item => {
+            if (filterType !== 'ALL' && item.typeEntite !== filterType) return false;
+            if (filterAction !== 'ALL' && item.action !== filterAction) return false;
+            if (!searchTerm) return true;
+            const term = searchTerm.toLowerCase();
+            const nom = (item.nomElement || '').toLowerCase();
+            const id = (item.idEntite || '').toLowerCase();
+            const type = (item.typeEntite || '').toLowerCase();
+            const action = (item.action || '').toLowerCase();
+            return nom.includes(term) || id.includes(term) || type.includes(term) || action.includes(term);
+        });
+    }, [corbeille, filterType, filterAction, searchTerm]);
+
+    const getEntityIcon = (type) => {
+        switch (type) {
+            case 'calendrier': return 'fa-calendar-days';
+            case 'comptes': return 'fa-store';
+            case 'utilisateurs': return 'fa-users-gear';
+            case 'organisations': return 'fa-sitemap';
+            case 'incidents': return 'fa-triangle-exclamation';
+            default: return 'fa-database';
+        }
+    };
+
+    const getEntityLabel = (type) => {
+        switch (type) {
+            case 'calendrier': return 'Calendrier';
+            case 'comptes': return 'Compte Vinted';
+            case 'utilisateurs': return 'Utilisateur';
+            case 'organisations': return 'Organisation';
+            case 'incidents': return 'Incident';
+            default: return type;
+        }
+    };
+
+    return (
+        <div className="view-container">
+            <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '24px', fontWeight: 700 }}>
+                        <i className="fa-solid fa-trash-can" style={{ color: '#ef4444' }}></i> Corbeille de Sauvegarde & Chiffrement
+                    </h2>
+                    <p className="subtitle" style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
+                        Historique chiffré (AES-256) des éléments modifiés et supprimés. Restauration en un clic.
+                    </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button className="btn btn-secondary" onClick={onRefresh} title="Actualiser la corbeille">
+                        <i className="fa-solid fa-arrows-rotate"></i> Actualiser
+                    </button>
+                    {corbeille.length > 0 && (
+                        <button className="btn btn-danger" onClick={onEmptyCorbeille} style={{ background: '#dc2626', color: '#fff' }}>
+                            <i className="fa-solid fa-broom"></i> Vider la corbeille ({corbeille.length})
+                        </button>
+                    )}
+                </div>
+            </header>
+
+            {/* Filtres & Recherche */}
+            <div className="card" style={{ padding: '16px', marginBottom: '20px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
+                    <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}></i>
+                    <input
+                        type="text"
+                        placeholder="Rechercher par nom, SKU, ID..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        style={{ width: '100%', paddingLeft: '36px', height: '38px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                    />
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Entité :</label>
+                    <select
+                        value={filterType}
+                        onChange={e => setFilterType(e.target.value)}
+                        style={{ height: '38px', padding: '0 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '13px' }}>
+                        <option value="ALL">Toutes les entités</option>
+                        <option value="calendrier">Calendrier</option>
+                        <option value="comptes">Comptes</option>
+                        <option value="utilisateurs">Utilisateurs</option>
+                        <option value="organisations">Organisations</option>
+                        <option value="incidents">Incidents</option>
+                    </select>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Action :</label>
+                    <select
+                        value={filterAction}
+                        onChange={e => setFilterAction(e.target.value)}
+                        style={{ height: '38px', padding: '0 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: '13px' }}>
+                        <option value="ALL">Toutes les actions</option>
+                        <option value="DELETE">Suppression</option>
+                        <option value="UPDATE">Modification</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Liste des éléments archivés */}
+            {filteredList.length === 0 ? (
+                <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <i className="fa-solid fa-box-open" style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}></i>
+                    <h3>Aucun élément dans la corbeille</h3>
+                    <p style={{ marginTop: '6px', fontSize: '14px' }}>Les éléments modifiés ou supprimés apparaîtront ici avec leurs sauvegardes chiffrées.</p>
+                </div>
+            ) : (
+                <div className="table-responsive card" style={{ padding: 0 }}>
+                    <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ background: 'rgba(0,0,0,0.03)', borderBottom: '2px solid var(--border-color)' }}>
+                                <th style={{ padding: '12px 16px', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>Date & Heure</th>
+                                <th style={{ padding: '12px 16px', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>Action</th>
+                                <th style={{ padding: '12px 16px', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>Type</th>
+                                <th style={{ padding: '12px 16px', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>Élément</th>
+                                <th style={{ padding: '12px 16px', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>Chiffrement JSON</th>
+                                <th style={{ padding: '12px 16px', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredList.map(item => {
+                                const isExpanded = expandedId === item.id;
+                                const dateStr = item.dateAction ? new Date(item.dateAction).toLocaleString('fr-FR') : '-';
+                                const isDelete = item.action === 'DELETE';
+                                return (
+                                    <React.Fragment key={item.id}>
+                                        <tr style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
+                                            <td style={{ padding: '12px 16px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                                                <i className="fa-regular fa-clock" style={{ marginRight: '6px', color: 'var(--text-muted)' }}></i>
+                                                {dateStr}
+                                            </td>
+                                            <td style={{ padding: '12px 16px' }}>
+                                                <span className="badge" style={{
+                                                    background: isDelete ? '#ef4444' : '#f59e0b',
+                                                    color: '#fff', fontSize: '11px', fontWeight: 600, padding: '3px 8px', borderRadius: '4px'
+                                                }}>
+                                                    {isDelete ? 'Suppression' : 'Modification'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '12px 16px', fontSize: '13px' }}>
+                                                <i className={`fa-solid ${getEntityIcon(item.typeEntite)}`} style={{ marginRight: '8px', color: 'var(--primary)' }}></i>
+                                                {getEntityLabel(item.typeEntite)}
+                                            </td>
+                                            <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 600 }}>
+                                                {item.nomElement || item.idEntite}
+                                            </td>
+                                            <td style={{ padding: '12px 16px' }}>
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                                                    style={{ padding: '3px 8px', fontSize: '11px', gap: '6px' }}>
+                                                    <i className={`fa-solid ${isExpanded ? 'fa-lock-open' : 'fa-lock'}`} style={{ color: isExpanded ? '#22c55e' : '#64748b' }}></i>
+                                                    {isExpanded ? 'Masquer détails' : 'AES-256 (Déchiffrer)'}
+                                                </button>
+                                            </td>
+                                            <td style={{ padding: '12px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                    <button
+                                                        className="btn btn-primary btn-sm"
+                                                        onClick={() => onRestoreItem(item.id)}
+                                                        title="Restaurer cet élément vers sa table d'origine"
+                                                        style={{ padding: '4px 10px', fontSize: '12px', background: '#0284c7' }}>
+                                                        <i className="fa-solid fa-rotate-left"></i> Restaurer
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-danger btn-sm"
+                                                        onClick={() => onDeleteItem(item.id)}
+                                                        title="Supprimer définitivement de la corbeille"
+                                                        style={{ padding: '4px 10px', fontSize: '12px' }}>
+                                                        <i className="fa-solid fa-trash"></i> Purger
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {isExpanded && (
+                                            <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+                                                <td colSpan="6" style={{ padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                                                                🔒 Raw Ciphertext (Payload Chiffré en Base) :
+                                                            </div>
+                                                            <pre style={{
+                                                                background: '#1e293b', color: '#38bdf8', padding: '12px', borderRadius: '6px',
+                                                                fontSize: '11px', overflowX: 'auto', maxHeight: '180px', whiteSpace: 'pre-wrap', wordBreak: 'break-all'
+                                                            }}>
+                                                                {item.donneesChiffrees}
+                                                            </pre>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#22c55e', marginBottom: '6px', textTransform: 'uppercase' }}>
+                                                                🔓 JSON Original Déchiffré :
+                                                            </div>
+                                                            <pre style={{
+                                                                background: '#0f172a', color: '#4ade80', padding: '12px', borderRadius: '6px',
+                                                                fontSize: '11px', overflowX: 'auto', maxHeight: '180px'
+                                                            }}>
+                                                                {JSON.stringify(item.donneesOriginales || {}, null, 2)}
+                                                            </pre>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // Export global React components
 window.ReactComponents = {
     Toast,
@@ -2328,6 +2717,7 @@ window.ReactComponents = {
     ClassementView,
     GagnantsView,
     JournalView,
+    CorbeilleView,
     LoginView
 };
 
