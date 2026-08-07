@@ -179,6 +179,8 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     const [filterStatut, setFilterStatut] = useState('');
     const [filterClassif, setFilterClassif] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
+    const [copiedSkuId, setCopiedSkuId] = useState(null);
+    const isAgent = currentUser && currentUser.role === 'agent';
 
     // Fermer dropdown Compte si clic en dehors
     React.useEffect(() => {
@@ -535,7 +537,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         </td>
                                         <td style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>{l.date}</td>
                                         <td>
-                                            <select className="input-table" style={{ width: '100%', minWidth: '130px', fontWeight: 600, color: 'var(--text-primary)' }} value={l.compteId || ''} onChange={(e) => {
+                                            <select className="input-table" style={{ width: '100%', minWidth: '130px', fontWeight: 600, color: 'var(--text-primary)' }} value={l.compteId || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => {
                                                 const selCompte = comptes.find(c => c.id === e.target.value);
                                                 onUpdateRow(l.id, { compteId: e.target.value, agent: selCompte ? selCompte.agent : l.agent });
                                             }}>
@@ -546,7 +548,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             </select>
                                         </td>
                                         <td>
-                                            <select className="input-table" style={{ width: '100%', minWidth: '110px', fontWeight: 600, color: 'var(--accent)' }} value={l.agent || ''} onChange={(e) => onUpdateRow(l.id, { agent: e.target.value })}>
+                                            <select className="input-table" style={{ width: '100%', minWidth: '110px', fontWeight: 600, color: 'var(--accent)' }} value={l.agent || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => onUpdateRow(l.id, { agent: e.target.value })}>
                                                 <option value="">Sélectionner...</option>
                                                 {agentsUnique.map(a => (
                                                     <option key={a} value={a}>{a}</option>
@@ -578,6 +580,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                         <input
                                                             type="time"
                                                             className="input-table"
+                                                            disabled={currentUser && currentUser.role === 'agent'}
                                                             style={{ fontWeight: 700, width: '92px', fontSize: '13px', padding: '2px 4px' }}
                                                             value={displayedTime || ''}
                                                             onChange={handleTimeChange}
@@ -592,8 +595,35 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             })()}
                                         </td>
                                         <td>
-                                            <input type="text" className="input-table" value={l.sku || ''} placeholder="SKU"
-                                                onChange={(e) => onUpdateRow(l.id, { sku: e.target.value })} />
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <input type="text" className="input-table" value={l.sku || ''} placeholder="SKU"
+                                                    disabled={currentUser && currentUser.role === 'agent'}
+                                                    onChange={(e) => onUpdateRow(l.id, { sku: e.target.value })} style={{ flex: 1, minWidth: '70px' }} />
+                                                {l.sku && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        style={{ padding: '3px 7px', fontSize: '11px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                                        title="Copier rapidement le SKU"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                                navigator.clipboard.writeText(l.sku);
+                                                            } else {
+                                                                const el = document.createElement('textarea');
+                                                                el.value = l.sku;
+                                                                document.body.appendChild(el);
+                                                                el.select();
+                                                                document.execCommand('copy');
+                                                                document.body.removeChild(el);
+                                                            }
+                                                            setCopiedSkuId(l.id);
+                                                            setTimeout(() => setCopiedSkuId(null), 1500);
+                                                        }}>
+                                                        <i className={`fa-solid ${copiedSkuId === l.id ? 'fa-check' : 'fa-copy'}`} style={{ color: copiedSkuId === l.id ? '#059669' : 'inherit' }}></i>
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                         <td>
                                             <button className={`btn btn-sm ${l.statut === 'Fait' ? 'btn-success' : 'btn-danger'}`}
@@ -604,6 +634,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         <td style={{ textAlign: 'center' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                                                 <button className={`btn btn-sm ${l.vente === 1 ? 'btn-success' : 'btn-secondary'}`}
+                                                    disabled={currentUser && currentUser.role === 'agent'}
                                                     onClick={() => onUpdateRow(l.id, { vente: l.vente === 1 ? 0 : 1 })}>
                                                     {l.vente === 1 ? '💰 Oui' : 'Non'}
                                                 </button>
@@ -616,7 +647,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             </div>
                                         </td>
                                         <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.vues || 0}
+                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.vues || 0} disabled={currentUser && currentUser.role === 'agent'}
                                                 onChange={(e) => onUpdateRow(l.id, { vues: parseInt(e.target.value) || 0 })} />
                                         </td>
                                         {/* <td>
@@ -624,7 +655,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 onChange={(e) => onUpdateRow(l.id, { likes: parseInt(e.target.value) || 0 })} />
                                         </td> */}
                                         <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.favoris || 0}
+                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.favoris || 0} disabled={currentUser && currentUser.role === 'agent'}
                                                 onChange={(e) => onUpdateRow(l.id, { favoris: parseInt(e.target.value) || 0 })} />
                                         </td>
                                         {/* <td>
