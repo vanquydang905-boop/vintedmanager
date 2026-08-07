@@ -116,12 +116,54 @@ function App() {
 
     const handleUpdateRow = async (id, fields) => {
         try {
+            // Chercher la ligne avant mise à jour pour détecter le passage à vente=1
+            const existingRow = appState.calendrier.find(l => l.id === id);
             await API.updateCalendrierRow(id, fields);
+
+            // Si on vient de marquer une VENTE (passage de 0 → 1), créer un créneau de republication
+            if (fields.vente === 1 && existingRow && existingRow.vente !== 1) {
+                try {
+                    // Calcul de la date de repub : lendemain de la date d'origine
+                    let repubDate = existingRow.date || new Date().toISOString().split('T')[0];
+                    try {
+                        const orig = new Date(repubDate);
+                        orig.setDate(orig.getDate() + 1);
+                        repubDate = orig.toISOString().split('T')[0];
+                    } catch(e) {
+                        repubDate = new Date().toISOString().split('T')[0];
+                    }
+
+                    // Heure de repub = même heure que l'original (ou 12:00 par défaut)
+                    const repubHeure = existingRow.heurePrevue || '12:00';
+
+                    const newRepubRow = {
+                        date: repubDate,
+                        compteId: existingRow.compteId || '',
+                        agent: existingRow.agent || '',
+                        heurePrevue: repubHeure,
+                        sku: existingRow.sku || '',
+                        statut: 'Non fait',
+                        vente: 0,
+                        vues: 0,
+                        favoris: 0,
+                        score: 0,
+                        notes: `Repub auto après vente du ${existingRow.date || '?'}`,
+                        organisationId: currentOrgId
+                    };
+
+                    await API.createCalendrierRow(newRepubRow);
+                    showToast(`💰 Vente enregistrée ! Créneau de repub ajouté pour le ${repubDate} à ${repubHeure}`);
+                } catch(repErr) {
+                    showToast('Vente enregistrée (erreur création repub automatique)', true);
+                }
+            }
+
             await loadData();
         } catch (err) {
             showToast("Erreur de mise à jour de la ligne", true);
         }
     };
+
 
     const handleDeleteRow = async (id) => {
         if (!confirm("Voulez-vous vraiment supprimer cette ligne ?")) return;
