@@ -211,6 +211,18 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         return calendrierAll;
     }, [calendrierAll, isAgent, myAgentName]);
 
+    const [sortField, setSortField] = useState('dateTime');
+    const [sortAsc, setSortAsc] = useState(true);
+
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortAsc(!sortAsc);
+        } else {
+            setSortField(field);
+            setSortAsc(true);
+        }
+    };
+
     const agentsUnique = useMemo(() => [...new Set(comptesAll.map(c => c.agent).filter(Boolean))], [comptesAll]);
 
     const filteredLines = useMemo(() => {
@@ -220,8 +232,37 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
             if (filterStatut && l.statut !== filterStatut) return false;
             if (filterClassif && l.classification !== filterClassif) return false;
             return true;
-        }).sort((a, b) => new Date(`${a.date}T${a.heurePrevue}`) - new Date(`${b.date}T${b.heurePrevue}`));
-    }, [baseLines, filterComptes, filterAgent, filterStatut, filterClassif]);
+        }).sort((a, b) => {
+            const parseDateAndMinutes = (dateStr, timeStr) => {
+                const d = dateStr || '1970-01-01';
+                let [h, m] = (timeStr || '00:00').split(':').map(n => parseInt(n) || 0);
+                const hPad = String(h).padStart(2, '0');
+                const mPad = String(m).padStart(2, '0');
+                return `${d} ${hPad}:${mPad}`;
+            };
+
+            let res = 0;
+            if (sortField === 'dateTime') {
+                const keyA = parseDateAndMinutes(a.date, a.heurePrevue);
+                const keyB = parseDateAndMinutes(b.date, b.heurePrevue);
+                res = keyA.localeCompare(keyB);
+            } else if (sortField === 'date') {
+                res = (a.date || '').localeCompare(b.date || '');
+            } else if (sortField === 'heure') {
+                res = (a.heurePrevue || '').localeCompare(b.heurePrevue || '');
+            } else if (sortField === 'score') {
+                res = (a.score || 0) - (b.score || 0);
+            } else if (sortField === 'sku') {
+                res = (a.sku || '').localeCompare(b.sku || '');
+            } else {
+                const keyA = parseDateAndMinutes(a.date, a.heurePrevue);
+                const keyB = parseDateAndMinutes(b.date, b.heurePrevue);
+                res = keyA.localeCompare(keyB);
+            }
+
+            return sortAsc ? res : -res;
+        });
+    }, [baseLines, filterComptes, filterAgent, filterStatut, filterClassif, sortField, sortAsc]);
 
     const isAllSelected = useMemo(() => {
         return filteredLines.length > 0 && filteredLines.every(l => selectedIds.includes(l.id));
@@ -530,10 +571,14 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th style={{ width: '40px', textAlign: 'center' }}>
                                     <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} style={{ width: '16px', height: '16px', cursor: 'pointer' }} title="Tout sélectionner / Tout désélectionner" />
                                 </th>
-                                <th style={{ fontWeight: 700 }}>Date</th>
+                                <th style={{ fontWeight: 700, cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('dateTime')} title="Cliquer pour trier par Date & Heure">
+                                     Date {sortField === 'dateTime' ? (sortAsc ? '▲' : '▼') : (sortField === 'date' ? (sortAsc ? '▲' : '▼') : '')}
+                                </th>
                                 <th style={{ fontWeight: 700, color: 'var(--accent)' }}>Compte</th>
                                 <th style={{ fontWeight: 700, color: 'var(--accent)' }}>Agent</th>
-                                <th style={{ fontWeight: 700 }}>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
+                                <th style={{ fontWeight: 700, cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('heure')} title="Cliquer pour trier par Heure">
+                                     Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'}) {sortField === 'heure' && (sortAsc ? '▲' : '▼')}
+                                </th>
                                 <th style={{ fontWeight: 700 }}>SKU</th>
                                 <th style={{ fontWeight: 700 }}>Classif.</th>
                                 <th style={{ fontWeight: 700 }}>Statut</th>
