@@ -967,7 +967,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                 <form onSubmit={handleSubmit}>
                     <div className="grid-3" style={{ marginBottom: '12px' }}>
                         <div className="form-group">
-                            <label>N° Compte (Index)</label>
+                            <label>N° Compte (Proxy)</label>
                             <input type="text" value={numeroCompte} onChange={(e) => setNumeroCompte(e.target.value)} placeholder="ex: 48" />
                         </div>
                         <div className="form-group">
@@ -1110,7 +1110,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 <th style={{ width: '40px', textAlign: 'center' }}>
                                     <input type="checkbox" checked={isAllComptesSelected} onChange={toggleSelectAllComptes} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                 </th>
-                                <th>N°</th>
+                                <th>N° Proxy</th>
                                 <th>Pseudo</th>
                                 <th>Téléphone</th>
                                 <th>Email</th>
