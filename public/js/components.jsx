@@ -173,6 +173,8 @@ function convertHHMM(timeStr, dateStr, fromTZ, toTZ) {
 
 // ------------------- VIEW: DASHBOARD / CALENDRIER -------------------
 function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick, onBulkUpdateCalendrier, onBulkDeleteCalendrier, selectedTZ = 'FR' }) {
+    const [filterDate, setFilterDate] = useState('');
+    const [filterHeure, setFilterHeure] = useState('');
     const [filterComptes, setFilterComptes] = useState([]); // multi-select
     const [showCompteDropdown, setShowCompteDropdown] = useState(false);
     const [filterAgent, setFilterAgent] = useState((currentUser && currentUser.role === 'agent') ? (currentUser.agentAssigne || '') : '');
@@ -182,6 +184,19 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     const [copiedSkuId, setCopiedSkuId] = useState(null);
     const isAgent = currentUser && currentUser.role === 'agent';
     const myAgentName = useMemo(() => isAgent ? (currentUser.agentAssigne || currentUser.nom || '').trim() : '', [currentUser, isAgent]);
+
+    const resetAllFilters = () => {
+        setFilterDate('');
+        setFilterHeure('');
+        setFilterComptes([]);
+        if (!isAgent) setFilterAgent('');
+        setFilterStatut('');
+        setFilterClassif('');
+    };
+
+    const isAnyFilterActive = useMemo(() => {
+        return Boolean(filterDate || filterHeure || filterComptes.length > 0 || (!isAgent && filterAgent) || filterStatut || filterClassif);
+    }, [filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, isAgent]);
 
     // Fermer dropdown Compte si clic en dehors
     React.useEffect(() => {
@@ -227,6 +242,8 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
     const filteredLines = useMemo(() => {
         return baseLines.filter(l => {
+            if (filterDate && l.date !== filterDate) return false;
+            if (filterHeure && l.heurePrevue !== filterHeure) return false;
             if (filterComptes.length > 0 && !filterComptes.includes(l.compteId)) return false;
             if (filterAgent && l.agent !== filterAgent) return false;
             if (filterStatut && l.statut !== filterStatut) return false;
@@ -262,7 +279,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
             return sortAsc ? res : -res;
         });
-    }, [baseLines, filterComptes, filterAgent, filterStatut, filterClassif, sortField, sortAsc]);
+    }, [baseLines, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, sortField, sortAsc]);
 
     const isAllSelected = useMemo(() => {
         return filteredLines.length > 0 && filteredLines.every(l => selectedIds.includes(l.id));
@@ -438,6 +455,30 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                             </div>
                         )}
                     </div>
+                    {/* FILTRE DATE */}
+                    <div style={{ minWidth: '140px', flex: 1 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date</label>
+                        <input
+                            type="date"
+                            className="input"
+                            value={filterDate}
+                            onChange={(e) => setFilterDate(e.target.value)}
+                            style={{ border: filterDate ? '1px solid var(--primary)' : '1px solid var(--border)', fontWeight: filterDate ? 700 : 400 }}
+                        />
+                    </div>
+
+                    {/* FILTRE HEURE */}
+                    <div style={{ minWidth: '120px', flex: 1 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Heure</label>
+                        <input
+                            type="time"
+                            className="input"
+                            value={filterHeure}
+                            onChange={(e) => setFilterHeure(e.target.value)}
+                            style={{ border: filterHeure ? '1px solid var(--primary)' : '1px solid var(--border)', fontWeight: filterHeure ? 700 : 400 }}
+                        />
+                    </div>
+
                     <div style={{ minWidth: '160px', flex: 1 }}>
                         <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Agent</label>
                         <select className="input" value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)} disabled={currentUser && currentUser.role === 'agent'}>
@@ -447,7 +488,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                             ))}
                         </select>
                     </div>
-                    <div style={{ minWidth: '140px', flex: 1 }}>
+                    <div style={{ minWidth: '130px', flex: 1 }}>
                         <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Statut</label>
                         <select className="input" value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)}>
                             <option value="">Tous les statuts</option>
@@ -465,6 +506,20 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                             <option value="Écarté">❌ Écarté</option>
                         </select>
                     </div>
+
+                    {isAnyFilterActive && (
+                        <div style={{ marginTop: '20px' }}>
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={resetAllFilters}
+                                style={{ color: 'var(--danger)', borderColor: '#fca5a5', backgroundColor: '#fef2f2', fontWeight: 600 }}
+                                title="Réinitialiser tous les filtres active"
+                            >
+                                <i className="fa-solid fa-rotate-left"></i> Réinitialiser
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
