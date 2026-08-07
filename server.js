@@ -54,6 +54,13 @@ function getClassification(itemOrScore, allOrgLinesOrVente = [], paramsObj = {})
         }
     }
 
+    const sku = (item.sku || '').trim().toLowerCase();
+
+    // Classification SI ET SEULEMENT SI un SKU est renseigné !
+    if (!sku) {
+        return "";
+    }
+
     const s = params.seuils || { ecarte: 15, gagnant: 40 };
     const score = item.score || 0;
     const vente = item.vente || 0;
@@ -61,18 +68,18 @@ function getClassification(itemOrScore, allOrgLinesOrVente = [], paramsObj = {})
     if (vente === 1 || score >= s.gagnant) return "Gagnant";
     if (score > 0 && score < s.ecarte) return "Écarté";
 
-    const sku = (item.sku || '').trim().toLowerCase();
-    if (sku) {
-        const otherWithSameSKU = (allOrgLines || []).filter(l => 
-            l.id !== item.id && 
-            l.sku && 
-            l.sku.trim().toLowerCase() === sku
-        );
-        if (otherWithSameSKU.length > 0) {
-            return "À retester";
-        }
+    // Vérifier si ce SKU a déjà été enregistré auparavant sur n'importe quel compte ou ligne de l'organisation
+    const otherWithSameSKU = (allOrgLines || []).filter(l => 
+        l.id !== item.id && 
+        l.sku && 
+        l.sku.trim().toLowerCase() === sku
+    );
+
+    if (otherWithSameSKU.length > 0) {
+        return "À retester";
     }
 
+    // SKU jamais enregistré auparavant -> Nouveau produit !
     return "Nouveau produit";
 }
 

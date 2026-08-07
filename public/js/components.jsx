@@ -663,14 +663,18 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         </td> */}
                                         <td><b>{(l.score || 0).toFixed(1)}</b></td>
                                         <td>
-                                            <span className={`badge ${
-                                                l.classification === 'Gagnant' ? 'badge-gagnant' :
-                                                l.classification === 'Écarté' ? 'badge-ecarte' :
-                                                l.classification === 'Nouveau produit' ? 'badge-nouveau' :
-                                                'badge-retester'
-                                            }`}>
-                                                {l.classification || 'Nouveau produit'}
-                                            </span>
+                                            {l.sku && String(l.sku).trim() !== '' ? (
+                                                <span className={`badge ${
+                                                    l.classification === 'Gagnant' ? 'badge-gagnant' :
+                                                    l.classification === 'Écarté' ? 'badge-ecarte' :
+                                                    l.classification === 'Nouveau produit' ? 'badge-nouveau' :
+                                                    'badge-retester'
+                                                }`}>
+                                                    {l.classification || 'Nouveau produit'}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>-</span>
+                                            )}
                                         </td>
                                         {(currentUser && currentUser.role !== 'agent') && (
                                             <td>
