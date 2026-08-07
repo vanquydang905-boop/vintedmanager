@@ -181,6 +181,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     const [selectedIds, setSelectedIds] = useState([]);
     const [copiedSkuId, setCopiedSkuId] = useState(null);
     const isAgent = currentUser && currentUser.role === 'agent';
+    const myAgentName = useMemo(() => isAgent ? (currentUser.agentAssigne || currentUser.nom || '').trim() : '', [currentUser, isAgent]);
 
     // Fermer dropdown Compte si clic en dehors
     React.useEffect(() => {
@@ -191,20 +192,36 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         return () => document.removeEventListener('mousedown', close);
     }, []);
 
-    const comptes = appState.comptes || [];
-    const calendrier = appState.calendrier || [];
+    const comptesAll = appState.comptes || [];
+    const calendrierAll = appState.calendrier || [];
 
-    const agentsUnique = useMemo(() => [...new Set(comptes.map(c => c.agent).filter(Boolean))], [comptes]);
+    // Pour un agent, restreindre la liste des comptes uniquement à ses comptes délégués
+    const comptes = useMemo(() => {
+        if (isAgent && myAgentName) {
+            return comptesAll.filter(c => c.agent && c.agent.trim().toLowerCase() === myAgentName.toLowerCase());
+        }
+        return comptesAll;
+    }, [comptesAll, isAgent, myAgentName]);
+
+    // Lignes de base : Pour un Agent, afficher STRICTEMENT ses lignes attribuées
+    const baseLines = useMemo(() => {
+        if (isAgent && myAgentName) {
+            return calendrierAll.filter(l => l.agent && l.agent.trim().toLowerCase() === myAgentName.toLowerCase());
+        }
+        return calendrierAll;
+    }, [calendrierAll, isAgent, myAgentName]);
+
+    const agentsUnique = useMemo(() => [...new Set(comptesAll.map(c => c.agent).filter(Boolean))], [comptesAll]);
 
     const filteredLines = useMemo(() => {
-        return calendrier.filter(l => {
+        return baseLines.filter(l => {
             if (filterComptes.length > 0 && !filterComptes.includes(l.compteId)) return false;
             if (filterAgent && l.agent !== filterAgent) return false;
             if (filterStatut && l.statut !== filterStatut) return false;
             if (filterClassif && l.classification !== filterClassif) return false;
             return true;
         }).sort((a, b) => new Date(`${a.date}T${a.heurePrevue}`) - new Date(`${b.date}T${b.heurePrevue}`));
-    }, [calendrier, filterComptes, filterAgent, filterStatut, filterClassif]);
+    }, [baseLines, filterComptes, filterAgent, filterStatut, filterClassif]);
 
     const isAllSelected = useMemo(() => {
         return filteredLines.length > 0 && filteredLines.every(l => selectedIds.includes(l.id));
@@ -248,22 +265,23 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         }
     };
 
-    const totalVentes = useMemo(() => calendrier.reduce((sum, l) => sum + (l.vente || 0), 0), [calendrier]);
-    const pubsFaite = useMemo(() => calendrier.filter(l => l.statut === 'Fait').length, [calendrier]);
-    const totalPubs = calendrier.length;
-    const avgScore = useMemo(() => totalPubs > 0 ? (calendrier.reduce((sum, l) => sum + (l.score || 0), 0) / totalPubs).toFixed(1) : "0.0", [calendrier, totalPubs]);
-    const winnersCount = useMemo(() => new Set(calendrier.filter(l => l.classification === 'Gagnant' && l.sku).map(l => l.sku)).size, [calendrier]);
+    // KPI Métriques calculées uniquement sur les données pertinentes de l'Agent (baseLines)
+    const totalVentes = useMemo(() => baseLines.reduce((sum, l) => sum + (l.vente || 0), 0), [baseLines]);
+    const pubsFaite = useMemo(() => baseLines.filter(l => l.statut === 'Fait').length, [baseLines]);
+    const totalPubs = baseLines.length;
+    const avgScore = useMemo(() => totalPubs > 0 ? (baseLines.reduce((sum, l) => sum + (l.score || 0), 0) / totalPubs).toFixed(1) : "0.0", [baseLines, totalPubs]);
+    const winnersCount = useMemo(() => new Set(baseLines.filter(l => l.classification === 'Gagnant' && l.sku).map(l => l.sku)).size, [baseLines]);
 
     // Nombre de ventes par SKU sur toute l'organisation
     const skuVentesMap = useMemo(() => {
         const map = {};
-        calendrier.forEach(l => {
+        calendrierAll.forEach(l => {
             if (l.sku && l.vente === 1) {
                 map[l.sku] = (map[l.sku] || 0) + 1;
             }
         });
         return map;
-    }, [calendrier]);
+    }, [calendrierAll]);
 
     return (
         <section className="view">
