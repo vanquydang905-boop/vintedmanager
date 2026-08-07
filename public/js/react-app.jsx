@@ -123,18 +123,19 @@ function App() {
             // Si on vient de marquer une VENTE (passage de 0 → 1), créer un créneau de republication
             if (fields.vente === 1 && existingRow && existingRow.vente !== 1) {
                 try {
-                    // Calcul de la date de repub : lendemain de la date d'origine
-                    let repubDate = existingRow.date || new Date().toISOString().split('T')[0];
-                    try {
-                        const orig = new Date(repubDate);
-                        orig.setDate(orig.getDate() + 1);
-                        repubDate = orig.toISOString().split('T')[0];
-                    } catch(e) {
-                        repubDate = new Date().toISOString().split('T')[0];
-                    }
+                    // Date de repub = même jour que la vente
+                    const repubDate = existingRow.date || new Date().toISOString().split('T')[0];
 
-                    // Heure de repub = même heure que l'original (ou 12:00 par défaut)
-                    const repubHeure = existingRow.heurePrevue || '12:00';
+                    // Heure de repub = heure originale + 20 à 30 min aléatoire
+                    let repubHeure = '12:00';
+                    try {
+                        const [h, m] = (existingRow.heurePrevue || '12:00').split(':').map(Number);
+                        const delayMin = 20 + Math.floor(Math.random() * 11); // 20..30 min
+                        const totalMin = h * 60 + m + delayMin;
+                        const newH = Math.floor(totalMin / 60) % 24;
+                        const newM = totalMin % 60;
+                        repubHeure = `${String(newH).padStart(2,'0')}:${String(newM).padStart(2,'0')}`;
+                    } catch(e) { repubHeure = '12:30'; }
 
                     const newRepubRow = {
                         date: repubDate,
