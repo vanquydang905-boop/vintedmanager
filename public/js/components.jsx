@@ -517,6 +517,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th style={{ fontWeight: 700, color: 'var(--accent)' }}>Agent</th>
                                 <th style={{ fontWeight: 700 }}>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
                                 <th style={{ fontWeight: 700 }}>SKU</th>
+                                <th style={{ fontWeight: 700 }}>Classif.</th>
                                 <th style={{ fontWeight: 700 }}>Statut</th>
                                 <th style={{ fontWeight: 700, color: 'var(--success)' }}>Vente</th>
                                 <th>Vues</th>
@@ -524,7 +525,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th>Favoris</th>
                                 {/* <th>Msgs</th> */}
                                 <th>Score</th>
-                                <th>Classif.</th>
                                 {(currentUser && currentUser.role !== 'agent') && <th>Actions</th>}
                             </tr>
                         </thead>
@@ -635,6 +635,20 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             </div>
                                         </td>
                                         <td>
+                                            {l.sku && String(l.sku).trim() !== '' ? (
+                                                <span className={`badge ${
+                                                    l.classification === 'Gagnant' ? 'badge-gagnant' :
+                                                    l.classification === 'Écarté' ? 'badge-ecarte' :
+                                                    l.classification === 'Nouveau produit' ? 'badge-nouveau' :
+                                                    'badge-retester'
+                                                }`}>
+                                                    {l.classification || 'Nouveau produit'}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>-</span>
+                                            )}
+                                        </td>
+                                        <td>
                                             <button className={`btn btn-sm ${l.statut === 'Fait' ? 'btn-success' : 'btn-danger'}`}
                                                 onClick={() => onUpdateRow(l.id, { statut: l.statut === 'Fait' ? 'Non fait' : 'Fait' })}>
                                                 {l.statut === 'Fait' ? '✓ Fait' : '⌛ Non fait'}
@@ -671,20 +685,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 onChange={(e) => onUpdateRow(l.id, { messages: parseInt(e.target.value) || 0 })} />
                                         </td> */}
                                         <td><b>{(l.score || 0).toFixed(1)}</b></td>
-                                        <td>
-                                            {l.sku && String(l.sku).trim() !== '' ? (
-                                                <span className={`badge ${
-                                                    l.classification === 'Gagnant' ? 'badge-gagnant' :
-                                                    l.classification === 'Écarté' ? 'badge-ecarte' :
-                                                    l.classification === 'Nouveau produit' ? 'badge-nouveau' :
-                                                    'badge-retester'
-                                                }`}>
-                                                    {l.classification || 'Nouveau produit'}
-                                                </span>
-                                            ) : (
-                                                <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>-</span>
-                                            )}
-                                        </td>
                                         {(currentUser && currentUser.role !== 'agent') && (
                                             <td>
                                                 <button className="btn btn-danger btn-sm" title="Supprimer" onClick={() => onDeleteRow(l.id)}>
