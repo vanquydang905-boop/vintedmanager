@@ -733,6 +733,57 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const [showTextModal, setShowTextModal] = useState(false);
     const [rawImportText, setRawImportText] = useState('');
 
+    // AdsPower API State
+    const [showAdsPowerModal, setShowAdsPowerModal] = useState(false);
+    const [adsPowerApiUrl, setAdsPowerApiUrl] = useState('http://127.0.0.1:50325');
+    const [adsPowerStatus, setAdsPowerStatus] = useState(null);
+    const [adsPowerLoading, setAdsPowerLoading] = useState(false);
+
+    const handleTestAdsPower = async () => {
+        setAdsPowerLoading(true);
+        setAdsPowerStatus(null);
+        try {
+            const res = await fetch(`/api/adspower/test?apiUrl=${encodeURIComponent(adsPowerApiUrl)}`);
+            const data = await res.json();
+            if (data.connected) {
+                setAdsPowerStatus({ type: 'success', message: `✅ Connexion réussie ! ${data.count} profils détectés dans AdsPower.` });
+            } else {
+                setAdsPowerStatus({ type: 'error', message: `❌ ${data.error || 'Erreur de connexion'}` });
+            }
+        } catch (err) {
+            setAdsPowerStatus({ type: 'error', message: `❌ Erreur : ${err.message}` });
+        } finally {
+            setAdsPowerLoading(false);
+        }
+    };
+
+    const handleSyncAdsPower = async () => {
+        setAdsPowerLoading(true);
+        setAdsPowerStatus(null);
+        try {
+            const res = await fetch('/api/adspower/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiUrl: adsPowerApiUrl, organisationId: userOrgId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setAdsPowerStatus({ type: 'success', message: `🎉 Synchronisation réussie ! ${data.count} comptes AdsPower importés/mis à jour.` });
+                if (window.showToast) window.showToast(`🎉 ${data.count} comptes AdsPower synchronisés !`);
+                setTimeout(() => {
+                    setShowAdsPowerModal(false);
+                    window.location.reload();
+                }, 1500);
+            } else {
+                setAdsPowerStatus({ type: 'error', message: `❌ ${data.error || 'Échec de synchronisation'}` });
+            }
+        } catch (err) {
+            setAdsPowerStatus({ type: 'error', message: `❌ Erreur de réseau : ${err.message}` });
+        } finally {
+            setAdsPowerLoading(false);
+        }
+    };
+
     const comptes = appState.comptes || [];
     const utilisateurs = appState.utilisateurs || [];
     const organisations = appState.organisations || [];
@@ -919,12 +970,69 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                     <h2 className="page-title">Gestion des Comptes Vinted</h2>
                     <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Gérez les comptes Vinted (N°, pseudo, tél, email, mot de passe, géré par, statut et date)</p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button type="button" className="btn btn-secondary" onClick={() => setShowTextModal(true)}>
-                        <i className="fa-solid fa-file-import"></i> Importer par Copier/Coller Texte
+                        <i className="fa-solid fa-file-import"></i> Importer par Texte
+                    </button>
+                    <button type="button" className="btn btn-primary" onClick={() => setShowAdsPowerModal(true)} style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', border: 'none' }}>
+                        <i className="fa-solid fa-bolt"></i> Synchro AdsPower API
                     </button>
                 </div>
             </div>
+
+            {/* MODAL SYNCHRONISATION ADSPOWER */}
+            {showAdsPowerModal && (
+                <div className="modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div className="modal-content card" style={{ maxWidth: '550px', width: '100%', backgroundColor: '#fff', borderRadius: '12px', padding: '24px' }}>
+                        <h3 className="card-title" style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <i className="fa-solid fa-bolt" style={{ color: '#0284c7' }}></i>
+                            Synchronisation & Importation AdsPower API
+                        </h3>
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                            Connectez-vous directement à l'API locale AdsPower pour importer et synchroniser automatiquement tous vos profils Vinted (N° Proxy, Pseudos, Emails, Mots de passe, Proxies et IDs).
+                        </p>
+                        
+                        <div className="form-group" style={{ marginBottom: '16px' }}>
+                            <label>URL de l'API Locale AdsPower</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input 
+                                    type="text" 
+                                    value={adsPowerApiUrl} 
+                                    onChange={(e) => setAdsPowerApiUrl(e.target.value)} 
+                                    placeholder="http://127.0.0.1:50325"
+                                />
+                                <button type="button" className="btn btn-secondary" onClick={handleTestAdsPower} disabled={adsPowerLoading}>
+                                    Tester
+                                </button>
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                                Port par défaut AdsPower : <code>http://127.0.0.1:50325</code> ou <code>http://local.adspower.net:50325</code>
+                            </span>
+                        </div>
+
+                        {adsPowerStatus && (
+                            <div style={{ 
+                                padding: '10px 14px', 
+                                borderRadius: '8px', 
+                                marginBottom: '16px', 
+                                fontSize: '13px',
+                                backgroundColor: adsPowerStatus.type === 'success' ? '#ecfdf5' : '#fef2f2',
+                                color: adsPowerStatus.type === 'success' ? '#047857' : '#b91c1c',
+                                border: `1px solid ${adsPowerStatus.type === 'success' ? '#6ee7b7' : '#fca5a5'}`
+                            }}>
+                                {adsPowerStatus.message}
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button type="button" className="btn btn-secondary" onClick={() => setShowAdsPowerModal(false)}>Fermer</button>
+                            <button type="button" className="btn btn-primary" onClick={handleSyncAdsPower} disabled={adsPowerLoading} style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', border: 'none' }}>
+                                {adsPowerLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-arrows-rotate"></i>} Lancer la Synchronisation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL COPIER/COLLER TEXTE */}
             {showTextModal && (
@@ -1144,7 +1252,34 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                         </td>
                                         <td style={{ fontSize: '12px', maxWidth: '200px' }}>{c.notes || '-'}</td>
                                         <td>
-                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                {c.adsPowerUserId && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        style={{ padding: '3px 8px', fontSize: '11px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                                        title={`Ouvrir le profil AdsPower (${c.adsPowerUserId})`}
+                                                        onClick={async () => {
+                                                            try {
+                                                                if (window.showToast) window.showToast(`Lancement AdsPower pour ${c.pseudo}...`);
+                                                                const res = await fetch('/api/adspower/start', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ userId: c.adsPowerUserId })
+                                                                });
+                                                                const data = await res.json();
+                                                                if (data.success) {
+                                                                    if (window.showToast) window.showToast(`🚀 Profil AdsPower "${c.pseudo}" ouvert !`);
+                                                                } else {
+                                                                    if (window.showToast) window.showToast(`Erreur AdsPower: ${data.error}`, true);
+                                                                }
+                                                            } catch (err) {
+                                                                if (window.showToast) window.showToast(`Connexion AdsPower impossible : ${err.message}`, true);
+                                                            }
+                                                        }}>
+                                                        <i className="fa-solid fa-rocket"></i> AdsPower
+                                                    </button>
+                                                )}
                                                 <button className="btn btn-primary btn-sm" onClick={() => handleEdit(c)} title="Éditer">
                                                     <i className="fa-solid fa-pen"></i>
                                                 </button>

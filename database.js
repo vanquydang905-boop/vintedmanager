@@ -621,7 +621,8 @@ const dbService = {
                     motDePasse: payload.motDePasse || '',
                     gereParInitiales: payload.gereParInitiales || '',
                     dateStatutCompte: payload.dateStatutCompte || '',
-                    userNotes: payload.notes || ''
+                    userNotes: payload.notes || '',
+                    adsPowerUserId: payload.adsPowerUserId || ''
                 };
 
                 const dbPayload = {
@@ -663,7 +664,8 @@ const dbService = {
                     motDePasse: updatedCompte.motDePasse || '',
                     gereParInitiales: updatedCompte.gereParInitiales || '',
                     dateStatutCompte: updatedCompte.dateStatutCompte || '',
-                    userNotes: updatedCompte.notes || ''
+                    userNotes: updatedCompte.notes || '',
+                    adsPowerUserId: updatedCompte.adsPowerUserId || ''
                 };
 
                 const dbFields = {
