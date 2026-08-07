@@ -598,7 +598,17 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         <td style={{ textAlign: 'center' }}>
                                             <input type="checkbox" checked={selectedIds.includes(l.id)} onChange={() => toggleSelectRow(l.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                         </td>
-                                        <td style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>{l.date}</td>
+                                        <td>
+                                            <input
+                                                type="date"
+                                                className="input-table"
+                                                value={l.date || ''}
+                                                disabled={currentUser && currentUser.role === 'agent'}
+                                                onChange={(e) => onUpdateRow(l.id, { date: e.target.value })}
+                                                style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '12.5px', padding: '2px 4px', width: '100%' }}
+                                                title="Modifier la date de publication"
+                                            />
+                                        </td>
                                         <td>
                                             <select className="input-table" style={{ width: '100%', minWidth: '130px', fontWeight: 600, color: 'var(--text-primary)' }} value={l.compteId || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => {
                                                 const selCompte = comptes.find(c => c.id === e.target.value);
