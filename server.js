@@ -597,6 +597,7 @@ function getComptesActifsEtAttribues(comptes = [], selectedAgents = null) {
 app.post('/api/calendrier/generate', async (req, res) => {
     try {
         const orgId = req.body.organisationId || 'org_default';
+        const params = (await dbService.getParametres(orgId)) || {};
         const comptes = await dbService.getComptes(orgId);
         const selectedAgents = req.body.selectedAgents;
 
