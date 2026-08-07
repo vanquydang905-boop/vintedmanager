@@ -162,11 +162,21 @@ function convertHHMM(timeStr, dateStr, fromTZ, toTZ) {
 
 // ------------------- VIEW: DASHBOARD / CALENDRIER -------------------
 function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick, onBulkUpdateCalendrier, onBulkDeleteCalendrier, selectedTZ = 'FR' }) {
-    const [filterCompte, setFilterCompte] = useState('');
+    const [filterComptes, setFilterComptes] = useState([]); // multi-select
+    const [showCompteDropdown, setShowCompteDropdown] = useState(false);
     const [filterAgent, setFilterAgent] = useState((currentUser && currentUser.role === 'agent') ? (currentUser.agentAssigne || '') : '');
     const [filterStatut, setFilterStatut] = useState('');
     const [filterClassif, setFilterClassif] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
+
+    // Fermer dropdown Compte si clic en dehors
+    React.useEffect(() => {
+        const close = (e) => {
+            if (!e.target.closest('#compte-multiselect-wrapper')) setShowCompteDropdown(false);
+        };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, []);
 
     const comptes = appState.comptes || [];
     const calendrier = appState.calendrier || [];
@@ -175,13 +185,13 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
     const filteredLines = useMemo(() => {
         return calendrier.filter(l => {
-            if (filterCompte && l.compteId !== filterCompte) return false;
+            if (filterComptes.length > 0 && !filterComptes.includes(l.compteId)) return false;
             if (filterAgent && l.agent !== filterAgent) return false;
             if (filterStatut && l.statut !== filterStatut) return false;
             if (filterClassif && l.classification !== filterClassif) return false;
             return true;
         }).sort((a, b) => new Date(`${a.date}T${a.heurePrevue}`) - new Date(`${b.date}T${b.heurePrevue}`));
-    }, [calendrier, filterCompte, filterAgent, filterStatut, filterClassif]);
+    }, [calendrier, filterComptes, filterAgent, filterStatut, filterClassif]);
 
     const isAllSelected = useMemo(() => {
         return filteredLines.length > 0 && filteredLines.every(l => selectedIds.includes(l.id));
@@ -291,14 +301,70 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
             {/* FILTRES */}
             <div className="card" style={{ marginBottom: '24px' }}>
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ minWidth: '160px', flex: 1 }}>
+                    {/* FILTRE COMPTE — MULTI-SELECT CHECKBOXES */}
+                    <div id="compte-multiselect-wrapper" style={{ minWidth: '180px', flex: 1, position: 'relative' }}>
                         <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Compte</label>
-                        <select className="input" value={filterCompte} onChange={(e) => setFilterCompte(e.target.value)}>
-                            <option value="">Tous les comptes ({comptes.length})</option>
-                            {comptes.map(c => (
-                                <option key={c.id} value={c.id}>{c.pseudo}</option>
-                            ))}
-                        </select>
+                        <button
+                            type="button"
+                            onClick={() => setShowCompteDropdown(v => !v)}
+                            style={{
+                                width: '100%', textAlign: 'left', padding: '9px 12px',
+                                border: `1px solid ${filterComptes.length > 0 ? 'var(--primary)' : 'var(--border)'}`,
+                                borderRadius: 'var(--radius-sm)', background: 'var(--bg-card)',
+                                color: filterComptes.length > 0 ? 'var(--primary)' : 'var(--text-main)',
+                                fontWeight: filterComptes.length > 0 ? 700 : 400,
+                                cursor: 'pointer', fontSize: '13.5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                            }}
+                        >
+                            <span>
+                                {filterComptes.length === 0
+                                    ? `Tous les comptes (${comptes.length})`
+                                    : filterComptes.length === 1
+                                        ? comptes.find(c => c.id === filterComptes[0])?.pseudo || '1 compte'
+                                        : `${filterComptes.length} comptes sélectionnés`
+                                }
+                            </span>
+                            <i className={`fa-solid fa-chevron-${showCompteDropdown ? 'up' : 'down'}`} style={{ fontSize: '11px', marginLeft: '8px' }}></i>
+                        </button>
+
+                        {showCompteDropdown && (
+                            <div style={{
+                                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                                borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                zIndex: 999, maxHeight: '260px', overflowY: 'auto', padding: '6px 0'
+                            }}>
+                                {/* Tout sélectionner / Tout désélectionner */}
+                                <div
+                                    style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}
+                                    onClick={() => setFilterComptes(filterComptes.length === comptes.length ? [] : comptes.map(c => c.id))}
+                                >
+                                    <input type="checkbox" readOnly checked={filterComptes.length === comptes.length} style={{ width: '14px', height: '14px' }} />
+                                    {filterComptes.length === comptes.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                                </div>
+                                {comptes.map(c => (
+                                    <div
+                                        key={c.id}
+                                        style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: filterComptes.includes(c.id) ? 'rgba(9,177,186,0.07)' : 'transparent', transition: 'background 0.1s' }}
+                                        onClick={() => setFilterComptes(prev => prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id])}
+                                    >
+                                        <input type="checkbox" readOnly checked={filterComptes.includes(c.id)} style={{ width: '14px', height: '14px', accentColor: 'var(--primary)' }} />
+                                        <span style={{ fontWeight: filterComptes.includes(c.id) ? 600 : 400, color: filterComptes.includes(c.id) ? 'var(--primary)' : 'var(--text-main)', fontSize: '13px' }}>
+                                            {c.pseudo}
+                                        </span>
+                                        {c.numeroCompte && <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>N°{c.numeroCompte}</span>}
+                                    </div>
+                                ))}
+                                {filterComptes.length > 0 && (
+                                    <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)' }}>
+                                        <button type="button" style={{ fontSize: '12px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                                            onClick={() => { setFilterComptes([]); setShowCompteDropdown(false); }}>
+                                            ✕ Effacer la sélection
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div style={{ minWidth: '160px', flex: 1 }}>
                         <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Agent</label>
