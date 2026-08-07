@@ -539,7 +539,8 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         <td>
                                             <select className="input-table" style={{ width: '100%', minWidth: '130px', fontWeight: 600, color: 'var(--text-primary)' }} value={l.compteId || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => {
                                                 const selCompte = comptes.find(c => c.id === e.target.value);
-                                                onUpdateRow(l.id, { compteId: e.target.value, agent: selCompte ? selCompte.agent : l.agent });
+                                                const targetAgent = selCompte && selCompte.agent && selCompte.agent !== 'À attribuer' ? selCompte.agent : l.agent;
+                                                onUpdateRow(l.id, { compteId: e.target.value, agent: targetAgent });
                                             }}>
                                                 <option value="">(aucun compte)</option>
                                                 {comptes.map(c => (
@@ -548,7 +549,15 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             </select>
                                         </td>
                                         <td>
-                                            <select className="input-table" style={{ width: '100%', minWidth: '110px', fontWeight: 600, color: 'var(--accent)' }} value={l.agent || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => onUpdateRow(l.id, { agent: e.target.value })}>
+                                            <select className="input-table" style={{ width: '100%', minWidth: '110px', fontWeight: 600, color: 'var(--accent)' }} value={l.agent || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => {
+                                                const newAgent = e.target.value;
+                                                const currentCompte = comptes.find(c => c.id === l.compteId);
+                                                if (currentCompte && currentCompte.agent && currentCompte.agent !== 'À attribuer' && currentCompte.agent !== newAgent) {
+                                                    if (window.showToast) window.showToast(`Attribution refusée : Le compte "${currentCompte.pseudo}" est officiellement attribué à ${currentCompte.agent}`, true);
+                                                    return;
+                                                }
+                                                onUpdateRow(l.id, { agent: newAgent });
+                                            }}>
                                                 <option value="">Sélectionner...</option>
                                                 {agentsUnique.map(a => (
                                                     <option key={a} value={a}>{a}</option>

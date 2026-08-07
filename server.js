@@ -472,7 +472,21 @@ app.put('/api/calendrier/:id', async (req, res) => {
         const params = await dbService.getParametres(orgId);
         const updated = { ...current };
 
-        if (field === 'statut') {
+        if (field === 'compteId') {
+            updated.compteId = value;
+            const comptes = await dbService.getComptes(orgId);
+            const targetCompte = comptes.find(c => c.id === value);
+            if (targetCompte && targetCompte.agent && targetCompte.agent !== 'À attribuer') {
+                updated.agent = targetCompte.agent;
+            }
+        } else if (field === 'agent') {
+            const comptes = await dbService.getComptes(orgId);
+            const targetCompte = comptes.find(c => c.id === updated.compteId);
+            if (targetCompte && targetCompte.agent && targetCompte.agent !== 'À attribuer' && targetCompte.agent !== value) {
+                return res.status(400).json({ error: `Attribution refusée : Le compte "${targetCompte.pseudo}" est officiellement attribué à ${targetCompte.agent} !` });
+            }
+            updated.agent = value;
+        } else if (field === 'statut') {
             updated.statut = value;
             if (value === 'Fait') {
                 updated.dateStatut = getLocalDateString();
