@@ -491,21 +491,21 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
             {/* TABLEAU CALENDRIER */}
             <div className="card">
                 <div className="table-container" style={{ overflowX: 'auto' }}>
-                    <table style={{ minWidth: '1100px', tableLayout: 'fixed' }}>
+                    <table style={{ minWidth: '1325px', width: '100%', tableLayout: 'fixed' }}>
                         <colgroup>
                             <col style={{ width: '40px' }} />
                             <col style={{ width: '100px' }} />
                             <col style={{ width: '150px' }} />
                             <col style={{ width: '120px' }} />
                             <col style={{ width: '180px' }} />
-                            <col style={{ width: '120px' }} />
-                            <col style={{ width: '65px' }} />
-                            <col style={{ width: '65px' }} />
-                            <col style={{ width: '65px' }} />
-                            <col style={{ width: '65px' }} />
-                            <col style={{ width: '100px' }} />
-                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '130px' }} />
+                            <col style={{ width: '130px' }} />
+                            <col style={{ width: '110px' }} />
+                            <col style={{ width: '80px' }} />
                             <col style={{ width: '70px' }} />
+                            <col style={{ width: '70px' }} />
+                            <col style={{ width: '70px' }} />
+                            <col style={{ width: '75px' }} />
                         </colgroup>
                         <thead>
                             <tr>
