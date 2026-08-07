@@ -634,7 +634,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         <td style={{ textAlign: 'center' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                                                 <button className={`btn btn-sm ${l.vente === 1 ? 'btn-success' : 'btn-secondary'}`}
-                                                    disabled={currentUser && currentUser.role === 'agent'}
                                                     onClick={() => onUpdateRow(l.id, { vente: l.vente === 1 ? 0 : 1 })}>
                                                     {l.vente === 1 ? '💰 Oui' : 'Non'}
                                                 </button>
@@ -647,7 +646,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             </div>
                                         </td>
                                         <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.vues || 0} disabled={currentUser && currentUser.role === 'agent'}
+                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.vues || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { vues: parseInt(e.target.value) || 0 })} />
                                         </td>
                                         {/* <td>
@@ -655,7 +654,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 onChange={(e) => onUpdateRow(l.id, { likes: parseInt(e.target.value) || 0 })} />
                                         </td> */}
                                         <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.favoris || 0} disabled={currentUser && currentUser.role === 'agent'}
+                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.favoris || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { favoris: parseInt(e.target.value) || 0 })} />
                                         </td>
                                         {/* <td>
