@@ -427,6 +427,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th style={{ fontWeight: 700, color: 'var(--accent)' }}>Agent</th>
                                 <th style={{ fontWeight: 700 }}>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
                                 <th style={{ fontWeight: 700 }}>SKU</th>
+                                <th style={{ fontWeight: 700 }}>Statut</th>
                                 <th>Vues</th>
                                 {/* <th>Likes</th> */}
                                 <th>Favoris</th>
@@ -434,7 +435,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th>Vente</th>
                                 <th>Score</th>
                                 <th>Classif.</th>
-                                <th>Statut</th>
                                 {(currentUser && currentUser.role !== 'agent') && <th>Actions</th>}
                             </tr>
                         </thead>
@@ -497,6 +497,12 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 onChange={(e) => onUpdateRow(l.id, { sku: e.target.value })} />
                                         </td>
                                         <td>
+                                            <button className={`btn btn-sm ${l.statut === 'Fait' ? 'btn-success' : 'btn-danger'}`}
+                                                onClick={() => onUpdateRow(l.id, { statut: l.statut === 'Fait' ? 'Non fait' : 'Fait' })}>
+                                                {l.statut === 'Fait' ? '✓ Fait' : '⌛ Non fait'}
+                                            </button>
+                                        </td>
+                                        <td>
                                             <input type="number" className="input-table" style={{ width: '60px' }} value={l.vues || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { vues: parseInt(e.target.value) || 0 })} />
                                         </td>
@@ -528,12 +534,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             }`}>
                                                 {l.classification || 'Nouveau produit'}
                                             </span>
-                                        </td>
-                                        <td>
-                                            <button className={`btn btn-sm ${l.statut === 'Fait' ? 'btn-success' : 'btn-danger'}`}
-                                                onClick={() => onUpdateRow(l.id, { statut: l.statut === 'Fait' ? 'Non fait' : 'Fait' })}>
-                                                {l.statut === 'Fait' ? '✓ Fait' : '⌛ Non fait'}
-                                            </button>
                                         </td>
                                         {(currentUser && currentUser.role !== 'agent') && (
                                             <td>
