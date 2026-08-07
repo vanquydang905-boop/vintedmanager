@@ -231,6 +231,17 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     const avgScore = useMemo(() => totalPubs > 0 ? (calendrier.reduce((sum, l) => sum + (l.score || 0), 0) / totalPubs).toFixed(1) : "0.0", [calendrier, totalPubs]);
     const winnersCount = useMemo(() => new Set(calendrier.filter(l => l.classification === 'Gagnant' && l.sku).map(l => l.sku)).size, [calendrier]);
 
+    // Nombre de ventes par SKU sur toute l'organisation
+    const skuVentesMap = useMemo(() => {
+        const map = {};
+        calendrier.forEach(l => {
+            if (l.sku && l.vente === 1) {
+                map[l.sku] = (map[l.sku] || 0) + 1;
+            }
+        });
+        return map;
+    }, [calendrier]);
+
     return (
         <section className="view">
             <div className="header-actions">
@@ -428,11 +439,11 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th style={{ fontWeight: 700 }}>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
                                 <th style={{ fontWeight: 700 }}>SKU</th>
                                 <th style={{ fontWeight: 700 }}>Statut</th>
+                                <th style={{ fontWeight: 700, color: 'var(--success)' }}>Vente</th>
                                 <th>Vues</th>
                                 {/* <th>Likes</th> */}
                                 <th>Favoris</th>
                                 {/* <th>Msgs</th> */}
-                                <th>Vente</th>
                                 <th>Score</th>
                                 <th>Classif.</th>
                                 {(currentUser && currentUser.role !== 'agent') && <th>Actions</th>}
@@ -502,6 +513,20 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 {l.statut === 'Fait' ? '✓ Fait' : '⌛ Non fait'}
                                             </button>
                                         </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                                                <button className={`btn btn-sm ${l.vente === 1 ? 'btn-success' : 'btn-secondary'}`}
+                                                    onClick={() => onUpdateRow(l.id, { vente: l.vente === 1 ? 0 : 1 })}>
+                                                    {l.vente === 1 ? '💰 Oui' : 'Non'}
+                                                </button>
+                                                {l.sku && skuVentesMap[l.sku] > 0 && (
+                                                    <span style={{ fontSize: '10px', color: skuVentesMap[l.sku] >= 3 ? '#059669' : 'var(--text-muted)', fontWeight: 700, background: skuVentesMap[l.sku] >= 3 ? 'rgba(5,150,105,0.1)' : '#f1f5f9', borderRadius: '4px', padding: '1px 5px', whiteSpace: 'nowrap' }}
+                                                        title={`Ce SKU a été vendu ${skuVentesMap[l.sku]}x dans l'organisation`}>
+                                                        {skuVentesMap[l.sku]}x ce SKU
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td>
                                             <input type="number" className="input-table" style={{ width: '60px' }} value={l.vues || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { vues: parseInt(e.target.value) || 0 })} />
@@ -518,12 +543,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             <input type="number" className="input-table" style={{ width: '60px' }} value={l.messages || 0}
                                                 onChange={(e) => onUpdateRow(l.id, { messages: parseInt(e.target.value) || 0 })} />
                                         </td> */}
-                                        <td style={{ textAlign: 'center' }}>
-                                            <button className={`btn btn-sm ${l.vente === 1 ? 'btn-success' : 'btn-secondary'}`}
-                                                onClick={() => onUpdateRow(l.id, { vente: l.vente === 1 ? 0 : 1 })}>
-                                                {l.vente === 1 ? '💰 Oui' : 'Non'}
-                                            </button>
-                                        </td>
                                         <td><b>{(l.score || 0).toFixed(1)}</b></td>
                                         <td>
                                             <span className={`badge ${
