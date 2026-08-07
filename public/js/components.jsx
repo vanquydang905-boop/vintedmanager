@@ -547,6 +547,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBulkUpdateComptes, onBulkDeleteComptes, onOpenQuickAgentModal }) {
     const isAdmin = currentUser && currentUser.role === 'admin';
     const userOrgId = (currentUser && currentUser.organisationId) || 'org_default';
+    const formRef = React.useRef(null);
 
     const [compteId, setCompteId] = useState('');
     const [numeroCompte, setNumeroCompte] = useState('');
@@ -621,6 +622,15 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
         setDateStatutCompte(c.dateStatutCompte || '');
         setOrganisationId(isAdmin ? (c.organisationId || 'org_default') : userOrgId);
         setNotes(c.notes || '');
+        // Scroll to form smoothly after state update
+        setTimeout(() => {
+            if (formRef.current) {
+                formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Focus the pseudo field
+                const pseudoInput = formRef.current.querySelector('input[placeholder*="pseudo"], input[placeholder*="isis_mlf"]');
+                if (pseudoInput) pseudoInput.focus();
+            }
+        }, 50);
     };
 
     const handleReset = () => {
@@ -780,8 +790,14 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             )}
 
             {/* FORMULAIRE COMPTE */}
-            <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 className="card-title">{compteId ? 'Modifier le compte' : 'Ajouter un nouveau compte Vinted'}</h3>
+            <div ref={formRef} className="card" style={{ marginBottom: '24px', scrollMarginTop: '20px' }}>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {compteId ? (
+                        <><i className="fa-solid fa-pen-to-square" style={{ color: 'var(--accent)' }}></i> Modifier le compte <span style={{ color: 'var(--accent)', fontWeight: 700 }}>#{numeroCompte || compteId}</span></>
+                    ) : (
+                        <><i className="fa-solid fa-plus-circle" style={{ color: 'var(--success)' }}></i> Ajouter un nouveau compte Vinted</>
+                    )}
+                </h3>
                 <form onSubmit={handleSubmit}>
                     <div className="grid-3" style={{ marginBottom: '12px' }}>
                         <div className="form-group">
