@@ -399,13 +399,81 @@ app.delete('/api/comptes/:id', async (req, res) => {
 });
 
 // ------------------- ADSPOWER API INTEGRATION -------------------
+app.post('/api/adspower/import-profiles', async (req, res) => {
+    try {
+        const profiles = req.body.profiles;
+        const orgId = req.body.organisationId || 'org_default';
+
+        if (!Array.isArray(profiles) || profiles.length === 0) {
+            return res.status(400).json({ error: "Aucun profil AdsPower fourni à enregistrer." });
+        }
+
+        const existingComptes = await dbService.getComptes(orgId);
+        let importedCount = 0;
+
+        for (const p of profiles) {
+            const numProxy = p.serial_number ? String(p.serial_number) : '';
+            const pseudo = p.name ? String(p.name) : (numProxy ? `compte_${numProxy}` : `compte_${p.user_id}`);
+            const email = p.username || p.email || '';
+            const motDePasse = p.password || '';
+            const notes = [p.remark, p.proxy ? `Proxy: ${p.proxy}` : ''].filter(Boolean).join(' | ');
+
+            const existing = existingComptes.find(c => 
+                (numProxy && String(c.numeroCompte) === numProxy) || 
+                (c.pseudo && c.pseudo.toLowerCase() === pseudo.toLowerCase()) ||
+                (c.adsPowerUserId && c.adsPowerUserId === p.user_id)
+            );
+
+            if (existing) {
+                await dbService.updateCompte(existing.id, {
+                    numeroCompte: numProxy || existing.numeroCompte,
+                    pseudo: pseudo || existing.pseudo,
+                    email: email || existing.email,
+                    motDePasse: motDePasse || existing.motDePasse,
+                    notes: notes || existing.notes,
+                    adsPowerUserId: p.user_id
+                });
+            } else {
+                await dbService.createCompte({
+                    organisationId: orgId,
+                    numeroCompte: numProxy,
+                    pseudo: pseudo,
+                    telephone: '',
+                    email: email,
+                    motDePasse: motDePasse,
+                    gereParInitiales: '',
+                    agent: 'À attribuer',
+                    lienProfil: '',
+                    statut: 'Actif',
+                    dateStatutCompte: '',
+                    dateCreation: new Date().toISOString().split('T')[0],
+                    notes: notes,
+                    adsPowerUserId: p.user_id
+                });
+            }
+            importedCount++;
+        }
+
+        await dbService.logAction("AdsPower Synchro", `Importation directe de ${importedCount} profils AdsPower`, "Succès", orgId);
+        const updatedComptes = await dbService.getComptes(orgId);
+        res.json({ success: true, count: importedCount, comptes: updatedComptes });
+    } catch (err) {
+        res.status(500).json({ error: `Erreur lors de l'enregistrement des profils : ${err.message}` });
+    }
+});
+
 app.get('/api/adspower/test', async (req, res) => {
     try {
         const apiUrl = req.query.apiUrl || 'http://127.0.0.1:50325';
+        const apiKey = req.query.apiKey || '';
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 4000);
 
-        const response = await fetch(`${apiUrl}/api/v1/user/list?page_size=1`, { signal: controller.signal });
+        let fetchUrl = `${apiUrl}/api/v1/user/list?page_size=1`;
+        if (apiKey) fetchUrl += `&api_key=${encodeURIComponent(apiKey)}`;
+
+        const headers = apiKey ? { 'Authorization': `Bearer ${apiKey}`, 'api_key': apiKey } : {};
+        const response = await fetch(fetchUrl, { signal: controller.signal, headers });
         clearTimeout(timeout);
         const data = await response.json();
 
@@ -422,12 +490,17 @@ app.get('/api/adspower/test', async (req, res) => {
 app.post('/api/adspower/sync', async (req, res) => {
     try {
         const apiUrl = req.body.apiUrl || 'http://127.0.0.1:50325';
+        const apiKey = req.body.apiKey || '';
         const orgId = req.body.organisationId || 'org_default';
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 10000);
 
-        const response = await fetch(`${apiUrl}/api/v1/user/list?page_size=200`, { signal: controller.signal });
+        let fetchUrl = `${apiUrl}/api/v1/user/list?page_size=200`;
+        if (apiKey) fetchUrl += `&api_key=${encodeURIComponent(apiKey)}`;
+
+        const headers = apiKey ? { 'Authorization': `Bearer ${apiKey}`, 'api_key': apiKey } : {};
+        const response = await fetch(fetchUrl, { signal: controller.signal, headers });
         clearTimeout(timeout);
         const data = await response.json();
 

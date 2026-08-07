@@ -735,23 +735,45 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
 
     // AdsPower API State
     const [showAdsPowerModal, setShowAdsPowerModal] = useState(false);
-    const [adsPowerApiUrl, setAdsPowerApiUrl] = useState('http://127.0.0.1:50325');
+    const [adsPowerApiUrl, setAdsPowerApiUrl] = useState('http://local.adspower.net:50325');
+    const [adsPowerApiKey, setAdsPowerApiKey] = useState('');
     const [adsPowerStatus, setAdsPowerStatus] = useState(null);
     const [adsPowerLoading, setAdsPowerLoading] = useState(false);
 
     const handleTestAdsPower = async () => {
         setAdsPowerLoading(true);
         setAdsPowerStatus(null);
+        let keyQuery = adsPowerApiKey ? `&api_key=${encodeURIComponent(adsPowerApiKey)}` : '';
+
+        // 1. Essai direct côté navigateur client
         try {
-            const res = await fetch(`/api/adspower/test?apiUrl=${encodeURIComponent(adsPowerApiUrl)}`);
+            let testUrl = `${adsPowerApiUrl}/api/v1/user/list?page_size=1${keyQuery}`;
+            const res = await fetch(testUrl);
+            const data = await res.json();
+            if (data.code === 0) {
+                const total = data.data ? (data.data.total || (data.data.list ? data.data.list.length : 0)) : 0;
+                setAdsPowerStatus({ type: 'success', message: `✅ Connexion directe AdsPower réussie ! ${total} profils détectés.` });
+                setAdsPowerLoading(false);
+                return;
+            }
+        } catch (e) {
+            console.log("Échec du fetch direct navigateur, tentative via le serveur...", e);
+        }
+
+        // 2. Essai via le serveur backend
+        try {
+            const res = await fetch(`/api/adspower/test?apiUrl=${encodeURIComponent(adsPowerApiUrl)}&apiKey=${encodeURIComponent(adsPowerApiKey)}`);
             const data = await res.json();
             if (data.connected) {
-                setAdsPowerStatus({ type: 'success', message: `✅ Connexion réussie ! ${data.count} profils détectés dans AdsPower.` });
+                setAdsPowerStatus({ type: 'success', message: `✅ Connexion réussie via le serveur ! ${data.count} profils détectés.` });
             } else {
-                setAdsPowerStatus({ type: 'error', message: `❌ ${data.error || 'Erreur de connexion'}` });
+                setAdsPowerStatus({ type: 'error', message: `❌ ${data.error || 'Erreur de connexion.'}` });
             }
         } catch (err) {
-            setAdsPowerStatus({ type: 'error', message: `❌ Erreur : ${err.message}` });
+            setAdsPowerStatus({ 
+                type: 'error', 
+                message: `❌ Note de connexion : L'application web tourne sur Vercel Cloud (HTTPS). Le navigateur bloque les requêtes HTTP locales (Mixed Content). Dans AdsPower > API & MCP, générez votre Clé API et désactivez la "Vérification de l'API" (interrupteur bleu) si elle bloque la connexion.` 
+            });
         } finally {
             setAdsPowerLoading(false);
         }
@@ -760,22 +782,63 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const handleSyncAdsPower = async () => {
         setAdsPowerLoading(true);
         setAdsPowerStatus(null);
+        let profilesToImport = null;
+        let keyQuery = adsPowerApiKey ? `&api_key=${encodeURIComponent(adsPowerApiKey)}` : '';
+
+        // 1. Tentative de récupération directe par le navigateur de l'utilisateur
+        try {
+            let listUrl = `${adsPowerApiUrl}/api/v1/user/list?page_size=200${keyQuery}`;
+            const res = await fetch(listUrl);
+            const data = await res.json();
+            if (data.code === 0 && data.data && Array.isArray(data.data.list)) {
+                profilesToImport = data.data.list;
+            }
+        } catch (e) {
+            console.log("Fetch direct client échoué, tentative via le proxy serveur...", e);
+        }
+
+        // Si le navigateur a récupéré les profils : envoi direct à la base de données
+        if (profilesToImport && profilesToImport.length > 0) {
+            try {
+                const res = await fetch('/api/adspower/import-profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profiles: profilesToImport, organisationId: userOrgId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setAdsPowerStatus({ type: 'success', message: `🎉 ${data.count} comptes AdsPower importés/mis à jour avec succès !` });
+                    if (window.showToast) window.showToast(`🎉 ${data.count} comptes AdsPower synchronisés !`);
+                    setTimeout(() => {
+                        setShowAdsPowerModal(false);
+                        window.location.reload();
+                    }, 1500);
+                    return;
+                }
+            } catch (err) {
+                console.error("Erreur d'envoi des profils au serveur:", err);
+            } finally {
+                setAdsPowerLoading(false);
+            }
+        }
+
+        // 2. Repli vers la synchro serveur
         try {
             const res = await fetch('/api/adspower/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ apiUrl: adsPowerApiUrl, organisationId: userOrgId })
+                body: JSON.stringify({ apiUrl: adsPowerApiUrl, apiKey: adsPowerApiKey, organisationId: userOrgId })
             });
             const data = await res.json();
             if (data.success) {
-                setAdsPowerStatus({ type: 'success', message: `🎉 Synchronisation réussie ! ${data.count} comptes AdsPower importés/mis à jour.` });
+                setAdsPowerStatus({ type: 'success', message: `🎉 Synchronisation réussie ! ${data.count} comptes AdsPower importés.` });
                 if (window.showToast) window.showToast(`🎉 ${data.count} comptes AdsPower synchronisés !`);
                 setTimeout(() => {
                     setShowAdsPowerModal(false);
                     window.location.reload();
                 }, 1500);
             } else {
-                setAdsPowerStatus({ type: 'error', message: `❌ ${data.error || 'Échec de synchronisation'}` });
+                setAdsPowerStatus({ type: 'error', message: `❌ ${data.error || 'Échec de synchronisation.'}` });
             }
         } catch (err) {
             setAdsPowerStatus({ type: 'error', message: `❌ Erreur de réseau : ${err.message}` });
@@ -992,21 +1055,34 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                             Connectez-vous directement à l'API locale AdsPower pour importer et synchroniser automatiquement tous vos profils Vinted (N° Proxy, Pseudos, Emails, Mots de passe, Proxies et IDs).
                         </p>
                         
-                        <div className="form-group" style={{ marginBottom: '16px' }}>
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
                             <label>URL de l'API Locale AdsPower</label>
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <input 
                                     type="text" 
                                     value={adsPowerApiUrl} 
                                     onChange={(e) => setAdsPowerApiUrl(e.target.value)} 
-                                    placeholder="http://127.0.0.1:50325"
+                                    placeholder="http://local.adspower.net:50325"
                                 />
                                 <button type="button" className="btn btn-secondary" onClick={handleTestAdsPower} disabled={adsPowerLoading}>
                                     Tester
                                 </button>
                             </div>
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                                Port par défaut AdsPower : <code>http://127.0.0.1:50325</code> ou <code>http://local.adspower.net:50325</code>
+                                Adresse par défaut AdsPower : <code>http://local.adspower.net:50325</code> ou <code>http://127.0.0.1:50325</code>
+                            </span>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: '16px' }}>
+                            <label>Clé API AdsPower (Optionnelle si configurée dans AdsPower)</label>
+                            <input 
+                                type="password" 
+                                value={adsPowerApiKey} 
+                                onChange={(e) => setAdsPowerApiKey(e.target.value)} 
+                                placeholder="Collez la Clé API générée depuis AdsPower > API & MCP"
+                            />
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                                💡 Disponible dans AdsPower ➔ <b>API & MCP</b> ➔ Bouton <b>« Générer »</b> sous API Key.
                             </span>
                         </div>
 
