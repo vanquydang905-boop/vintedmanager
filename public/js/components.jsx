@@ -16,14 +16,14 @@ function Toast({ toast }) {
 }
 
 // ------------------- SIDEBAR NAVIGATION -------------------
-function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0 }) {
+function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0, isOpen = false }) {
     if (!currentUser) return null;
 
     const isAdmin = currentUser.role === 'admin';
     const isCadre = currentUser.role === 'cadre' || isAdmin;
 
     return (
-        <aside className="sidebar" id="sidebar">
+        <aside className={`sidebar ${isOpen ? 'open' : ''}`} id="sidebar">
             <div className="brand-header">
                 <div className="brand-logo">V</div>
                 <h1>Vinted Manager</h1>

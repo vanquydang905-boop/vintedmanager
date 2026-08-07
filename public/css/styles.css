@@ -630,20 +630,49 @@ tbody tr:hover .input-table {
     position: fixed;
     top: 16px;
     left: 16px;
-    z-index: 150;
+    z-index: 1000;
     padding: 10px 14px;
+    font-size: 16px;
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
 }
 
-/* RESPONSIVE */
-@media (max-width: 992px) {
-    .grid-2, .grid-3 {
-        grid-template-columns: 1fr;
+/* Container de tableau avec défilement horizontal fluide */
+.table-responsive, .table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+    background: #ffffff;
+}
+
+.table-responsive table, .table-container table {
+    width: 100%;
+    min-width: 900px; /* Garantit que les colonnes ne sont pas écrasées */
+}
+
+/* RESPONSIVE DESIGN MULTI-ÉCRANS */
+@media (max-width: 1024px) {
+    .grid-4, .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    .grid-3 {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .main-content {
+        padding: 24px 20px;
     }
 }
 
 @media (max-width: 768px) {
     .sidebar {
         transform: translateX(-100%);
+        width: 280px;
+        box-shadow: 10px 0 30px rgba(0,0,0,0.15);
     }
 
     .sidebar.open {
@@ -651,12 +680,63 @@ tbody tr:hover .input-table {
     }
 
     .main-content {
-        margin-left: 0;
-        width: 100%;
-        padding: 70px 16px 24px;
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding: 76px 12px 24px !important;
     }
 
     .mobile-menu-btn {
         display: inline-flex !important;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .grid-2, .grid-3, .grid-4, .stats-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px;
+    }
+
+    .filters {
+        padding: 14px;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .filters > div {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    .card {
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .page-title {
+        font-size: 20px !important;
+    }
+
+    /* Adapter les boutons de la barre supérieure */
+    .top-header-actions {
+        flex-wrap: wrap;
+        justify-content: center !important;
+        gap: 8px;
+        margin-bottom: 20px;
+    }
+
+    /* Améliorer les zones de touch sur mobile */
+    input, select, button {
+        min-height: 42px;
+    }
+}
+
+@media (max-width: 480px) {
+    .grid-4, .stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .badge {
+        font-size: 11px;
+        padding: 3px 8px;
     }
 }

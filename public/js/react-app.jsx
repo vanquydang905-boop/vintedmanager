@@ -32,6 +32,7 @@ function App() {
 
     const [currentOrgId, setCurrentOrgId] = useState('org_default');
     const [activeView, setActiveView] = useState('dashboard');
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [timeZone, setTimeZone] = useState(() => localStorage.getItem('vinted_timezone') || 'FR');
     const [toast, setToast] = useState({ visible: false, message: '', isError: false });
     const [loginError, setLoginError] = useState('');
@@ -462,21 +463,50 @@ function App() {
 
     return (
         <div className="app-container">
+            <button
+                type="button"
+                className="mobile-menu-btn btn btn-primary"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                title="Menu principal">
+                <i className={`fa-solid ${mobileMenuOpen ? 'fa-xmark' : 'fa-bars'}`}></i> Menu
+            </button>
+
+            {mobileMenuOpen && (
+                <div
+                    className="sidebar-overlay"
+                    onClick={() => setMobileMenuOpen(false)}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(15, 23, 42, 0.5)',
+                        backdropFilter: 'blur(3px)',
+                        zIndex: 99
+                    }}
+                />
+            )}
+
             <Sidebar
                 currentUser={currentUser}
                 currentOrgId={currentOrgId}
                 organisations={appState.organisations}
                 activeView={activeView}
-                onSelectView={setActiveView}
+                onSelectView={(view) => {
+                    setActiveView(view);
+                    setMobileMenuOpen(false);
+                }}
                 onSwitchOrg={handleSwitchOrg}
                 onLogout={handleLogout}
                 onExportJSON={handleExportJSON}
                 onImportJSON={handleImportJSON}
                 corbeilleCount={(appState.corbeille || []).length}
+                isOpen={mobileMenuOpen}
             />
 
             <main className="main-content">
-                <div style={{
+                <div className="top-header-actions" style={{
                     display: 'flex',
                     justifyContent: 'flex-end',
                     alignItems: 'center',
