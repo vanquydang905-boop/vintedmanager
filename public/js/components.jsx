@@ -400,18 +400,33 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
             {/* TABLEAU CALENDRIER */}
             <div className="card">
-                <div className="table-container">
-                    <table>
+                <div className="table-container" style={{ overflowX: 'auto' }}>
+                    <table style={{ minWidth: '1100px', tableLayout: 'fixed' }}>
+                        <colgroup>
+                            <col style={{ width: '40px' }} />
+                            <col style={{ width: '100px' }} />
+                            <col style={{ width: '150px' }} />
+                            <col style={{ width: '120px' }} />
+                            <col style={{ width: '180px' }} />
+                            <col style={{ width: '120px' }} />
+                            <col style={{ width: '65px' }} />
+                            <col style={{ width: '65px' }} />
+                            <col style={{ width: '65px' }} />
+                            <col style={{ width: '65px' }} />
+                            <col style={{ width: '100px' }} />
+                            <col style={{ width: '90px' }} />
+                            <col style={{ width: '70px' }} />
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th style={{ width: '40px', textAlign: 'center' }}>
                                     <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} style={{ width: '16px', height: '16px', cursor: 'pointer' }} title="Tout sélectionner / Tout désélectionner" />
                                 </th>
-                                <th>Date</th>
-                                <th>Compte</th>
-                                <th>Agent</th>
-                                <th>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
-                                <th>SKU</th>
+                                <th style={{ fontWeight: 700 }}>Date</th>
+                                <th style={{ fontWeight: 700, color: 'var(--accent)' }}>Compte</th>
+                                <th style={{ fontWeight: 700, color: 'var(--accent)' }}>Agent</th>
+                                <th style={{ fontWeight: 700 }}>Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'})</th>
+                                <th style={{ fontWeight: 700 }}>SKU</th>
                                 <th>Vues</th>
                                 {/* <th>Likes</th> */}
                                 <th>Favoris</th>
@@ -430,19 +445,20 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         <td style={{ textAlign: 'center' }}>
                                             <input type="checkbox" checked={selectedIds.includes(l.id)} onChange={() => toggleSelectRow(l.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                         </td>
-                                        <td>{l.date}</td>
+                                        <td style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>{l.date}</td>
                                         <td>
-                                            <select className="input-table" value={l.compteId || ''} onChange={(e) => {
+                                            <select className="input-table" style={{ width: '100%', minWidth: '130px', fontWeight: 600, color: 'var(--text-primary)' }} value={l.compteId || ''} onChange={(e) => {
                                                 const selCompte = comptes.find(c => c.id === e.target.value);
                                                 onUpdateRow(l.id, { compteId: e.target.value, agent: selCompte ? selCompte.agent : l.agent });
                                             }}>
+                                                <option value="">(aucun compte)</option>
                                                 {comptes.map(c => (
                                                     <option key={c.id} value={c.id}>{c.pseudo}</option>
                                                 ))}
                                             </select>
                                         </td>
                                         <td>
-                                            <select className="input-table" value={l.agent || ''} onChange={(e) => onUpdateRow(l.id, { agent: e.target.value })}>
+                                            <select className="input-table" style={{ width: '100%', minWidth: '110px', fontWeight: 600, color: 'var(--accent)' }} value={l.agent || ''} onChange={(e) => onUpdateRow(l.id, { agent: e.target.value })}>
                                                 <option value="">Sélectionner...</option>
                                                 {agentsUnique.map(a => (
                                                     <option key={a} value={a}>{a}</option>
