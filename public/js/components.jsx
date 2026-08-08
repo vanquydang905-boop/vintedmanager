@@ -990,17 +990,18 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
         
         const getStatusPriority = (statut) => {
             const s = (statut || '').toLowerCase();
-            if (s.includes('banni') || s.includes('bloqué')) return 1;
-            if (s.includes('limité') || s.includes('restreint')) return 2;
-            if (s.includes('pause')) return 3;
-            return 4; // 'Actif'
+            if (s.includes('limité') || s.includes('restreint')) return 1;
+            if (s.includes('pause')) return 2;
+            if (s.includes('actif')) return 3;
+            if (s.includes('banni') || s.includes('bloqué')) return 99; // Comptes bannis tout en bas !
+            return 3;
         };
 
         return [...list].sort((a, b) => {
             const prioA = getStatusPriority(a.statut);
             const prioB = getStatusPriority(b.statut);
             if (prioA !== prioB) {
-                return prioA - prioB; // Comptes non actifs (prio 1..4) placés en premier
+                return prioA - prioB;
             }
             return (parseInt(a.numeroCompte) || 0) - (parseInt(b.numeroCompte) || 0);
         });
