@@ -218,18 +218,32 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         return comptesAll;
     }, [comptesAll, isAgent, myAgentName]);
 
-    const myAccountIds = useMemo(() => (comptes || []).map(c => c.id), [comptes]);
+    const myAccountIdentifiers = useMemo(() => {
+        const set = new Set();
+        (comptes || []).forEach(c => {
+            if (c.id) set.add(String(c.id).toLowerCase());
+            if (c.numeroCompte) {
+                set.add(String(c.numeroCompte).toLowerCase());
+                set.add(`compte_${c.numeroCompte}`.toLowerCase());
+            }
+            if (c.pseudo) set.add(String(c.pseudo).toLowerCase());
+        });
+        return set;
+    }, [comptes]);
 
     // Lignes de base : Pour un Agent, afficher ses lignes attribuées OU les lignes de ses comptes attribués
     const baseLines = useMemo(() => {
         if (isAgent && myAgentName) {
-            return calendrierAll.filter(l => 
-                (l.agent && l.agent.trim().toLowerCase() === myAgentName.toLowerCase()) ||
-                (l.compteId && myAccountIds.includes(l.compteId))
-            );
+            return calendrierAll.filter(l => {
+                const lineAgent = (l.agent || '').trim().toLowerCase();
+                if (lineAgent && lineAgent === myAgentName.toLowerCase()) return true;
+                const lineCompteId = (l.compteId || '').toString().toLowerCase();
+                if (lineCompteId && myAccountIdentifiers.has(lineCompteId)) return true;
+                return false;
+            });
         }
         return calendrierAll;
-    }, [calendrierAll, isAgent, myAgentName, myAccountIds]);
+    }, [calendrierAll, isAgent, myAgentName, myAccountIdentifiers]);
 
     const [sortField, setSortField] = useState('dateTime');
     const [sortAsc, setSortAsc] = useState(true);
@@ -249,7 +263,14 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         return baseLines.filter(l => {
             if (filterDate && l.date !== filterDate) return false;
             if (filterHeure && l.heurePrevue !== filterHeure) return false;
-            if (filterComptes.length > 0 && !filterComptes.includes(l.compteId)) return false;
+            if (filterComptes.length > 0) {
+                const lineCompteId = (l.compteId || '').toString().toLowerCase();
+                const matched = filterComptes.some(fc => {
+                    const fcStr = (fc || '').toString().toLowerCase();
+                    return lineCompteId === fcStr || lineCompteId.includes(fcStr) || fcStr.includes(lineCompteId);
+                });
+                if (!matched) return false;
+            }
             if (!isAgent && filterAgent && (l.agent || '').trim().toLowerCase() !== filterAgent.trim().toLowerCase()) return false;
             if (filterStatut && l.statut !== filterStatut) return false;
             if (filterClassif && l.classification !== filterClassif) return false;
