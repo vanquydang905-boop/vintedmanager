@@ -954,8 +954,6 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const [showTextModal, setShowTextModal] = useState(false);
     const [rawImportText, setRawImportText] = useState('');
 
-    const [rawImportText, setRawImportText] = useState('');
-
     const comptes = appState.comptes || [];
     const utilisateurs = appState.utilisateurs || [];
     const organisations = appState.organisations || [];
