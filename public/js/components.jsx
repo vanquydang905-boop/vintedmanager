@@ -993,8 +993,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             if (s.includes('banni') || s.includes('bloqué')) return 1;
             if (s.includes('limité') || s.includes('restreint')) return 2;
             if (s.includes('pause')) return 3;
-            if (s.includes('attribuer')) return 4;
-            return 5; // 'Actif'
+            return 4; // 'Actif'
         };
 
         return [...list].sort((a, b) => {
@@ -1133,9 +1132,8 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                     initiales = line;
                 } else if (!mp && (line.includes('*') || line.includes('&') || line.length >= 6) && !line.toLowerCase().includes('actif') && !line.toLowerCase().includes('bloqué') && !line.toLowerCase().includes('connecté')) {
                     mp = line;
-                } else if (line.toLowerCase().includes('actif') || line.toLowerCase().includes('bloqué') || line.toLowerCase().includes('banni') || line.toLowerCase().includes('limité') || line.toLowerCase().includes('pause') || line.toLowerCase().includes('attribuer')) {
+                } else if (line.toLowerCase().includes('actif') || line.toLowerCase().includes('bloqué') || line.toLowerCase().includes('banni') || line.toLowerCase().includes('limité') || line.toLowerCase().includes('pause')) {
                     if (line.toLowerCase().includes('pause')) statutStr = 'Pause';
-                    else if (line.toLowerCase().includes('attribuer')) statutStr = 'À attribuer';
                     else if (line.toLowerCase().includes('bloqué') || line.toLowerCase().includes('banni')) statutStr = 'Banni';
                     else if (line.toLowerCase().includes('limité') || line.toLowerCase().includes('restreint')) statutStr = 'Limité';
                     else statutStr = 'Actif';
@@ -1143,7 +1141,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                     const dateMatch = line.match(/\d{2}\/\d{2}\/\d{4}/) || line.match(/\d{2}\/\d{2}\/\d{2}/);
                     if (dateMatch) dateStatut = dateMatch[0];
 
-                    const restOfLine = line.replace(/actif|bloqué|banni|limité|restreint|pause|attribuer|\d{2}\/\d{2}\/\d{2,4}/gi, '').trim();
+                    const restOfLine = line.replace(/actif|bloqué|banni|limité|restreint|pause|\d{2}\/\d{2}\/\d{2,4}/gi, '').trim();
                     if (restOfLine) notesArr.push(restOfLine);
                 } else {
                     notesArr.push(line);
@@ -1347,7 +1345,6 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                             <select value={statut} onChange={(e) => setStatut(e.target.value)}>
                                 <option value="Actif">Actif</option>
                                 <option value="Pause">Pause</option>
-                                <option value="À attribuer">À attribuer</option>
                                 <option value="Limité">Limité / Restreint</option>
                                 <option value="Banni">Banni / Bloqué</option>
                             </select>
@@ -1418,9 +1415,6 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                         <button type="button" className="btn btn-sm" style={{ backgroundColor: '#6366f1', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkCompteStatut('Pause')}>
                             Statut Pause
                         </button>
-                        <button type="button" className="btn btn-sm" style={{ backgroundColor: '#64748b', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkCompteStatut('À attribuer')}>
-                            À attribuer
-                        </button>
                         <button type="button" className="btn btn-sm" style={{ backgroundColor: '#f59e0b', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkCompteStatut('Limité')}>
                             Statut Limité
                         </button>
@@ -1469,7 +1463,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                             <input type="checkbox" checked={selectedCompteIds.includes(c.id)} onChange={() => toggleSelectCompte(c.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                         </td>
                                         <td>
-                                            <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Pause' ? 'badge-pause' : (c.statut === 'À attribuer' ? 'badge-attribuer' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite')))}`}>
+                                            <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Pause' ? 'badge-pause' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite'))}`}>
                                                 {c.statut}
                                             </span>
                                             {c.dateStatutCompte && <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>{c.dateStatutCompte}</span>}
