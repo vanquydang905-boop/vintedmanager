@@ -54,11 +54,22 @@ function getClassification(itemOrScore, allOrgLinesOrVente = [], paramsObj = {})
         }
     }
 
+    // Si la ligne est déjà explicitement classée Gagnant, on conserve impérativement ce statut !
+    if (item.classification === "Gagnant") return "Gagnant";
+
     const sku = (item.sku || '').trim().toLowerCase();
 
     // Classification SI ET SEULEMENT SI un SKU est renseigné !
     if (!sku) {
         return "";
+    }
+
+    // Si ce SKU a déjà été classé "Gagnant" sur une autre ligne de l'organisation, propager "Gagnant" !
+    if (allOrgLines && allOrgLines.length > 0) {
+        const isWinnerInOrg = allOrgLines.some(l => 
+            l.sku && l.sku.trim().toLowerCase() === sku && l.classification === "Gagnant"
+        );
+        if (isWinnerInOrg) return "Gagnant";
     }
 
     const s = params.seuils || { ecarte: 15, gagnant: 40 };
@@ -716,15 +727,25 @@ app.put('/api/calendrier/:id', async (req, res) => {
                 updated.prochainRepost = reposDate.toTimeString().split(' ')[0].substring(0, 5);
                 await dbService.logAction("Vente détectée", `Vente enregistrée pour la ligne ${id}`, "Succès", orgId);
             }
-        } else if (['vues', 'likes', 'favoris', 'messages'].includes(field)) {
-            updated[field] = parseInt(value) || 0;
+        } else if (field === 'classification') {
+            updated.classification = value;
+            if (value === 'Gagnant' && updated.sku && String(updated.sku).trim() !== '') {
+                const cleanSku = String(updated.sku).trim().toLowerCase();
+                const allCal = await dbService.getCalendrier(orgId);
+                const matchingIds = allCal.filter(l => l.sku && String(l.sku).trim().toLowerCase() === cleanSku).map(l => l.id);
+                if (matchingIds.length > 0) {
+                    await dbService.bulkUpdateCalendrierRows(matchingIds, { classification: 'Gagnant' });
+                }
+            }
         } else {
             updated[field] = value;
         }
 
         const allCal = await dbService.getCalendrier(orgId);
         updated.score = calcScore(updated, params);
-        updated.classification = getClassification(updated, allCal, params);
+        if (field !== 'classification') {
+            updated.classification = getClassification(updated, allCal, params);
+        }
 
         const saved = await dbService.updateCalendrierRow(id, updated);
 
@@ -1055,6 +1076,60 @@ app.post('/api/calendrier/publish-winner', async (req, res) => {
 
         await dbService.logAction("Suggestion Gagnant", `SKU ${sku} publié sur ${added} comptes`, "Succès", orgId);
         res.json({ message: `${added} lignes ajoutées au calendrier pour le SKU ${sku}`, added });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Enregistrement / qualification directe d'un SKU avec sa classification (ex: Gagnant)
+app.post('/api/sku/register', async (req, res) => {
+    try {
+        const { sku, classification, organisationId } = req.body;
+        if (!sku || !String(sku).trim()) {
+            return res.status(400).json({ error: "Code SKU requis" });
+        }
+        const orgId = organisationId || 'org_default';
+        const cleanSku = String(sku).trim();
+        const targetClassif = classification || 'Gagnant';
+
+        const allCal = await dbService.getCalendrier(orgId);
+        const matchingLines = allCal.filter(l => l.sku && String(l.sku).trim().toLowerCase() === cleanSku.toLowerCase());
+
+        if (matchingLines.length > 0) {
+            const ids = matchingLines.map(l => l.id);
+            await dbService.bulkUpdateCalendrierRows(ids, { classification: targetClassif });
+            await dbService.logAction("Classification SKU", `SKU ${cleanSku} qualifié comme ${targetClassif} sur ${ids.length} lignes`, "Succès", orgId);
+            return res.json({ success: true, message: `✅ SKU "${cleanSku}" qualifié en "${targetClassif}" sur ${ids.length} ligne(s) !`, count: ids.length });
+        } else {
+            // Création d'une ligne d'enregistrement initiale dans la base pour persister le SKU qualifié
+            const id = "sku_reg_" + Date.now() + Math.random().toString(36).substr(2, 5);
+            const comptes = await dbService.getComptes(orgId);
+            const firstCompte = comptes[0] || { id: 'c_default', agent: 'Admin' };
+            const todayStr = getLocalDateString(new Date());
+
+            await dbService.createCalendrierRow({
+                id,
+                organisationId: orgId,
+                date: todayStr,
+                jour: "Enregistrement",
+                compteId: firstCompte.id,
+                agent: firstCompte.agent || "Admin",
+                heurePrevue: "12:00",
+                sku: cleanSku,
+                produit: "Article " + cleanSku,
+                lien: "",
+                vues: 0,
+                likes: 0,
+                favoris: 0,
+                messages: 0,
+                vente: 0,
+                score: 0,
+                classification: targetClassif,
+                statut: "Non fait"
+            });
+            await dbService.logAction("Enregistrement SKU", `SKU ${cleanSku} enregistré avec statut ${targetClassif}`, "Succès", orgId);
+            return res.json({ success: true, message: `✅ SKU "${cleanSku}" enregistré avec succès comme "${targetClassif}" !`, count: 1 });
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

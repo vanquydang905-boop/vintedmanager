@@ -3007,19 +3007,27 @@ function ClassementView({ appState, onUpdateRow }) {
         })).sort((a, b) => b.scoreMoyen - a.scoreMoyen);
     }, [calendrier]);
 
-    const handleRegisterSKU = (e) => {
+    const handleRegisterSKU = async (e) => {
         e.preventDefault();
         if (!newSkuInput.trim()) return;
         const skuClean = newSkuInput.trim();
-        const existingSKU = allSKUsMap[skuClean];
+        const userOrgId = (appState.currentUser && appState.currentUser.organisationId) || 'org_default';
 
-        if (existingSKU && existingSKU.lineIds.length > 0 && onUpdateRow) {
-            existingSKU.lineIds.forEach(id => {
-                onUpdateRow(id, { classification: newClassifInput });
+        try {
+            const res = await fetch('/api/sku/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sku: skuClean, classification: newClassifInput, organisationId: userOrgId })
             });
-            if (window.showToast) window.showToast(`✅ Classification du SKU "${skuClean}" mise à jour en "${newClassifInput}" !`);
-        } else {
-            if (window.showToast) window.showToast(`✅ SKU "${skuClean}" enregistré avec la classification "${newClassifInput}" !`);
+            const data = await res.json();
+            if (data.success) {
+                if (window.showToast) window.showToast(data.message || `✅ SKU "${skuClean}" enregistré comme "${newClassifInput}" !`);
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                if (window.showToast) window.showToast(`❌ Erreur : ${data.error || 'Échec de l\'enregistrement'}`);
+            }
+        } catch (err) {
+            console.error("Erreur enregistrement SKU:", err);
         }
 
         setNewSkuInput('');
