@@ -2953,6 +2953,7 @@ function ClassementView({ appState, onUpdateRow }) {
     const [newSkuInput, setNewSkuInput] = useState('');
     const [newClassifInput, setNewClassifInput] = useState('Nouveau produit');
     const [skuSearchTerm, setSkuSearchTerm] = useState('');
+    const [skuFilterClassif, setSkuFilterClassif] = useState('');
 
     // Répertoire de tous les SKUs enregistrés avec leur classification et statistiques
     const allSKUsMap = useMemo(() => {
@@ -2982,10 +2983,16 @@ function ClassementView({ appState, onUpdateRow }) {
     const skuList = useMemo(() => Object.values(allSKUsMap), [allSKUsMap]);
 
     const filteredSKUList = useMemo(() => {
-        if (!skuSearchTerm.trim()) return skuList;
-        const q = skuSearchTerm.trim().toLowerCase();
-        return skuList.filter(s => s.sku.toLowerCase().includes(q) || s.classification.toLowerCase().includes(q));
-    }, [skuList, skuSearchTerm]);
+        let list = skuList;
+        if (skuFilterClassif) {
+            list = list.filter(s => s.classification === skuFilterClassif);
+        }
+        if (skuSearchTerm.trim()) {
+            const q = skuSearchTerm.trim().toLowerCase();
+            list = list.filter(s => s.sku.toLowerCase().includes(q) || s.classification.toLowerCase().includes(q));
+        }
+        return list;
+    }, [skuList, skuSearchTerm, skuFilterClassif]);
 
     const topSKUs = useMemo(() => {
         return [...skuList].sort((a, b) => b.scoreCumule - a.scoreCumule).slice(0, 10);
@@ -3083,14 +3090,28 @@ function ClassementView({ appState, onUpdateRow }) {
                 {/* TABLEAU DES SKUS ET CLASSIFICATIONS */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
                     <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Catalogue des SKUs Qualifiés ({filteredSKUList.length})</h4>
-                    <input
-                        type="text"
-                        className="input"
-                        value={skuSearchTerm}
-                        onChange={(e) => setSkuSearchTerm(e.target.value)}
-                        placeholder="🔍 Filtrer les SKUs..."
-                        style={{ width: '220px', height: '34px', fontSize: '12px' }}
-                    />
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select
+                            className="input"
+                            value={skuFilterClassif}
+                            onChange={(e) => setSkuFilterClassif(e.target.value)}
+                            style={{ height: '34px', fontSize: '12px', width: '190px', borderRadius: '6px', border: skuFilterClassif ? '1.5px solid var(--primary)' : '1px solid var(--border)' }}
+                        >
+                            <option value="">Toutes les classifications</option>
+                            <option value="Gagnant">🏆 Produit Gagnant</option>
+                            <option value="Nouveau produit">✨ Nouveau produit</option>
+                            <option value="À retester">🔄 À retester</option>
+                            <option value="Écarté">🚫 Écarté</option>
+                        </select>
+                        <input
+                            type="text"
+                            className="input"
+                            value={skuSearchTerm}
+                            onChange={(e) => setSkuSearchTerm(e.target.value)}
+                            placeholder="🔍 Filtrer les SKUs..."
+                            style={{ width: '200px', height: '34px', fontSize: '12px' }}
+                        />
+                    </div>
                 </div>
 
                 <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
