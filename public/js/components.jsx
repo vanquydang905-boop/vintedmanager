@@ -666,12 +666,12 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                         </td>
                                         <td>
                                             <select className="input-table" style={{ width: '100%', minWidth: '130px', fontWeight: 600, color: 'var(--text-primary)' }} value={l.compteId || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => {
-                                                const selCompte = comptes.find(c => c.id === e.target.value);
+                                                const selCompte = comptesAll.find(c => c.id === e.target.value);
                                                 const targetAgent = selCompte && selCompte.agent && selCompte.agent !== 'À attribuer' ? selCompte.agent : l.agent;
                                                 onUpdateRow(l.id, { compteId: e.target.value, agent: targetAgent });
                                             }}>
                                                 <option value="">(aucun compte)</option>
-                                                {comptes.map(c => (
+                                                {comptesAll.map(c => (
                                                     <option key={c.id} value={c.id}>{c.pseudo}</option>
                                                 ))}
                                             </select>
