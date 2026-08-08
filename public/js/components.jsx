@@ -1957,6 +1957,9 @@ function PlanningView({ appState, onGeneratePlanning }) {
                             onChange={(e) => setHeureFin(e.target.value)}
                             style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
                         />
+                    </div>
+                </div>
+
                 {/* OPTION ATTRIBUTION AUTOMATIQUE SKU GAGNANTS */}
                 <div style={{
                     background: includeWinnerSKUs ? 'rgba(16, 185, 129, 0.05)' : '#f8fafc',
