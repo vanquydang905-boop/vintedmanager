@@ -403,6 +403,39 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                 </div>
             </div>
 
+            {/* BANNIÈRE VOS COMPTES VINTED ATTRIBUÉS (POUR LES AGENTS) */}
+            {isAgent && (
+                <div className="card" style={{ marginBottom: '20px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#ffffff', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ backgroundColor: '#09b1ba', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px' }}>
+                                <i className="fa-solid fa-user-check"></i>
+                            </div>
+                            <div>
+                                <h4 style={{ margin: 0, fontSize: '15px', color: '#ffffff', fontWeight: 700 }}>Vos Comptes Vinted Attribués ({comptes.length})</h4>
+                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>Agent connecté : <b style={{ color: '#38bdf8' }}>{currentUser.nom || myAgentName}</b></span>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {comptes.length > 0 ? (
+                                comptes.map(c => (
+                                    <div key={c.id} style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.18)', display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                                        <span style={{ color: '#38bdf8', fontWeight: 700 }}>N°{c.numeroCompte || '?'}</span>
+                                        <b style={{ color: '#ffffff' }}>{c.pseudo}</b>
+                                        <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Pause' ? 'badge-pause' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite'))}`} style={{ fontSize: '10.5px', padding: '2px 7px' }}>
+                                            {c.statut}
+                                        </span>
+                                    </div>
+                                ))
+                            ) : (
+                                <span style={{ fontSize: '13px', color: '#cbd5e1', fontStyle: 'italic' }}>Aucun compte actuellement attribué.</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* FILTRES */}
             <div className="card" style={{ marginBottom: '24px' }}>
                 {/* BARRE DE RECHERCHE GLOBALE INSTANTANÉE */}
