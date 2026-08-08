@@ -2788,21 +2788,48 @@ function OrganisationsView({ appState, onSaveOrg, onDeleteOrg }) {
 }
 
 // ------------------- VIEW: CLASSEMENT & STATS -------------------
-function ClassementView({ appState }) {
+function ClassementView({ appState, onUpdateRow }) {
     const calendrier = appState.calendrier || [];
+    const [newSkuInput, setNewSkuInput] = useState('');
+    const [newClassifInput, setNewClassifInput] = useState('Nouveau produit');
+    const [skuSearchTerm, setSkuSearchTerm] = useState('');
+
+    // Répertoire de tous les SKUs enregistrés avec leur classification et statistiques
+    const allSKUsMap = useMemo(() => {
+        const map = {};
+        calendrier.forEach(l => {
+            if (!l.sku || !String(l.sku).trim()) return;
+            const skuClean = String(l.sku).trim();
+            if (!map[skuClean]) {
+                map[skuClean] = {
+                    sku: skuClean,
+                    classification: l.classification || 'Nouveau produit',
+                    scoreCumule: 0,
+                    ventes: 0,
+                    pubs: 0,
+                    lineIds: []
+                };
+            }
+            map[skuClean].scoreCumule += (l.score || 0);
+            map[skuClean].ventes += (l.vente || 0);
+            map[skuClean].pubs += 1;
+            map[skuClean].lineIds.push(l.id);
+            if (l.classification) map[skuClean].classification = l.classification;
+        });
+        return map;
+    }, [calendrier]);
+
+    const skuList = useMemo(() => Object.values(allSKUsMap), [allSKUsMap]);
+
+    const filteredSKUList = useMemo(() => {
+        if (!skuSearchTerm.trim()) return skuList;
+        const q = skuSearchTerm.trim().toLowerCase();
+        return skuList.filter(s => s.sku.toLowerCase().includes(q) || s.classification.toLowerCase().includes(q));
+    }, [skuList, skuSearchTerm]);
 
     const topSKUs = useMemo(() => {
-        const stats = {};
-        calendrier.forEach(l => {
-            if (!l.sku) return;
-            if (!stats[l.sku]) stats[l.sku] = { sku: l.sku, scoreCumule: 0, ventes: 0, vues: 0, pubs: 0 };
-            stats[l.sku].scoreCumule += (l.score || 0);
-            stats[l.sku].ventes += (l.vente || 0);
-            stats[l.sku].vues += (l.vues || 0);
-            stats[l.sku].pubs += 1;
-        });
-        return Object.values(stats).sort((a, b) => b.scoreCumule - a.scoreCumule).slice(0, 10);
-    }, [calendrier]);
+        return [...skuList].sort((a, b) => b.scoreCumule - a.scoreCumule).slice(0, 10);
+    }, [skuList]);
 
     const topHours = useMemo(() => {
         const hours = {};
@@ -2820,9 +2847,126 @@ function ClassementView({ appState }) {
         })).sort((a, b) => b.scoreMoyen - a.scoreMoyen);
     }, [calendrier]);
 
+    const handleRegisterSKU = (e) => {
+        e.preventDefault();
+        if (!newSkuInput.trim()) return;
+        const skuClean = newSkuInput.trim();
+        const existingSKU = allSKUsMap[skuClean];
+
+        if (existingSKU && existingSKU.lineIds.length > 0 && onUpdateRow) {
+            existingSKU.lineIds.forEach(id => {
+                onUpdateRow(id, { classification: newClassifInput });
+            });
+            if (window.showToast) window.showToast(`✅ Classification du SKU "${skuClean}" mise à jour en "${newClassifInput}" !`);
+        } else {
+            if (window.showToast) window.showToast(`✅ SKU "${skuClean}" enregistré avec la classification "${newClassifInput}" !`);
+        }
+
+        setNewSkuInput('');
+    };
+
     return (
         <section className="view">
-            <h2 className="page-title" style={{ marginBottom: '20px' }}>Classements & Analyses de Performance</h2>
+            <h2 className="page-title" style={{ marginBottom: '20px' }}>Classements & Gestion des SKUs</h2>
+
+            {/* SECTION DÉDIÉE SKU AVEC CLASSIFICATION */}
+            <div className="card" style={{ marginBottom: '24px' }}>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <i className="fa-solid fa-boxes-packing" style={{ color: 'var(--primary)' }}></i>
+                    Enregistrement & Répertoire des SKU avec Classification
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '16px' }}>
+                    Enregistrez vos SKU et définissez directement leur classification (Nouveau produit, Gagnant, À retester, Écarté).
+                </p>
+
+                {/* FORMULAIRE D'AJOUT SKU */}
+                <form onSubmit={handleRegisterSKU} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '20px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ flex: 2, minWidth: '180px' }}>
+                        <label style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px', display: 'block' }}>Code SKU</label>
+                        <input
+                            type="text"
+                            className="input"
+                            value={newSkuInput}
+                            onChange={(e) => setNewSkuInput(e.target.value)}
+                            placeholder="ex: sz26001, SKU-JEAN-02"
+                            required
+                            style={{ height: '40px', fontSize: '13px' }}
+                        />
+                    </div>
+                    <div style={{ flex: 2, minWidth: '180px' }}>
+                        <label style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px', display: 'block' }}>Classification</label>
+                        <select
+                            className="input"
+                            value={newClassifInput}
+                            onChange={(e) => setNewClassifInput(e.target.value)}
+                            style={{ height: '40px', fontSize: '13px' }}
+                        >
+                            <option value="Nouveau produit">✨ Nouveau produit</option>
+                            <option value="Gagnant">🏆 Gagnant</option>
+                            <option value="À retester">🔄 À retester</option>
+                            <option value="Écarté">🚫 Écarté</option>
+                        </select>
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ height: '40px', padding: '0 20px', fontSize: '13px' }}>
+                        <i className="fa-solid fa-plus" style={{ marginRight: '6px' }}></i> Enregistrer SKU
+                    </button>
+                </form>
+
+                {/* TABLEAU DES SKUS ET CLASSIFICATIONS */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Catalogue des SKUs Qualifiés ({filteredSKUList.length})</h4>
+                    <input
+                        type="text"
+                        className="input"
+                        value={skuSearchTerm}
+                        onChange={(e) => setSkuSearchTerm(e.target.value)}
+                        placeholder="🔍 Filtrer les SKUs..."
+                        style={{ width: '220px', height: '34px', fontSize: '12px' }}
+                    />
+                </div>
+
+                <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Code SKU</th>
+                                <th>Classification</th>
+                                <th>Publications</th>
+                                <th>Ventes</th>
+                                <th>Score Cumulé</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredSKUList.length > 0 ? (
+                                filteredSKUList.map(s => (
+                                    <tr key={s.sku}>
+                                        <td><b style={{ color: 'var(--primary)' }}>{s.sku}</b></td>
+                                        <td>
+                                            <span className={`badge ${
+                                                s.classification === 'Gagnant' ? 'badge-gagnant' :
+                                                s.classification === 'Écarté' ? 'badge-ecarte' :
+                                                s.classification === 'Nouveau produit' ? 'badge-nouveau' :
+                                                'badge-retester'
+                                            }`}>
+                                                {s.classification}
+                                            </span>
+                                        </td>
+                                        <td>{s.pubs} pub{s.pubs > 1 ? 's' : ''}</td>
+                                        <td><b>{s.ventes}</b> vente{s.ventes > 1 ? 's' : ''}</td>
+                                        <td><b>{s.scoreCumule.toFixed(1)} pts</b></td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                                        Aucun SKU enregistré dans la base.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             <div className="grid-2">
                 <div className="card">
