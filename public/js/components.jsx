@@ -1840,6 +1840,30 @@ function PlanningView({ appState, onGeneratePlanning }) {
         }
     };
 
+    const handleCleanEmptySKUs = async () => {
+        if (!confirm("Voulez-vous vraiment supprimer toutes les lignes de planning sans SKU ?")) return;
+        setLoading(true);
+        try {
+            const orgId = (appState.currentUser && appState.currentUser.organisationId) || 'org_default';
+            const res = await fetch('/api/calendrier/clean-empty-skus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ organisationId: orgId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (window.showToast) window.showToast(data.message);
+                if (window.loadAppState) await window.loadAppState();
+            } else {
+                if (window.showToast) window.showToast(`❌ ${data.error}`, true);
+            }
+        } catch (err) {
+            console.error("Erreur nettoyage SKU:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <section className="view">
             <h2 className="page-title" style={{ marginBottom: '20px' }}>Générateur Automatique de Planning</h2>
@@ -2170,15 +2194,28 @@ function PlanningView({ appState, onGeneratePlanning }) {
                     </div>
                 )}
 
-                <button
-                    className="btn btn-primary"
-                    onClick={handleGenerate}
-                    disabled={loading || totalDays <= 0 || filteredActiveComptes.length === 0}
-                    style={{ padding: '12px 24px', fontSize: '15px' }}
-                >
-                    {loading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> : <i className="fa-solid fa-bolt" style={{ marginRight: '8px' }}></i>}
-                    {loading ? 'Génération en cours...' : `Générer le Planning (${totalEstimatedSlots} pub${totalEstimatedSlots > 1 ? 's' : ''})`}
-                </button>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleGenerate}
+                        disabled={loading || totalDays <= 0 || filteredActiveComptes.length === 0}
+                        style={{ padding: '12px 24px', fontSize: '15px' }}
+                    >
+                        {loading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> : <i className="fa-solid fa-bolt" style={{ marginRight: '8px' }}></i>}
+                        {loading ? 'Génération en cours...' : `Générer le Planning (${totalEstimatedSlots} pub${totalEstimatedSlots > 1 ? 's' : ''})`}
+                    </button>
+                    
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={handleCleanEmptySKUs}
+                        disabled={loading}
+                        style={{ padding: '12px 18px', fontSize: '14px', color: 'var(--danger)', borderColor: '#fca5a5', backgroundColor: '#fef2f2', fontWeight: 600 }}
+                        title="Supprimer du planning toutes les lignes qui n'ont pas de SKU attribué"
+                    >
+                        <i className="fa-solid fa-broom" style={{ marginRight: '6px' }}></i> Nettoyer les lignes sans SKU
+                    </button>
+                </div>
             </div>
         </section>
     );

@@ -1063,19 +1063,23 @@ app.post('/api/calendrier/clean-empty-skus', async (req, res) => {
         const orgId = req.body.organisationId || 'org_default';
         const allCal = await dbService.getCalendrier(orgId);
 
-        const emptyRows = allCal.filter(l => !l.sku || String(l.sku).trim() === '');
+        const emptyRows = allCal.filter(l => 
+            !l.sku || 
+            String(l.sku).trim() === '' || 
+            String(l.sku).trim() === '-' || 
+            String(l.sku).trim().toLowerCase() === 'aucun' || 
+            String(l.sku).trim().toLowerCase() === 'n/a'
+        );
         const emptyIds = emptyRows.map(l => l.id);
 
         if (emptyIds.length === 0) {
             return res.json({ success: true, message: "Aucune ligne sans SKU trouvée dans le planning.", deletedCount: 0 });
         }
 
-        for (const id of emptyIds) {
-            await dbService.deleteCalendrierRow(id);
-        }
+        await dbService.bulkDeleteCalendrierRows(emptyIds);
 
         await dbService.logAction("Nettoyage Planning", `${emptyIds.length} lignes sans SKU supprimées du planning.`, "Succès", orgId);
-        res.json({ success: true, message: `🧹 ${emptyIds.length} ligne(s) sans SKU ont été supprimées du planning !`, deletedCount: emptyIds.length });
+        res.json({ success: true, message: `🧹 ${emptyIds.length} ligne(s) sans SKU ont été nettoyées et supprimées du planning avec succès !`, deletedCount: emptyIds.length });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
