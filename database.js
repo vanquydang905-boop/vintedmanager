@@ -219,7 +219,18 @@ function getNomElement(typeEntite, data) {
 
 let DEFAULT_ORGANISATIONS = [];
 let DEFAULT_UTILISATEURS = [];
-let DEFAULT_COMPTES = [];
+let DEFAULT_COMPTES = [
+    { id: 'compte_1', organisationId: 'org_default', numeroCompte: 1, pseudo: 'julie_last476', adspowerProfileId: 'k1b32q8m', proxyHost: '', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' },
+    { id: 'compte_2', organisationId: 'org_default', numeroCompte: 2, pseudo: 'laura_vsni', adspowerProfileId: 'k1b32rq9', proxyHost: '185.134.193.179', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' },
+    { id: 'compte_3', organisationId: 'org_default', numeroCompte: 3, pseudo: 'marie_sdm963', adspowerProfileId: 'k1b32st2', proxyHost: '91.124.5.179', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' },
+    { id: 'compte_5', organisationId: 'org_default', numeroCompte: 5, pseudo: 'elsa_mar', adspowerProfileId: 'k1b32yr6', proxyHost: '178.210.244.236', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' },
+    { id: 'compte_9', organisationId: 'org_default', numeroCompte: 9, pseudo: 'CLARA ARMAND', adspowerProfileId: 'k1b6v9o1', proxyHost: '217.67.72.192', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' },
+    { id: 'compte_10', organisationId: 'org_default', numeroCompte: 10, pseudo: 'camillenda78', adspowerProfileId: 'k1b6va78', proxyHost: '217.67.72.192', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' },
+    { id: 'compte_12', organisationId: 'org_default', numeroCompte: 12, pseudo: 'maya_roli', adspowerProfileId: 'k1c40dit', proxyHost: '217.67.72.25', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' },
+    { id: 'compte_13', organisationId: 'org_default', numeroCompte: 13, pseudo: 'ines_fra', adspowerProfileId: 'k1c40eyr', proxyHost: '141.226.247.79', gereParInitiales: 'VA 1', statut: 'Banni', agent: 'Ricardo' },
+    { id: 'compte_14', organisationId: 'org_default', numeroCompte: 14, pseudo: 'lola_ver', adspowerProfileId: 'k1c40fnp', proxyHost: '91.124.5.52', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' },
+    { id: 'compte_15', organisationId: 'org_default', numeroCompte: 15, pseudo: 'eva_mila', adspowerProfileId: 'k1c40g02', proxyHost: '194.152.141.163', gereParInitiales: 'VA 1', statut: 'Actif', agent: 'Ricardo' }
+];
 let DEFAULT_CALENDRIER = [];
 let DEFAULT_INCIDENTS = [];
 let DEFAULT_JOURNAL = [];
@@ -578,6 +589,8 @@ const dbService = {
                             statut: dbRow.statut || 'Actif',
                             dateCreation: dbRow.datecreation || '',
                             numeroCompte: extra.numeroCompte || dbRow.numerocompte || '',
+                            adspowerProfileId: extra.adspowerProfileId || extra.adsPowerUserId || dbRow.adspowerprofileid || '',
+                            proxyHost: extra.proxyHost || dbRow.proxyhost || '',
                             telephone: extra.telephone || dbRow.telephone || '',
                             email: extra.email || dbRow.email || '',
                             motDePasse: extra.motDePasse || dbRow.motdepasse || '',
@@ -616,13 +629,15 @@ const dbService = {
             try {
                 const extraMeta = {
                     numeroCompte: payload.numeroCompte || '',
+                    adspowerProfileId: payload.adspowerProfileId || payload.adsPowerUserId || '',
+                    proxyHost: payload.proxyHost || '',
                     telephone: payload.telephone || '',
                     email: payload.email || '',
                     motDePasse: payload.motDePasse || '',
                     gereParInitiales: payload.gereParInitiales || '',
                     dateStatutCompte: payload.dateStatutCompte || '',
                     userNotes: payload.notes || '',
-                    adsPowerUserId: payload.adsPowerUserId || ''
+                    adsPowerUserId: payload.adspowerProfileId || payload.adsPowerUserId || ''
                 };
 
                 const dbPayload = {
@@ -659,13 +674,15 @@ const dbService = {
             try {
                 const extraMeta = {
                     numeroCompte: updatedCompte.numeroCompte || '',
+                    adspowerProfileId: updatedCompte.adspowerProfileId || updatedCompte.adsPowerUserId || '',
+                    proxyHost: updatedCompte.proxyHost || '',
                     telephone: updatedCompte.telephone || '',
                     email: updatedCompte.email || '',
                     motDePasse: updatedCompte.motDePasse || '',
                     gereParInitiales: updatedCompte.gereParInitiales || '',
                     dateStatutCompte: updatedCompte.dateStatutCompte || '',
                     userNotes: updatedCompte.notes || '',
-                    adsPowerUserId: updatedCompte.adsPowerUserId || ''
+                    adsPowerUserId: updatedCompte.adspowerProfileId || updatedCompte.adsPowerUserId || ''
                 };
 
                 const dbFields = {
