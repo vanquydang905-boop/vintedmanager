@@ -68,11 +68,9 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                     <i className="fa-solid fa-calendar-days"></i> Calendrier
                 </button>
 
-                {isCadre && (
-                    <button className={`nav-btn ${activeView === 'comptes' ? 'active' : ''}`} onClick={() => onSelectView('comptes')}>
-                        <i className="fa-solid fa-store"></i> Comptes
-                    </button>
-                )}
+                <button className={`nav-btn ${activeView === 'comptes' ? 'active' : ''}`} onClick={() => onSelectView('comptes')}>
+                    <i className="fa-solid fa-store"></i> Comptes
+                </button>
 
                 {isCadre && (
                     <button className={`nav-btn ${activeView === 'planning' ? 'active' : ''}`} onClick={() => onSelectView('planning')}>
@@ -985,6 +983,17 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const visibleComptes = useMemo(() => {
         let list = isAdmin ? comptes : comptes.filter(c => (c.organisationId || 'org_default') === userOrgId);
         
+        // Si l'utilisateur est un agent, il voit ses comptes attribués par défaut
+        if (!isAdmin && currentUser && currentUser.role === 'agent') {
+            const userAgentName = (currentUser.nom || currentUser.agentAssigne || '').trim().toLowerCase();
+            if (userAgentName && !filterAgentCompte) {
+                const assignedOnly = list.filter(c => c.agent && c.agent.trim().toLowerCase() === userAgentName);
+                if (assignedOnly.length > 0) {
+                    list = assignedOnly;
+                }
+            }
+        }
+
         if (filterStatutCompte) {
             list = list.filter(c => c.statut === filterStatutCompte);
         }
