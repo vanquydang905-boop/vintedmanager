@@ -357,6 +357,27 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         return map;
     }, [calendrierAll]);
 
+    const handleCleanEmptySKUs = async () => {
+        if (!confirm("Voulez-vous vraiment supprimer toutes les lignes de planning sans SKU ?")) return;
+        try {
+            const orgId = (currentUser && currentUser.organisationId) || 'org_default';
+            const res = await fetch('/api/calendrier/clean-empty-skus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ organisationId: orgId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (window.showToast) window.showToast(data.message);
+                if (window.loadAppState) await window.loadAppState();
+            } else {
+                if (window.showToast) window.showToast(`❌ ${data.error}`, true);
+            }
+        } catch (err) {
+            console.error("Erreur nettoyage SKU:", err);
+        }
+    };
+
     return (
         <section className="view">
             <div className="header-actions">
@@ -365,9 +386,14 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                     <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Suivi temps réel des publications, scores et réinterventions</p>
                 </div>
                 {(currentUser && currentUser.role !== 'agent') && (
-                    <button className="btn btn-primary" onClick={onAddRowClick}>
-                        <i className="fa-solid fa-plus"></i> Ajouter une ligne
-                    </button>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button type="button" className="btn btn-secondary" onClick={handleCleanEmptySKUs} style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} title="Supprimer toutes les lignes sans SKU">
+                            <i className="fa-solid fa-broom"></i> Nettoyer (sans SKU)
+                        </button>
+                        <button className="btn btn-primary" onClick={onAddRowClick}>
+                            <i className="fa-solid fa-plus"></i> Ajouter une ligne
+                        </button>
+                    </div>
                 )}
             </div>
 
