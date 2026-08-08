@@ -173,6 +173,7 @@ function convertHHMM(timeStr, dateStr, fromTZ, toTZ) {
 
 // ------------------- VIEW: DASHBOARD / CALENDRIER -------------------
 function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick, onBulkUpdateCalendrier, onBulkDeleteCalendrier, selectedTZ = 'FR' }) {
+    const [searchTerm, setSearchTerm] = useState('');
     const [filterDate, setFilterDate] = useState('');
     const [filterHeure, setFilterHeure] = useState('');
     const [filterComptes, setFilterComptes] = useState([]); // multi-select
@@ -186,6 +187,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     const myAgentName = useMemo(() => isAgent ? (currentUser.agentAssigne || currentUser.nom || '').trim() : '', [currentUser, isAgent]);
 
     const resetAllFilters = () => {
+        setSearchTerm('');
         setFilterDate('');
         setFilterHeure('');
         setFilterComptes([]);
@@ -195,8 +197,8 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     };
 
     const isAnyFilterActive = useMemo(() => {
-        return Boolean(filterDate || filterHeure || filterComptes.length > 0 || (!isAgent && filterAgent) || filterStatut || filterClassif);
-    }, [filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, isAgent]);
+        return Boolean(searchTerm || filterDate || filterHeure || filterComptes.length > 0 || (!isAgent && filterAgent) || filterStatut || filterClassif);
+    }, [searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, isAgent]);
 
     // Fermer dropdown Compte si clic en dehors
     React.useEffect(() => {
@@ -248,6 +250,20 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
             if (filterAgent && l.agent !== filterAgent) return false;
             if (filterStatut && l.statut !== filterStatut) return false;
             if (filterClassif && l.classification !== filterClassif) return false;
+            if (searchTerm.trim()) {
+                const q = searchTerm.trim().toLowerCase();
+                const cObj = comptesAll.find(c => c.id === l.compteId);
+                const pseudoStr = cObj ? (cObj.pseudo || '').toLowerCase() : '';
+                const numProxyStr = cObj && cObj.numeroCompte ? String(cObj.numeroCompte).toLowerCase() : '';
+                const skuStr = (l.sku || '').toLowerCase();
+                const agentStr = (l.agent || '').toLowerCase();
+                const statutStr = (l.statut || '').toLowerCase();
+                const classifStr = (l.classification || '').toLowerCase();
+
+                if (!skuStr.includes(q) && !pseudoStr.includes(q) && !numProxyStr.includes(q) && !agentStr.includes(q) && !statutStr.includes(q) && !classifStr.includes(q)) {
+                    return false;
+                }
+            }
             return true;
         }).sort((a, b) => {
             const parseDateAndMinutes = (dateStr, timeStr) => {
@@ -389,6 +405,24 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
             {/* FILTRES */}
             <div className="card" style={{ marginBottom: '24px' }}>
+                {/* BARRE DE RECHERCHE GLOBALE INSTANTANÉE */}
+                <div style={{ marginBottom: '16px', position: 'relative', width: '100%' }}>
+                    <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)', fontSize: '15px' }}></i>
+                    <input
+                        type="text"
+                        className="input"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="🔍 Recherche avancée instantanée (SKU, Pseudo compte, N° Proxy, Agent, Statut, Date, Heure...)"
+                        style={{ paddingLeft: '42px', paddingRight: '36px', height: '44px', fontSize: '14px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', border: searchTerm ? '2px solid var(--primary)' : '1px solid var(--border)' }}
+                    />
+                    {searchTerm && (
+                        <button type="button" onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>
+                            ✕
+                        </button>
+                    )}
+                </div>
+
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                     {/* FILTRE COMPTE — MULTI-SELECT CHECKBOXES */}
                     <div id="compte-multiselect-wrapper" style={{ minWidth: '180px', flex: 1, position: 'relative' }}>
@@ -985,9 +1019,31 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
         return base;
     }, [utilisateurs, isAdmin, userOrgId]);
 
+    const [searchTermComptes, setSearchTermComptes] = useState('');
+    const [filterStatutCompte, setFilterStatutCompte] = useState('');
+    const [filterAgentCompte, setFilterAgentCompte] = useState('');
+
     const visibleComptes = useMemo(() => {
         let list = isAdmin ? comptes : comptes.filter(c => (c.organisationId || 'org_default') === userOrgId);
         
+        if (filterStatutCompte) {
+            list = list.filter(c => c.statut === filterStatutCompte);
+        }
+        if (filterAgentCompte) {
+            list = list.filter(c => c.agent === filterAgentCompte);
+        }
+        if (searchTermComptes.trim()) {
+            const q = searchTermComptes.trim().toLowerCase();
+            list = list.filter(c => 
+                (c.pseudo && c.pseudo.toLowerCase().includes(q)) ||
+                (c.numeroCompte && String(c.numeroCompte).toLowerCase().includes(q)) ||
+                (c.telephone && String(c.telephone).toLowerCase().includes(q)) ||
+                (c.email && c.email.toLowerCase().includes(q)) ||
+                (c.agent && c.agent.toLowerCase().includes(q)) ||
+                (c.notes && c.notes.toLowerCase().includes(q))
+            );
+        }
+
         const getStatusPriority = (statut) => {
             const s = (statut || '').toLowerCase();
             if (s.includes('limité') || s.includes('restreint')) return 1;
@@ -1005,7 +1061,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             }
             return (parseInt(a.numeroCompte) || 0) - (parseInt(b.numeroCompte) || 0);
         });
-    }, [comptes, isAdmin, userOrgId]);
+    }, [comptes, isAdmin, userOrgId, filterStatutCompte, filterAgentCompte, searchTermComptes]);
 
     const isAllComptesSelected = useMemo(() => {
         return visibleComptes.length > 0 && visibleComptes.every(c => selectedCompteIds.includes(c.id));
@@ -1436,7 +1492,52 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
 
             {/* LISTE COMPTES */}
             <div className="card">
-                <h3 className="card-title">Liste des Comptes enregistrés ({visibleComptes.length})</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                    <h3 className="card-title" style={{ margin: 0 }}>Liste des Comptes enregistrés ({visibleComptes.length})</h3>
+
+                    {/* FILTRES AVANCÉS COMPTES */}
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', width: '100%', maxWidth: '750px' }}>
+                        <div style={{ position: 'relative', flex: 2, minWidth: '220px' }}>
+                            <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }}></i>
+                            <input
+                                type="text"
+                                className="input"
+                                value={searchTermComptes}
+                                onChange={(e) => setSearchTermComptes(e.target.value)}
+                                placeholder="🔍 Recherche avancée compte (N°, Pseudo, Tél, Email, Agent, Notes...)"
+                                style={{ paddingLeft: '36px', paddingRight: '28px', height: '38px', fontSize: '13px', borderRadius: '8px' }}
+                            />
+                            {searchTermComptes && (
+                                <button type="button" onClick={() => setSearchTermComptes('')} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+
+                        <select className="input" value={filterStatutCompte} onChange={(e) => setFilterStatutCompte(e.target.value)} style={{ flex: 1, minWidth: '130px', height: '38px', fontSize: '13px' }}>
+                            <option value="">Tous statuts</option>
+                            <option value="Actif">🟢 Actif</option>
+                            <option value="Pause">🟣 Pause</option>
+                            <option value="Limité">🟠 Limité</option>
+                            <option value="Banni">🔴 Banni</option>
+                        </select>
+
+                        <select className="input" value={filterAgentCompte} onChange={(e) => setFilterAgentCompte(e.target.value)} style={{ flex: 1, minWidth: '140px', height: '38px', fontSize: '13px' }}>
+                            <option value="">Tous agents</option>
+                            <option value="À attribuer">👤 À attribuer</option>
+                            {agentsList.map(a => (
+                                <option key={a.id} value={a.agentAssigne || a.nom}>{a.nom}</option>
+                            ))}
+                        </select>
+
+                        {(searchTermComptes || filterStatutCompte || filterAgentCompte) && (
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setSearchTermComptes(''); setFilterStatutCompte(''); setFilterAgentCompte(''); }} style={{ height: '38px', padding: '0 12px', fontSize: '12px', color: '#ef4444', borderColor: '#fca5a5' }} title="Réinitialiser les filtres">
+                                🔄 Effacer
+                            </button>
+                        )}
+                    </div>
+                </div>
+
                 <div className="table-container">
                     <table>
                         <thead>
