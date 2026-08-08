@@ -218,13 +218,18 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         return comptesAll;
     }, [comptesAll, isAgent, myAgentName]);
 
-    // Lignes de base : Pour un Agent, afficher STRICTEMENT ses lignes attribuées
+    const myAccountIds = useMemo(() => (comptes || []).map(c => c.id), [comptes]);
+
+    // Lignes de base : Pour un Agent, afficher ses lignes attribuées OU les lignes de ses comptes attribués
     const baseLines = useMemo(() => {
         if (isAgent && myAgentName) {
-            return calendrierAll.filter(l => l.agent && l.agent.trim().toLowerCase() === myAgentName.toLowerCase());
+            return calendrierAll.filter(l => 
+                (l.agent && l.agent.trim().toLowerCase() === myAgentName.toLowerCase()) ||
+                (l.compteId && myAccountIds.includes(l.compteId))
+            );
         }
         return calendrierAll;
-    }, [calendrierAll, isAgent, myAgentName]);
+    }, [calendrierAll, isAgent, myAgentName, myAccountIds]);
 
     const [sortField, setSortField] = useState('dateTime');
     const [sortAsc, setSortAsc] = useState(true);
