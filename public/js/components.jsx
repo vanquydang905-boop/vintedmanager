@@ -939,6 +939,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 // ------------------- VIEW: COMPTES -------------------
 function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBulkUpdateComptes, onBulkDeleteComptes, onOpenQuickAgentModal }) {
     const isAdmin = currentUser && currentUser.role === 'admin';
+    const isCadre = currentUser && (currentUser.role === 'admin' || currentUser.role === 'cadre');
     const userOrgId = (currentUser && currentUser.organisationId) || 'org_default';
     const formRef = React.useRef(null);
 
@@ -1210,13 +1211,17 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             <div className="header-actions">
                 <div>
                     <h2 className="page-title">Gestion des Comptes Vinted</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Gérez les comptes Vinted (N°, pseudo, tél, email, mot de passe, géré par, statut et date)</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
+                        {isCadre ? "Gérez les comptes Vinted (N°, pseudo, tél, email, mot de passe, géré par, statut et date)" : "Consultez les détails et identifiants de vos comptes attribués"}
+                    </p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowTextModal(true)}>
-                        <i className="fa-solid fa-file-import"></i> Importer par Texte
-                    </button>
-                </div>
+                {isCadre && (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button type="button" className="btn btn-secondary" onClick={() => setShowTextModal(true)}>
+                            <i className="fa-solid fa-file-import"></i> Importer par Texte
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* MODAL COPIER/COLLER TEXTE */}
@@ -1248,104 +1253,106 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                 </div>
             )}
 
-            {/* FORMULAIRE COMPTE */}
-            <div ref={formRef} className="card" style={{ marginBottom: '24px', scrollMarginTop: '20px' }}>
-                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {compteId ? (
-                        <><i className="fa-solid fa-pen-to-square" style={{ color: 'var(--accent)' }}></i> Modifier le compte <span style={{ color: 'var(--accent)', fontWeight: 700 }}>#{numeroCompte || compteId}</span></>
-                    ) : (
-                        <><i className="fa-solid fa-plus-circle" style={{ color: 'var(--success)' }}></i> Ajouter un nouveau compte Vinted</>
-                    )}
-                </h3>
-                <form onSubmit={handleSubmit}>
-                    <div className="grid-3" style={{ marginBottom: '12px' }}>
-                        <div className="form-group">
-                            <label>N° Compte (Proxy)</label>
-                            <input type="text" value={numeroCompte} onChange={(e) => setNumeroCompte(e.target.value)} placeholder="ex: 48" />
-                        </div>
-                        <div className="form-group">
-                            <label>Pseudo Vinted</label>
-                            <input type="text" value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="ex: isis_mlf" required />
-                        </div>
-                        <div className="form-group">
-                            <label>N° Téléphone</label>
-                            <input type="text" value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="ex: 06 33 40 86 06" />
-                        </div>
-                    </div>
-
-                    <div className="grid-3" style={{ marginBottom: '12px' }}>
-                        <div className="form-group">
-                            <label>Adresse Email</label>
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ex: juyjgj26@gmail.com" />
-                        </div>
-                        <div className="form-group">
-                            <label>Mot de Passe Vinted</label>
-                            <input type="text" value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)} placeholder="ex: Vinted009&*" />
-                        </div>
-                        <div className="form-group">
-                            <label>Géré par (Initiales)</label>
-                            <input type="text" value={gereParInitiales} onChange={(e) => setGereParInitiales(e.target.value)} placeholder="ex: TD, EG" />
-                        </div>
-                    </div>
-
-                    <div className="grid-3" style={{ marginBottom: '12px' }}>
-                        <div className="form-group">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                <label style={{ marginBottom: 0 }}>Agent Responsable</label>
-                                <button type="button" className="btn btn-secondary btn-sm" onClick={onOpenQuickAgentModal} style={{ fontSize: '11px', padding: '2px 8px' }}>
-                                    <i className="fa-solid fa-user-plus"></i> + Créer Agent
-                                </button>
-                            </div>
-                            <select value={agent} onChange={(e) => setAgent(e.target.value)}>
-                                <option value="">À attribuer (Non spécifié)</option>
-                                {agentsList.map(a => (
-                                    <option key={a.id} value={a.agentAssigne || a.nom}>{a.nom} ({a.agentAssigne || a.role})</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Statut du compte</label>
-                            <select value={statut} onChange={(e) => setStatut(e.target.value)}>
-                                <option value="Actif">Actif</option>
-                                <option value="Pause">Pause</option>
-                                <option value="Limité">Limité / Restreint</option>
-                                <option value="Banni">Banni / Bloqué</option>
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Date du Statut</label>
-                            <input type="text" value={dateStatutCompte} onChange={(e) => setDateStatutCompte(e.target.value)} placeholder="ex: 28/07/2026" />
-                        </div>
-                    </div>
-
-                    <div className="grid-2" style={{ marginBottom: '16px' }}>
-                        <div className="form-group">
-                            <label>Organisation</label>
-                            <select value={isAdmin ? organisationId : userOrgId} onChange={(e) => setOrganisationId(e.target.value)} disabled={!isAdmin}>
-                                {organisations.map(o => (
-                                    <option key={o.id} value={o.id}>{o.nom}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Notes & Observations (Adspower, Ventes, etc.)</label>
-                            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ex: connecté à Adspower le 05/08/26, 1 article en vente" />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <button type="submit" className="btn btn-primary">
-                            <i className="fa-solid fa-floppy-disk"></i> Enregistrer le Compte
-                        </button>
-                        {compteId && (
-                            <button type="button" className="btn btn-secondary" onClick={handleReset}>Annuler</button>
+            {/* FORMULAIRE COMPTE (ACCESSIBLE UNIQUEMENT AUX ADMINS / CADRES) */}
+            {isCadre && (
+                <div ref={formRef} className="card" style={{ marginBottom: '24px', scrollMarginTop: '20px' }}>
+                    <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {compteId ? (
+                            <><i className="fa-solid fa-pen-to-square" style={{ color: 'var(--accent)' }}></i> Modifier le compte <span style={{ color: 'var(--accent)', fontWeight: 700 }}>#{numeroCompte || compteId}</span></>
+                        ) : (
+                            <><i className="fa-solid fa-plus-circle" style={{ color: 'var(--success)' }}></i> Ajouter un nouveau compte Vinted</>
                         )}
-                    </div>
-                </form>
-            </div>
+                    </h3>
+                    <form onSubmit={handleSubmit}>
+                        <div className="grid-3" style={{ marginBottom: '12px' }}>
+                            <div className="form-group">
+                                <label>N° Compte (Proxy)</label>
+                                <input type="text" value={numeroCompte} onChange={(e) => setNumeroCompte(e.target.value)} placeholder="ex: 48" />
+                            </div>
+                            <div className="form-group">
+                                <label>Pseudo Vinted</label>
+                                <input type="text" value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="ex: isis_mlf" required />
+                            </div>
+                            <div className="form-group">
+                                <label>N° Téléphone</label>
+                                <input type="text" value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="ex: 06 33 40 86 06" />
+                            </div>
+                        </div>
+
+                        <div className="grid-3" style={{ marginBottom: '12px' }}>
+                            <div className="form-group">
+                                <label>Adresse Email</label>
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ex: juyjgj26@gmail.com" />
+                            </div>
+                            <div className="form-group">
+                                <label>Mot de Passe Vinted</label>
+                                <input type="text" value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)} placeholder="ex: Vinted009&*" />
+                            </div>
+                            <div className="form-group">
+                                <label>Géré par (Initiales)</label>
+                                <input type="text" value={gereParInitiales} onChange={(e) => setGereParInitiales(e.target.value)} placeholder="ex: TD, EG" />
+                            </div>
+                        </div>
+
+                        <div className="grid-3" style={{ marginBottom: '12px' }}>
+                            <div className="form-group">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                    <label style={{ marginBottom: 0 }}>Agent Responsable</label>
+                                    <button type="button" className="btn btn-secondary btn-sm" onClick={onOpenQuickAgentModal} style={{ fontSize: '11px', padding: '2px 8px' }}>
+                                        <i className="fa-solid fa-user-plus"></i> + Créer Agent
+                                    </button>
+                                </div>
+                                <select value={agent} onChange={(e) => setAgent(e.target.value)}>
+                                    <option value="">À attribuer (Non spécifié)</option>
+                                    {agentsList.map(a => (
+                                        <option key={a.id} value={a.agentAssigne || a.nom}>{a.nom} ({a.agentAssigne || a.role})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Statut du compte</label>
+                                <select value={statut} onChange={(e) => setStatut(e.target.value)}>
+                                    <option value="Actif">Actif</option>
+                                    <option value="Pause">Pause</option>
+                                    <option value="Limité">Limité / Restreint</option>
+                                    <option value="Banni">Banni / Bloqué</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Date du Statut</label>
+                                <input type="text" value={dateStatutCompte} onChange={(e) => setDateStatutCompte(e.target.value)} placeholder="ex: 28/07/2026" />
+                            </div>
+                        </div>
+
+                        <div className="grid-2" style={{ marginBottom: '16px' }}>
+                            <div className="form-group">
+                                <label>Organisation</label>
+                                <select value={isAdmin ? organisationId : userOrgId} onChange={(e) => setOrganisationId(e.target.value)} disabled={!isAdmin}>
+                                    {organisations.map(o => (
+                                        <option key={o.id} value={o.id}>{o.nom}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Notes & Observations (Adspower, Ventes, etc.)</label>
+                                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ex: connecté à Adspower le 05/08/26, 1 article en vente" />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button type="submit" className="btn btn-primary">
+                                <i className="fa-solid fa-floppy-disk"></i> Enregistrer le Compte
+                            </button>
+                            {compteId && (
+                                <button type="button" className="btn btn-secondary" onClick={handleReset}>Annuler</button>
+                            )}
+                        </div>
+                    </form>
+                </div>
+            )}
 
             {/* BULK ACTIONS FOR COMPTES */}
             {selectedCompteIds.length > 0 && (
@@ -1456,9 +1463,11 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                     <table>
                         <thead>
                             <tr>
-                                <th style={{ width: '40px', textAlign: 'center' }}>
-                                    <input type="checkbox" checked={isAllComptesSelected} onChange={toggleSelectAllComptes} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                                </th>
+                                {isCadre && (
+                                    <th style={{ width: '40px', textAlign: 'center' }}>
+                                        <input type="checkbox" checked={isAllComptesSelected} onChange={toggleSelectAllComptes} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                    </th>
+                                )}
                                 <th>Statut & Date</th>
                                 <th>N° Proxy</th>
                                 <th>Pseudo</th>
@@ -1468,7 +1477,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 <th>Email</th>
                                 <th>Mot de passe</th>
                                 <th>Notes & Observations</th>
-                                <th>Actions</th>
+                                {isCadre && <th>Actions</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -1492,16 +1501,18 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                         <td><span style={{ fontSize: '12px' }}>{c.email || '-'}</span></td>
                                         <td><code style={{ fontSize: '11px', backgroundColor: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{c.motDePasse || '-'}</code></td>
                                         <td style={{ fontSize: '12px', maxWidth: '200px' }}>{c.notes || '-'}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                <button className="btn btn-primary btn-sm" onClick={() => handleEdit(c)} title="Éditer">
-                                                    <i className="fa-solid fa-pen"></i>
-                                                </button>
-                                                <button className="btn btn-danger btn-sm" onClick={() => onDeleteCompte(c.id)} title="Supprimer">
-                                                    <i className="fa-solid fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
+                                        {isCadre && (
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                    <button className="btn btn-primary btn-sm" onClick={() => handleEdit(c)} title="Éditer">
+                                                        <i className="fa-solid fa-pen"></i>
+                                                    </button>
+                                                    <button className="btn btn-danger btn-sm" onClick={() => onDeleteCompte(c.id)} title="Supprimer">
+                                                        <i className="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))
                             ) : (
