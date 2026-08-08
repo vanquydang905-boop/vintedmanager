@@ -749,12 +749,29 @@ app.put('/api/calendrier/:id', async (req, res) => {
 
         const saved = await dbService.updateCalendrierRow(id, updated);
 
-        // Verification SKU unique avertissement
+        // Vérification Anti-Doublon Stricte (Même compte ou Autre compte)
         let warning = null;
-        if (field === 'sku' && value && updated.classification !== 'Gagnant') {
-            const allCal = await dbService.getCalendrier(orgId);
-            const exists = allCal.find(row => row.sku === value && row.compteId !== updated.compteId && row.id !== id);
-            if (exists) warning = `Attention: SKU ${value} déjà publié sur un autre compte!`;
+        if (field === 'sku' && value && String(value).trim() !== '') {
+            const cleanSku = String(value).trim().toLowerCase();
+            const sameAccountDuplicate = allCal.find(row => 
+                row.id !== id && 
+                row.compteId === updated.compteId && 
+                row.sku && 
+                row.sku.trim().toLowerCase() === cleanSku
+            );
+            if (sameAccountDuplicate) {
+                warning = `⚠️ Anti-Doublon : Le SKU "${value}" est déjà attribué à ce compte !`;
+            } else {
+                const otherAccountDuplicate = allCal.find(row => 
+                    row.id !== id && 
+                    row.compteId !== updated.compteId && 
+                    row.sku && 
+                    row.sku.trim().toLowerCase() === cleanSku
+                );
+                if (otherAccountDuplicate && updated.classification !== 'Gagnant') {
+                    warning = `ℹ️ Le SKU "${value}" est déjà publié sur un autre compte.`;
+                }
+            }
         }
 
         res.json({ item: saved, warning });
