@@ -488,6 +488,7 @@ app.put('/api/calendrier/:id', async (req, res) => {
 
         const orgId = current.organisationId || 'org_default';
         const params = await dbService.getParametres(orgId);
+        const allCal = await dbService.getCalendrier(orgId);
         const updated = { ...current };
 
         if (field === 'compteId') {
@@ -527,7 +528,6 @@ app.put('/api/calendrier/:id', async (req, res) => {
             updated.classification = value;
             if (value === 'Gagnant' && updated.sku && String(updated.sku).trim() !== '') {
                 const cleanSku = String(updated.sku).trim().toLowerCase();
-                const allCal = await dbService.getCalendrier(orgId);
                 const matchingIds = allCal.filter(l => l.sku && String(l.sku).trim().toLowerCase() === cleanSku).map(l => l.id);
                 if (matchingIds.length > 0) {
                     await dbService.bulkUpdateCalendrierRows(matchingIds, { classification: 'Gagnant' });
