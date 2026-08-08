@@ -832,9 +832,13 @@ app.post('/api/calendrier/generate', async (req, res) => {
         const params = (await dbService.getParametres(orgId)) || {};
         const comptes = await dbService.getComptes(orgId);
         const selectedAgents = req.body.selectedAgents;
+        const selectedComptes = req.body.selectedComptes || req.body.selectedAccountIds;
 
         // Exclusivité stricte : Seuls les comptes au statut Actif ET attribués à un agent réel
-        const activeComptes = getComptesActifsEtAttribues(comptes, selectedAgents);
+        let activeComptes = getComptesActifsEtAttribues(comptes, selectedAgents);
+        if (Array.isArray(selectedComptes) && selectedComptes.length > 0) {
+            activeComptes = activeComptes.filter(c => selectedComptes.includes(c.id));
+        }
 
         if (activeComptes.length === 0) {
             return res.status(400).json({ error: "Aucun compte au statut Actif et attribué à un agent sélectionné trouvé !" });

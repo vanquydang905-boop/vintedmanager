@@ -1763,8 +1763,23 @@ function PlanningView({ appState, onGeneratePlanning }) {
     const selectAllAgents = () => setSelectedAgents([...availableAgents]);
     const deselectAllAgents = () => setSelectedAgents([]);
 
-    // Comptes actifs filtrés par la sélection d'agents (excluant les pauses/congés)
-    const filteredActiveComptes = useMemo(() => getComptesActifsEtAttribues(comptes, selectedAgents), [comptes, selectedAgents]);
+    const [excludedAccountIds, setExcludedAccountIds] = useState([]);
+
+    const toggleAccount = (id) => {
+        setExcludedAccountIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const includeAllAccounts = () => setExcludedAccountIds([]);
+    const excludeAllAccounts = () => {
+        const base = getComptesActifsEtAttribues(comptes, selectedAgents);
+        setExcludedAccountIds(base.map(c => c.id));
+    };
+
+    // Comptes actifs filtrés par la sélection d'agents ET la sélection individuelle de comptes
+    const filteredActiveComptes = useMemo(() => {
+        const base = getComptesActifsEtAttribues(comptes, selectedAgents);
+        return base.filter(c => !excludedAccountIds.includes(c.id));
+    }, [comptes, selectedAgents, excludedAccountIds]);
 
     const totalDays = useMemo(() => {
         if (!dateDebut || !dateFin) return 0;
@@ -1792,7 +1807,8 @@ function PlanningView({ appState, onGeneratePlanning }) {
         if (!dateDebut || !dateFin || totalDays <= 0) return;
         setLoading(true);
         try {
-            await onGeneratePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents, includeWinnerSKUs);
+            const selectedAccountIds = filteredActiveComptes.map(c => c.id);
+            await onGeneratePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents, includeWinnerSKUs, selectedAccountIds);
         } finally {
             setLoading(false);
         }
@@ -1882,6 +1898,77 @@ function PlanningView({ appState, onGeneratePlanning }) {
                                     {!isSelected && (
                                         <span style={{ fontSize: '11px', fontStyle: 'italic', color: '#ef4444', fontWeight: 600 }}>
                                             (Pause / Congé)
+                                        </span>
+                                    )}
+                                </label>
+                            );
+                        })}
+                </div>
+
+                {/* SÉLECTION / EXCLUSION DES COMPTES CONCERNÉS */}
+                <div style={{
+                    background: 'rgba(99, 102, 241, 0.04)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    marginBottom: '20px'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                                <i className="fa-solid fa-address-book" style={{ color: '#6366f1' }}></i>
+                                Comptes Concernés ({filteredActiveComptes.length} / {activeComptes.length} comptes inclus)
+                            </h4>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Cochez ou décochez individuellement les comptes Vinted à inclure ou exclure de la génération du planning.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={includeAllAccounts} style={{ fontSize: '11px', padding: '4px 8px' }}>
+                                <i className="fa-solid fa-check-double" style={{ marginRight: '4px' }}></i> Tout inclure
+                            </button>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={excludeAllAccounts} style={{ fontSize: '11px', padding: '4px 8px' }}>
+                                <i className="fa-solid fa-xmark" style={{ marginRight: '4px' }}></i> Tout exclure
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {activeComptes.length === 0 ? (
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Aucun compte actif disponible.</span>
+                        ) : activeComptes.map(c => {
+                            const isIncluded = !excludedAccountIds.includes(c.id);
+                            return (
+                                <label
+                                    key={c.id}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '8px 14px',
+                                        borderRadius: '20px',
+                                        border: `1.5px solid ${isIncluded ? '#6366f1' : 'var(--border-color)'}`,
+                                        background: isIncluded ? 'rgba(99, 102, 241, 0.08)' : 'var(--bg-card)',
+                                        color: isIncluded ? '#4338ca' : 'var(--text-muted)',
+                                        fontWeight: isIncluded ? 600 : 400,
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        userSelect: 'none'
+                                    }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={isIncluded}
+                                        onChange={() => toggleAccount(c.id)}
+                                        style={{ accentColor: '#6366f1', cursor: 'pointer', width: '16px', height: '16px' }}
+                                    />
+                                    <span><b>N°{c.numeroCompte || '?'}</b> - {c.pseudo}</span>
+                                    <span className="badge badge-agent" style={{ fontSize: '10.5px', padding: '1px 6px' }}>
+                                        {c.agent}
+                                    </span>
+                                    {!isIncluded && (
+                                        <span style={{ fontSize: '11px', fontStyle: 'italic', color: '#ef4444', fontWeight: 600 }}>
+                                            (Exclu)
                                         </span>
                                     )}
                                 </label>
