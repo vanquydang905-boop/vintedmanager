@@ -1446,11 +1446,11 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 <th>Statut & Date</th>
                                 <th>N° Proxy</th>
                                 <th>Pseudo</th>
+                                <th>Géré par</th>
+                                <th>Agent</th>
                                 <th>Téléphone</th>
                                 <th>Email</th>
                                 <th>Mot de passe</th>
-                                <th>Géré par</th>
-                                <th>Agent</th>
                                 <th>Notes & Observations</th>
                                 <th>Actions</th>
                             </tr>
@@ -1470,11 +1470,11 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                         </td>
                                         <td><b style={{ color: 'var(--primary)' }}>{c.numeroCompte || '-'}</b></td>
                                         <td><b>{c.pseudo}</b></td>
+                                        <td>{c.gereParInitiales ? <span className="badge" style={{ backgroundColor: '#475569', color: '#fff' }}>{c.gereParInitiales}</span> : '-'}</td>
+                                        <td>{c.agent && c.agent !== 'À attribuer' ? <span className="badge badge-agent">{c.agent}</span> : <span className="badge" style={{ backgroundColor: '#64748b', color: '#fff' }}>À attribuer</span>}</td>
                                         <td>{c.telephone || '-'}</td>
                                         <td><span style={{ fontSize: '12px' }}>{c.email || '-'}</span></td>
                                         <td><code style={{ fontSize: '11px', backgroundColor: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{c.motDePasse || '-'}</code></td>
-                                        <td>{c.gereParInitiales ? <span className="badge" style={{ backgroundColor: '#475569', color: '#fff' }}>{c.gereParInitiales}</span> : '-'}</td>
-                                        <td>{c.agent && c.agent !== 'À attribuer' ? <span className="badge badge-agent">{c.agent}</span> : <span className="badge" style={{ backgroundColor: '#64748b', color: '#fff' }}>À attribuer</span>}</td>
                                         <td style={{ fontSize: '12px', maxWidth: '200px' }}>{c.notes || '-'}</td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
