@@ -2959,6 +2959,7 @@ function ClassementView({ appState, onUpdateRow }) {
     const allSKUsMap = useMemo(() => {
         const map = {};
         calendrier.forEach(l => {
+            if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
             if (!l.sku || !String(l.sku).trim()) return;
             const skuClean = String(l.sku).trim();
             if (!map[skuClean]) {

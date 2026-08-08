@@ -920,12 +920,19 @@ app.post('/api/calendrier/generate', async (req, res) => {
 
         const includeWinnerSKUs = req.body.includeWinnerSKUs !== false;
 
-        // Récupération de l'historique pour extraire les SKU Gagnants et l'historique par compte
+        // Récupération de l'historique actif (EXCLUSION STRICTE des plannings et lignes supprimés)
         const existingCal = await dbService.getCalendrier(orgId);
+        const activeCal = (existingCal || []).filter(l => 
+            !l.isDeleted && 
+            !l.supprime && 
+            l.statut !== 'Supprimé' && 
+            l.statut !== 'Corbeille'
+        );
+
         const winnerSKUsMap = {};
         const accountPublishedSKUs = {};
 
-        existingCal.forEach(l => {
+        activeCal.forEach(l => {
             if (!l.compteId) return;
             if (!accountPublishedSKUs[l.compteId]) {
                 accountPublishedSKUs[l.compteId] = new Set();
