@@ -1022,6 +1022,17 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const [searchTermComptes, setSearchTermComptes] = useState('');
     const [filterStatutCompte, setFilterStatutCompte] = useState('');
     const [filterAgentCompte, setFilterAgentCompte] = useState('');
+    const [filterGereParCompte, setFilterGereParCompte] = useState('');
+
+    const gereParList = useMemo(() => {
+        const set = new Set();
+        comptes.forEach(c => {
+            if (c.gereParInitiales && c.gereParInitiales.trim() !== '') {
+                set.add(c.gereParInitiales.trim());
+            }
+        });
+        return Array.from(set).sort();
+    }, [comptes]);
 
     const visibleComptes = useMemo(() => {
         let list = isAdmin ? comptes : comptes.filter(c => (c.organisationId || 'org_default') === userOrgId);
@@ -1032,6 +1043,9 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
         if (filterAgentCompte) {
             list = list.filter(c => c.agent === filterAgentCompte);
         }
+        if (filterGereParCompte) {
+            list = list.filter(c => (c.gereParInitiales || '').trim().toLowerCase() === filterGereParCompte.trim().toLowerCase());
+        }
         if (searchTermComptes.trim()) {
             const q = searchTermComptes.trim().toLowerCase();
             list = list.filter(c => 
@@ -1040,6 +1054,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                 (c.telephone && String(c.telephone).toLowerCase().includes(q)) ||
                 (c.email && c.email.toLowerCase().includes(q)) ||
                 (c.agent && c.agent.toLowerCase().includes(q)) ||
+                (c.gereParInitiales && c.gereParInitiales.toLowerCase().includes(q)) ||
                 (c.notes && c.notes.toLowerCase().includes(q))
             );
         }
@@ -1061,7 +1076,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             }
             return (parseInt(a.numeroCompte) || 0) - (parseInt(b.numeroCompte) || 0);
         });
-    }, [comptes, isAdmin, userOrgId, filterStatutCompte, filterAgentCompte, searchTermComptes]);
+    }, [comptes, isAdmin, userOrgId, filterStatutCompte, filterAgentCompte, filterGereParCompte, searchTermComptes]);
 
     const isAllComptesSelected = useMemo(() => {
         return visibleComptes.length > 0 && visibleComptes.every(c => selectedCompteIds.includes(c.id));
@@ -1530,8 +1545,15 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                             ))}
                         </select>
 
-                        {(searchTermComptes || filterStatutCompte || filterAgentCompte) && (
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setSearchTermComptes(''); setFilterStatutCompte(''); setFilterAgentCompte(''); }} style={{ height: '38px', padding: '0 12px', fontSize: '12px', color: '#ef4444', borderColor: '#fca5a5' }} title="Réinitialiser les filtres">
+                        <select className="input" value={filterGereParCompte} onChange={(e) => setFilterGereParCompte(e.target.value)} style={{ flex: 1, minWidth: '130px', height: '38px', fontSize: '13px' }}>
+                            <option value="">Tous géré par</option>
+                            {gereParList.map(g => (
+                                <option key={g} value={g}>🏷️ Géré par : {g}</option>
+                            ))}
+                        </select>
+
+                        {(searchTermComptes || filterStatutCompte || filterAgentCompte || filterGereParCompte) && (
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setSearchTermComptes(''); setFilterStatutCompte(''); setFilterAgentCompte(''); setFilterGereParCompte(''); }} style={{ height: '38px', padding: '0 12px', fontSize: '12px', color: '#ef4444', borderColor: '#fca5a5' }} title="Réinitialiser les filtres">
                                 🔄 Effacer
                             </button>
                         )}
