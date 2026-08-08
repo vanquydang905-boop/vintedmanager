@@ -1354,8 +1354,8 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                 </div>
             )}
 
-            {/* BULK ACTIONS FOR COMPTES */}
-            {selectedCompteIds.length > 0 && (
+            {/* BULK ACTIONS FOR COMPTES (CADRES/ADMINS UNIQUEMENT) */}
+            {isCadre && selectedCompteIds.length > 0 && (
                 <div style={{
                     position: 'sticky',
                     top: '10px',
@@ -1484,9 +1484,11 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                             {visibleComptes.length > 0 ? (
                                 visibleComptes.map(c => (
                                     <tr key={c.id} style={{ backgroundColor: selectedCompteIds.includes(c.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <input type="checkbox" checked={selectedCompteIds.includes(c.id)} onChange={() => toggleSelectCompte(c.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                                        </td>
+                                        {isCadre && (
+                                            <td style={{ textAlign: 'center' }}>
+                                                <input type="checkbox" checked={selectedCompteIds.includes(c.id)} onChange={() => toggleSelectCompte(c.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                            </td>
+                                        )}
                                         <td>
                                             <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Pause' ? 'badge-pause' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite'))}`}>
                                                 {c.statut}
