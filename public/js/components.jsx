@@ -987,7 +987,24 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
 
     const visibleComptes = useMemo(() => {
         let list = isAdmin ? comptes : comptes.filter(c => (c.organisationId || 'org_default') === userOrgId);
-        return list.sort((a, b) => (parseInt(a.numeroCompte) || 0) - (parseInt(b.numeroCompte) || 0));
+        
+        const getStatusPriority = (statut) => {
+            const s = (statut || '').toLowerCase();
+            if (s.includes('banni') || s.includes('bloqué')) return 1;
+            if (s.includes('limité') || s.includes('restreint')) return 2;
+            if (s.includes('pause')) return 3;
+            if (s.includes('attribuer')) return 4;
+            return 5; // 'Actif'
+        };
+
+        return [...list].sort((a, b) => {
+            const prioA = getStatusPriority(a.statut);
+            const prioB = getStatusPriority(b.statut);
+            if (prioA !== prioB) {
+                return prioA - prioB; // Comptes non actifs (prio 1..4) placés en premier
+            }
+            return (parseInt(a.numeroCompte) || 0) - (parseInt(b.numeroCompte) || 0);
+        });
     }, [comptes, isAdmin, userOrgId]);
 
     const isAllComptesSelected = useMemo(() => {
@@ -1432,6 +1449,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 <th style={{ width: '40px', textAlign: 'center' }}>
                                     <input type="checkbox" checked={isAllComptesSelected} onChange={toggleSelectAllComptes} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                 </th>
+                                <th>Statut & Date</th>
                                 <th>N° Proxy</th>
                                 <th>Pseudo</th>
                                 <th>Téléphone</th>
@@ -1439,7 +1457,6 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 <th>Mot de passe</th>
                                 <th>Géré par</th>
                                 <th>Agent</th>
-                                <th>Statut & Date</th>
                                 <th>Notes & Observations</th>
                                 <th>Actions</th>
                             </tr>
@@ -1451,6 +1468,12 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                         <td style={{ textAlign: 'center' }}>
                                             <input type="checkbox" checked={selectedCompteIds.includes(c.id)} onChange={() => toggleSelectCompte(c.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                         </td>
+                                        <td>
+                                            <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Pause' ? 'badge-pause' : (c.statut === 'À attribuer' ? 'badge-attribuer' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite')))}`}>
+                                                {c.statut}
+                                            </span>
+                                            {c.dateStatutCompte && <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>{c.dateStatutCompte}</span>}
+                                        </td>
                                         <td><b style={{ color: 'var(--primary)' }}>{c.numeroCompte || '-'}</b></td>
                                         <td><b>{c.pseudo}</b></td>
                                         <td>{c.telephone || '-'}</td>
@@ -1458,12 +1481,6 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                         <td><code style={{ fontSize: '11px', backgroundColor: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{c.motDePasse || '-'}</code></td>
                                         <td>{c.gereParInitiales ? <span className="badge" style={{ backgroundColor: '#475569', color: '#fff' }}>{c.gereParInitiales}</span> : '-'}</td>
                                         <td>{c.agent && c.agent !== 'À attribuer' ? <span className="badge badge-agent">{c.agent}</span> : <span className="badge" style={{ backgroundColor: '#64748b', color: '#fff' }}>À attribuer</span>}</td>
-                                        <td>
-                                            <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Pause' ? 'badge-pause' : (c.statut === 'À attribuer' ? 'badge-attribuer' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite')))}`}>
-                                                {c.statut}
-                                            </span>
-                                            {c.dateStatutCompte && <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>{c.dateStatutCompte}</span>}
-                                        </td>
                                         <td style={{ fontSize: '12px', maxWidth: '200px' }}>{c.notes || '-'}</td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
