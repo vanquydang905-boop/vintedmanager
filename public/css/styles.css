@@ -549,6 +549,8 @@ tbody tr:hover .input-table {
 }
 
 .badge-actif { background-color: var(--success-bg); color: #047857; }
+.badge-pause { background-color: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
+.badge-attribuer { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 .badge-limite { background-color: var(--warning-bg); color: #b45309; }
 .badge-banni { background-color: var(--danger-bg); color: #b91c1c; }
 

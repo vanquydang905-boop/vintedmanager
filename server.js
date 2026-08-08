@@ -418,6 +418,18 @@ app.post('/api/adspower/import-profiles', async (req, res) => {
             const motDePasse = p.password || '';
             const notes = [p.remark, p.proxy ? `Proxy: ${p.proxy}` : ''].filter(Boolean).join(' | ');
 
+            const combinedInfo = `${p.remark || ''} ${p.name || ''} ${p.group_name || ''}`.toLowerCase();
+            let detectedStatut = 'Actif';
+            if (combinedInfo.includes('pause')) {
+                detectedStatut = 'Pause';
+            } else if (combinedInfo.includes('attribuer') || combinedInfo.includes('non attribue') || combinedInfo.includes('a attribuer')) {
+                detectedStatut = 'À attribuer';
+            } else if (combinedInfo.includes('banni') || combinedInfo.includes('bloqué') || combinedInfo.includes('ban')) {
+                detectedStatut = 'Banni';
+            } else if (combinedInfo.includes('limité') || combinedInfo.includes('restreint') || combinedInfo.includes('limite')) {
+                detectedStatut = 'Limité';
+            }
+
             const existing = existingComptes.find(c => 
                 (numProxy && String(c.numeroCompte) === numProxy) || 
                 (c.pseudo && c.pseudo.toLowerCase() === pseudo.toLowerCase()) ||
@@ -431,7 +443,8 @@ app.post('/api/adspower/import-profiles', async (req, res) => {
                     email: email || existing.email,
                     motDePasse: motDePasse || existing.motDePasse,
                     notes: notes || existing.notes,
-                    adsPowerUserId: p.user_id
+                    adsPowerUserId: p.user_id,
+                    statut: detectedStatut !== 'Actif' ? detectedStatut : existing.statut
                 });
             } else {
                 await dbService.createCompte({
@@ -444,7 +457,7 @@ app.post('/api/adspower/import-profiles', async (req, res) => {
                     gereParInitiales: '',
                     agent: 'À attribuer',
                     lienProfil: '',
-                    statut: 'Actif',
+                    statut: detectedStatut,
                     dateStatutCompte: '',
                     dateCreation: new Date().toISOString().split('T')[0],
                     notes: notes,
@@ -519,6 +532,18 @@ app.post('/api/adspower/sync', async (req, res) => {
             const motDePasse = p.password || '';
             const notes = [p.remark, p.proxy ? `Proxy: ${p.proxy}` : ''].filter(Boolean).join(' | ');
 
+            const combinedInfo = `${p.remark || ''} ${p.name || ''} ${p.group_name || ''}`.toLowerCase();
+            let detectedStatut = 'Actif';
+            if (combinedInfo.includes('pause')) {
+                detectedStatut = 'Pause';
+            } else if (combinedInfo.includes('attribuer') || combinedInfo.includes('non attribue') || combinedInfo.includes('a attribuer')) {
+                detectedStatut = 'À attribuer';
+            } else if (combinedInfo.includes('banni') || combinedInfo.includes('bloqué') || combinedInfo.includes('ban')) {
+                detectedStatut = 'Banni';
+            } else if (combinedInfo.includes('limité') || combinedInfo.includes('restreint') || combinedInfo.includes('limite')) {
+                detectedStatut = 'Limité';
+            }
+
             const existing = existingComptes.find(c => 
                 (numProxy && String(c.numeroCompte) === numProxy) || 
                 (c.pseudo && c.pseudo.toLowerCase() === pseudo.toLowerCase()) ||
@@ -532,7 +557,8 @@ app.post('/api/adspower/sync', async (req, res) => {
                     email: email || existing.email,
                     motDePasse: motDePasse || existing.motDePasse,
                     notes: notes || existing.notes,
-                    adsPowerUserId: p.user_id
+                    adsPowerUserId: p.user_id,
+                    statut: detectedStatut !== 'Actif' ? detectedStatut : existing.statut
                 });
             } else {
                 await dbService.createCompte({
@@ -545,7 +571,7 @@ app.post('/api/adspower/sync', async (req, res) => {
                     gereParInitiales: '',
                     agent: 'À attribuer',
                     lienProfil: '',
-                    statut: 'Actif',
+                    statut: detectedStatut,
                     dateStatutCompte: '',
                     dateCreation: new Date().toISOString().split('T')[0],
                     notes: notes,
