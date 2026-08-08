@@ -876,7 +876,39 @@ app.post('/api/calendrier/generate', async (req, res) => {
         const endHourMin = (isNaN(endH) ? 22 : endH) * 60 + (isNaN(endM) ? 0 : endM);
         const windowDurationMin = Math.max(60, endHourMin - startHourMin);
 
+        // Récupération de l'historique pour extraire les SKU Gagnants et l'historique par compte
+        const existingCal = await dbService.getCalendrier(orgId);
+        const winnerSKUsMap = {};
+        const accountPublishedSKUs = {};
+
+        existingCal.forEach(l => {
+            if (!l.compteId) return;
+            if (!accountPublishedSKUs[l.compteId]) {
+                accountPublishedSKUs[l.compteId] = new Set();
+            }
+            if (l.sku && String(l.sku).trim() !== '') {
+                accountPublishedSKUs[l.compteId].add(String(l.sku).trim());
+            }
+            if (l.classification === 'Gagnant' && l.sku && String(l.sku).trim() !== '') {
+                const cleanSku = String(l.sku).trim();
+                winnerSKUsMap[cleanSku] = {
+                    sku: cleanSku,
+                    produit: l.produit || '',
+                    classification: 'Gagnant'
+                };
+            }
+        });
+
+        const winnerSKUsList = Object.values(winnerSKUsMap);
+
+        // Suivi local des SKU attribués par compte pendant cette session de génération (anti-doublon)
+        const accountSessionSKUs = {};
+        activeComptes.forEach(c => {
+            accountSessionSKUs[c.id] = new Set(accountPublishedSKUs[c.id] || []);
+        });
+
         let generated = 0;
+        let winnersAssignedCount = 0;
 
         for (const dateObj of datesList) {
             const dateStr = getLocalDateString(dateObj);
@@ -889,6 +921,10 @@ app.post('/api/calendrier/generate', async (req, res) => {
                 const compte = activeComptes[c];
                 // Décalage de 5 minutes entre comptes pour étaler les publications
                 const accountStaggerMin = (c * 5) % 30;
+
+                // Trouver les SKU Gagnants non encore attribués à ce compte (Anti-Doublon stricte par compte)
+                const availableWinnerSKUs = winnerSKUsList.filter(w => !accountSessionSKUs[compte.id].has(w.sku));
+                let winnerIdx = 0;
 
                 for (let s = 0; s < slotsPerAccount; s++) {
                     // Calcul de l'heure cible
@@ -907,6 +943,21 @@ app.post('/api/calendrier/generate', async (req, res) => {
                     const mStr = String(targetMinutes % 60).padStart(2, '0');
                     const chosenHour = `${hStr}:${mStr}`;
 
+                    // Auto-assignation d'un SKU Gagnant disponible si présent
+                    let assignedSku = "";
+                    let assignedProduit = "";
+                    let assignedClassif = "Nouveau produit";
+
+                    if (winnerIdx < availableWinnerSKUs.length) {
+                        const wObj = availableWinnerSKUs[winnerIdx];
+                        assignedSku = wObj.sku;
+                        assignedProduit = wObj.produit;
+                        assignedClassif = "Gagnant";
+                        accountSessionSKUs[compte.id].add(wObj.sku);
+                        winnerIdx++;
+                        winnersAssignedCount++;
+                    }
+
                     const id = "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5);
                     await dbService.createCalendrierRow({
                         id,
@@ -916,8 +967,8 @@ app.post('/api/calendrier/generate', async (req, res) => {
                         compteId: compte.id,
                         agent: compte.agent,
                         heurePrevue: chosenHour,
-                        sku: "",
-                        produit: "",
+                        sku: assignedSku,
+                        produit: assignedProduit,
                         lien: "",
                         vues: 0,
                         likes: 0,
@@ -925,7 +976,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
                         messages: 0,
                         vente: 0,
                         score: 0,
-                        classification: "À retester",
+                        classification: assignedClassif,
                         statut: "Non fait",
                         dateStatut: null,
                         heureStatut: null,
@@ -941,8 +992,8 @@ app.post('/api/calendrier/generate', async (req, res) => {
         const dateStartStr = datesList[0].toISOString().split('T')[0];
         const dateEndStr = datesList[datesList.length - 1].toISOString().split('T')[0];
 
-        await dbService.logAction("Génération planning", `${generated} lignes générées pour ${datesList.length} jours et ${activeComptes.length} comptes (${slotsPerAccount} pub/compte/jour, du ${dateStartStr} au ${dateEndStr})`, "Succès", orgId);
-        res.json({ message: `${generated} lignes de planning générées avec succès (${slotsPerAccount} publications par compte et par jour) !`, generated });
+        await dbService.logAction("Génération planning", `${generated} lignes générées (${winnersAssignedCount} SKU Gagnants répartis sans doublon) pour ${datesList.length} jours et ${activeComptes.length} comptes (${slotsPerAccount} pub/compte/jour, du ${dateStartStr} au ${dateEndStr})`, "Succès", orgId);
+        res.json({ message: `${generated} lignes de planning générées avec succès (${winnersAssignedCount} SKU Gagnants attribués sans aucun doublon par compte) !`, generated, winnersAssignedCount });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
