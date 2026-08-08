@@ -387,6 +387,9 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                 </div>
                 {(currentUser && currentUser.role !== 'agent') && (
                     <div style={{ display: 'flex', gap: '10px' }}>
+                        <button type="button" className="btn btn-secondary" onClick={async () => { if (window.loadAppState) await window.loadAppState(); if (window.showToast) window.showToast("Données rafraîchies !"); }} title="Rafraîchir les données">
+                            <i className="fa-solid fa-rotate-right"></i> Rafraîchir
+                        </button>
                         <button type="button" className="btn btn-secondary" onClick={handleCleanEmptySKUs} style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} title="Supprimer toutes les lignes sans SKU">
                             <i className="fa-solid fa-broom"></i> Nettoyer (sans SKU)
                         </button>
