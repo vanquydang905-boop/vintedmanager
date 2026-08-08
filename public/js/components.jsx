@@ -250,7 +250,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
             if (filterDate && l.date !== filterDate) return false;
             if (filterHeure && l.heurePrevue !== filterHeure) return false;
             if (filterComptes.length > 0 && !filterComptes.includes(l.compteId)) return false;
-            if (filterAgent && l.agent !== filterAgent) return false;
+            if (!isAgent && filterAgent && (l.agent || '').trim().toLowerCase() !== filterAgent.trim().toLowerCase()) return false;
             if (filterStatut && l.statut !== filterStatut) return false;
             if (filterClassif && l.classification !== filterClassif) return false;
             if (searchTerm.trim()) {
