@@ -2071,11 +2071,11 @@ function PlanningView({ appState, onGeneratePlanning }) {
                         />
                         <label htmlFor="includeWinnerSKUsCheck" style={{ cursor: 'pointer', userSelect: 'none', margin: 0 }}>
                             <b style={{ fontSize: '14px', color: includeWinnerSKUs ? '#047857' : 'var(--text-main)', display: 'block' }}>
-                                🏆 Répartir automatiquement les SKU Gagnants (Anti-doublon par compte)
+                                🏆 Répartir automatiquement les SKU Gagnants (Anti-doublon : 1 SKU par jour max)
                             </b>
                             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                 {includeWinnerSKUs 
-                                    ? "Activé : Les SKU Gagnants de votre catalogue sont automatiquement distribués sans doublon sur chaque compte."
+                                    ? "Activé : Chaque SKU Gagnant est attribué au maximum une fois par jour et sans aucun doublon par compte."
                                     : "Désactivé : Le planning sera généré avec des lignes neutres/vierges sans pré-remplissage des SKU Gagnants."
                                 }
                             </span>

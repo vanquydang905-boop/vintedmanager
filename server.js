@@ -961,13 +961,19 @@ app.post('/api/calendrier/generate', async (req, res) => {
 
             const intervalPerSlot = windowDurationMin / Math.max(1, slotsPerAccount);
 
+            // Suivi des SKU attribués CE JOUR PRÉCIS (Règle Anti-Doublon : 1 SKU par jour au maximum)
+            const skusAssignedToday = new Set();
+
             for (let c = 0; c < activeComptes.length; c++) {
                 const compte = activeComptes[c];
                 // Décalage de 5 minutes entre comptes pour étaler les publications
                 const accountStaggerMin = (c * 5) % 30;
 
-                // Trouver les SKU Gagnants non encore attribués à ce compte (Anti-Doublon stricte par compte)
-                const availableWinnerSKUs = winnerSKUsList.filter(w => !accountSessionSKUs[compte.id].has(w.sku));
+                // SKU Gagnants non encore attribués à ce compte ET non encore attribués aujourd'hui (Anti-Doublon Stricte Compte & Jour)
+                const availableWinnerSKUs = winnerSKUsList.filter(w => 
+                    !accountSessionSKUs[compte.id].has(w.sku) && 
+                    !skusAssignedToday.has(w.sku)
+                );
                 let winnerIdx = 0;
 
                 for (let s = 0; s < slotsPerAccount; s++) {
@@ -998,6 +1004,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
                         assignedProduit = wObj.produit;
                         assignedClassif = "Gagnant";
                         accountSessionSKUs[compte.id].add(wObj.sku);
+                        skusAssignedToday.add(wObj.sku);
                         winnerIdx++;
                         winnersAssignedCount++;
                     }
