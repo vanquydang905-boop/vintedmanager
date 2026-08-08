@@ -528,7 +528,6 @@ async function runPlanningGeneration() {
         const res = await API.generatePlanning(nbJours, appState.currentOrganisationId);
         await loadAppState();
         showToast(res.message);
-        showView('dashboard', document.querySelector('.nav-btn'));
     } catch (err) {
         showToast(err.message, true);
     }
@@ -662,7 +661,6 @@ async function publishWinnerToAll(sku) {
         const res = await API.publishWinner(sku, appState.currentOrganisationId);
         await loadAppState();
         showToast(res.message);
-        showView('dashboard', document.querySelector('.nav-btn'));
     } catch (err) {
         showToast("Erreur lors de la publication", true);
     }

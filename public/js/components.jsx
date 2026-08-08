@@ -1006,8 +1006,8 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                     if (window.showToast) window.showToast(`🎉 ${data.count} comptes AdsPower synchronisés !`);
                     setTimeout(() => {
                         setShowAdsPowerModal(false);
-                        window.location.reload();
-                    }, 1500);
+                        if (window.loadAppState) window.loadAppState();
+                    }, 1000);
                     return;
                 }
             } catch (err) {
@@ -1030,8 +1030,8 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                 if (window.showToast) window.showToast(`🎉 ${data.count} comptes AdsPower synchronisés !`);
                 setTimeout(() => {
                     setShowAdsPowerModal(false);
-                    window.location.reload();
-                }, 1500);
+                    if (window.loadAppState) window.loadAppState();
+                }, 1000);
             } else {
                 setAdsPowerStatus({ type: 'error', message: `❌ ${data.error || 'Échec de synchronisation.'}` });
             }
@@ -3022,7 +3022,7 @@ function ClassementView({ appState, onUpdateRow }) {
             const data = await res.json();
             if (data.success) {
                 if (window.showToast) window.showToast(data.message || `✅ SKU "${skuClean}" enregistré comme "${newClassifInput}" !`);
-                setTimeout(() => window.location.reload(), 1000);
+                if (window.loadAppState) await window.loadAppState();
             } else {
                 if (window.showToast) window.showToast(`❌ Erreur : ${data.error || 'Échec de l\'enregistrement'}`);
             }
