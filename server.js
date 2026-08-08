@@ -54,8 +54,13 @@ function getClassification(itemOrScore, allOrgLinesOrVente = [], paramsObj = {})
         }
     }
 
-    // Si la ligne est déjà explicitement classée Gagnant, on conserve impérativement ce statut !
-    if (item.classification === "Gagnant") return "Gagnant";
+    // Si la ligne possède déjà une classification (Nouveau produit, Gagnant, etc.), la préserver impérativement intacte !
+    if (item.classification && String(item.classification).trim() !== '') {
+        if (item.vente === 1 || (item.score || 0) >= ((params && params.seuils && params.seuils.gagnant) || 40)) {
+            return "Gagnant";
+        }
+        return item.classification;
+    }
 
     const sku = (item.sku || '').trim().toLowerCase();
 
@@ -532,9 +537,8 @@ app.put('/api/calendrier/:id', async (req, res) => {
             updated[field] = value;
         }
 
-        const allCal = await dbService.getCalendrier(orgId);
         updated.score = calcScore(updated, params);
-        if (field !== 'classification') {
+        if (field !== 'classification' && (!updated.classification || String(updated.classification).trim() === '')) {
             updated.classification = getClassification(updated, allCal, params);
         }
 
@@ -1110,16 +1114,7 @@ app.post('/api/extension/sync', async (req, res) => {
         const comptes = await dbService.getComptes(orgId);
         let compte = comptes.find(c => c.pseudo.toLowerCase() === pseudo.toLowerCase());
         if (!compte) {
-            const newCompteId = "cmp_" + Date.now();
-            compte = await dbService.createCompte({
-                id: newCompteId,
-                organisationId: orgId,
-                pseudo,
-                agent: 'Extension Chrome',
-                statut: 'Actif',
-                dateCreation: new Date().toISOString().split('T')[0],
-                notes: 'Créé automatiquement via Extension Chrome'
-            });
+            return res.status(404).json({ error: `Le compte Vinted "${pseudo}" n'existe pas dans votre gestion des comptes.` });
         }
 
         const todayStr = new Date().toISOString().split('T')[0];
