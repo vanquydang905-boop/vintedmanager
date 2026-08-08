@@ -876,6 +876,8 @@ app.post('/api/calendrier/generate', async (req, res) => {
         const endHourMin = (isNaN(endH) ? 22 : endH) * 60 + (isNaN(endM) ? 0 : endM);
         const windowDurationMin = Math.max(60, endHourMin - startHourMin);
 
+        const includeWinnerSKUs = req.body.includeWinnerSKUs !== false;
+
         // Récupération de l'historique pour extraire les SKU Gagnants et l'historique par compte
         const existingCal = await dbService.getCalendrier(orgId);
         const winnerSKUsMap = {};
@@ -889,7 +891,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
             if (l.sku && String(l.sku).trim() !== '') {
                 accountPublishedSKUs[l.compteId].add(String(l.sku).trim());
             }
-            if (l.classification === 'Gagnant' && l.sku && String(l.sku).trim() !== '') {
+            if (includeWinnerSKUs && l.classification === 'Gagnant' && l.sku && String(l.sku).trim() !== '') {
                 const cleanSku = String(l.sku).trim();
                 winnerSKUsMap[cleanSku] = {
                     sku: cleanSku,
@@ -899,7 +901,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
             }
         });
 
-        const winnerSKUsList = Object.values(winnerSKUsMap);
+        const winnerSKUsList = includeWinnerSKUs ? Object.values(winnerSKUsMap) : [];
 
         // Suivi local des SKU attribués par compte pendant cette session de génération (anti-doublon)
         const accountSessionSKUs = {};

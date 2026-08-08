@@ -1721,6 +1721,7 @@ function PlanningView({ appState, onGeneratePlanning }) {
     const [creneauxParJour, setCreneauxParJour] = useState((appState.parametres && appState.parametres.creneauxParJour) || 6);
     const [heureDebut, setHeureDebut] = useState("07:00");
     const [heureFin, setHeureFin] = useState("22:00");
+    const [includeWinnerSKUs, setIncludeWinnerSKUs] = useState(true);
     const [loading, setLoading] = useState(false);
 
     const comptes = appState.comptes || [];
@@ -1791,7 +1792,7 @@ function PlanningView({ appState, onGeneratePlanning }) {
         if (!dateDebut || !dateFin || totalDays <= 0) return;
         setLoading(true);
         try {
-            await onGeneratePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents);
+            await onGeneratePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents, includeWinnerSKUs);
         } finally {
             setLoading(false);
         }
@@ -1956,7 +1957,42 @@ function PlanningView({ appState, onGeneratePlanning }) {
                             onChange={(e) => setHeureFin(e.target.value)}
                             style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
                         />
+                {/* OPTION ATTRIBUTION AUTOMATIQUE SKU GAGNANTS */}
+                <div style={{
+                    background: includeWinnerSKUs ? 'rgba(16, 185, 129, 0.05)' : '#f8fafc',
+                    border: `1px solid ${includeWinnerSKUs ? '#a7f3d0' : '#cbd5e1'}`,
+                    borderRadius: '12px',
+                    padding: '14px 18px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <input
+                            type="checkbox"
+                            id="includeWinnerSKUsCheck"
+                            checked={includeWinnerSKUs}
+                            onChange={(e) => setIncludeWinnerSKUs(e.target.checked)}
+                            style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#10b981' }}
+                        />
+                        <label htmlFor="includeWinnerSKUsCheck" style={{ cursor: 'pointer', userSelect: 'none', margin: 0 }}>
+                            <b style={{ fontSize: '14px', color: includeWinnerSKUs ? '#047857' : 'var(--text-main)', display: 'block' }}>
+                                🏆 Répartir automatiquement les SKU Gagnants (Anti-doublon par compte)
+                            </b>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                {includeWinnerSKUs 
+                                    ? "Activé : Les SKU Gagnants de votre catalogue sont automatiquement distribués sans doublon sur chaque compte."
+                                    : "Désactivé : Le planning sera généré avec des lignes neutres/vierges sans pré-remplissage des SKU Gagnants."
+                                }
+                            </span>
+                        </label>
                     </div>
+                    <span className={`badge ${includeWinnerSKUs ? 'badge-actif' : 'badge-secondary'}`} style={{ padding: '4px 10px', fontSize: '12px' }}>
+                        {includeWinnerSKUs ? '✓ SKU Gagnants Inclus' : 'Sans SKU Gagnant'}
+                    </span>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
