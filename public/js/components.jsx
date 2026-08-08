@@ -1903,6 +1903,7 @@ function PlanningView({ appState, onGeneratePlanning }) {
                                 </label>
                             );
                         })}
+                    </div>
                 </div>
 
                 {/* SÉLECTION / EXCLUSION DES COMPTES CONCERNÉS */}
