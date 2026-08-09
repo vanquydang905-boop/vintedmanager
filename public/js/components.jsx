@@ -996,6 +996,15 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const [filterStatutCompte, setFilterStatutCompte] = useState('');
     const [filterAgentCompte, setFilterAgentCompte] = useState('');
     const [filterGereParCompte, setFilterGereParCompte] = useState('');
+    const [copiedField, setCopiedField] = useState(null);
+
+    const handleCopyText = (text, type, accountId) => {
+        if (!text) return;
+        navigator.clipboard.writeText(text);
+        const key = `${accountId}_${type}`;
+        setCopiedField(key);
+        setTimeout(() => setCopiedField(null), 2000);
+    };
 
     const gereParList = useMemo(() => {
         const set = new Set();
@@ -1516,14 +1525,96 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                             </span>
                                             {c.dateStatutCompte && <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>{c.dateStatutCompte}</span>}
                                         </td>
-                                        <td><b style={{ color: 'var(--primary)' }}>{c.numeroCompte || '-'}</b></td>
-                                        <td><b>{c.pseudo}</b></td>
+                                        <td>
+                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                 <b style={{ color: 'var(--primary)' }}>{c.numeroCompte || '-'}</b>
+                                                 {c.numeroCompte && (
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => handleCopyText(c.numeroCompte, 'num', c.id)}
+                                                         title="Copier le N° Proxy"
+                                                         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '2px 4px', color: copiedField === `${c.id}_num` ? '#10b981' : '#94a3b8', fontSize: '11px', transition: 'color 0.2s' }}
+                                                     >
+                                                         <i className={`fa-solid ${copiedField === `${c.id}_num` ? 'fa-check' : 'fa-copy'}`}></i>
+                                                     </button>
+                                                 )}
+                                             </div>
+                                         </td>
+                                         <td>
+                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                 <b>{c.pseudo}</b>
+                                                 {c.pseudo && (
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => handleCopyText(c.pseudo, 'pseudo', c.id)}
+                                                         title="Copier le pseudo"
+                                                         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '2px 4px', color: copiedField === `${c.id}_pseudo` ? '#10b981' : '#94a3b8', fontSize: '11px', transition: 'color 0.2s' }}
+                                                     >
+                                                         <i className={`fa-solid ${copiedField === `${c.id}_pseudo` ? 'fa-check' : 'fa-copy'}`}></i>
+                                                     </button>
+                                                 )}
+                                             </div>
+                                         </td>
                                         <td>{c.gereParInitiales ? <span className="badge" style={{ backgroundColor: '#475569', color: '#fff' }}>{c.gereParInitiales}</span> : '-'}</td>
                                         <td>{c.agent && c.agent !== 'À attribuer' ? <span className="badge badge-agent">{c.agent}</span> : <span className="badge" style={{ backgroundColor: '#64748b', color: '#fff' }}>À attribuer</span>}</td>
-                                        <td>{c.telephone || '-'}</td>
-                                        <td><span style={{ fontSize: '12px' }}>{c.email || '-'}</span></td>
-                                        <td><code style={{ fontSize: '11px', backgroundColor: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{c.motDePasse || '-'}</code></td>
-                                        <td style={{ fontSize: '12px', maxWidth: '200px' }}>{c.notes || '-'}</td>
+                                        <td>
+                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                 <span>{c.telephone || '-'}</span>
+                                                 {c.telephone && (
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => handleCopyText(c.telephone, 'tel', c.id)}
+                                                         title="Copier le téléphone"
+                                                         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '2px 4px', color: copiedField === `${c.id}_tel` ? '#10b981' : '#94a3b8', fontSize: '11px', transition: 'color 0.2s' }}
+                                                     >
+                                                         <i className={`fa-solid ${copiedField === `${c.id}_tel` ? 'fa-check' : 'fa-copy'}`}></i>
+                                                     </button>
+                                                 )}
+                                             </div>
+                                         </td>
+                                         <td>
+                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                 <span style={{ fontSize: '12px' }}>{c.email || '-'}</span>
+                                                 {c.email && (
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => handleCopyText(c.email, 'email', c.id)}
+                                                         title="Copier l'email"
+                                                         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '2px 4px', color: copiedField === `${c.id}_email` ? '#10b981' : '#94a3b8', fontSize: '11px', transition: 'color 0.2s' }}
+                                                     >
+                                                         <i className={`fa-solid ${copiedField === `${c.id}_email` ? 'fa-check' : 'fa-copy'}`}></i>
+                                                     </button>
+                                                 )}
+                                             </div>
+                                         </td>
+                                         <td>
+                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                 <code style={{ fontSize: '11px', backgroundColor: '#f1f5f9', padding: '2px 5px', borderRadius: '4px' }}>{c.motDePasse || '-'}</code>
+                                                 {c.motDePasse && (
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => handleCopyText(c.motDePasse, 'mp', c.id)}
+                                                         title="Copier le mot de passe"
+                                                         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '2px 4px', color: copiedField === `${c.id}_mp` ? '#10b981' : '#94a3b8', fontSize: '11px', transition: 'color 0.2s' }}
+                                                     >
+                                                         <i className={`fa-solid ${copiedField === `${c.id}_mp` ? 'fa-check' : 'fa-copy'}`}></i>
+                                                     </button>
+                                                 )}
+                                             </div>
+                                         </td>
+                                         <td style={{ fontSize: '12px', maxWidth: '200px' }}>
+                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                                 <span>{c.notes || '-'}</span>
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => handleCopyText(`N°${c.numeroCompte || ''} | Pseudo: ${c.pseudo || ''} | Tél: ${c.telephone || ''} | Email: ${c.email || ''} | MP: ${c.motDePasse || ''}`, 'all', c.id)}
+                                                     title="Copier TOUS les identifiants"
+                                                     style={{ border: '1px solid #cbd5e1', background: '#f8fafc', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', color: copiedField === `${c.id}_all` ? '#10b981' : '#64748b', fontSize: '10px', fontWeight: 600, flexShrink: 0 }}
+                                                 >
+                                                     {copiedField === `${c.id}_all` ? '✓ Copié !' : '📋 Tout copier'}
+                                                 </button>
+                                             </div>
+                                         </td>
                                         {isCadre && (
                                             <td>
                                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
