@@ -172,7 +172,6 @@ function convertHHMM(timeStr, dateStr, fromTZ, toTZ) {
 // ------------------- VIEW: DASHBOARD / CALENDRIER -------------------
 function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick, onBulkUpdateCalendrier, onBulkDeleteCalendrier, selectedTZ = 'FR' }) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterSku, setFilterSku] = useState('');
     const [filterDate, setFilterDate] = useState('');
     const [filterHeure, setFilterHeure] = useState('');
     const [filterComptes, setFilterComptes] = useState([]); // multi-select
@@ -187,7 +186,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
     const resetAllFilters = () => {
         setSearchTerm('');
-        setFilterSku('');
         setFilterDate('');
         setFilterHeure('');
         setFilterComptes([]);
@@ -197,8 +195,8 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     };
 
     const isAnyFilterActive = useMemo(() => {
-        return Boolean(searchTerm || filterSku || filterDate || filterHeure || filterComptes.length > 0 || (!isAgent && filterAgent) || filterStatut || filterClassif);
-    }, [searchTerm, filterSku, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, isAgent]);
+        return Boolean(searchTerm || filterDate || filterHeure || filterComptes.length > 0 || (!isAgent && filterAgent) || filterStatut || filterClassif);
+    }, [searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, isAgent]);
 
     // Fermer dropdown Compte si clic en dehors
     React.useEffect(() => {
@@ -276,24 +274,51 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
             if (!isAgent && filterAgent && (l.agent || '').trim().toLowerCase() !== filterAgent.trim().toLowerCase()) return false;
             if (filterStatut && l.statut !== filterStatut) return false;
             if (filterClassif && l.classification !== filterClassif) return false;
-            if (filterSku.trim()) {
-                const qSku = filterSku.trim().toLowerCase();
-                const lineSku = (l.sku || '').toLowerCase();
-                if (!lineSku.includes(qSku)) return false;
-            }
             if (searchTerm.trim()) {
                 const q = searchTerm.trim().toLowerCase();
-                const cObj = comptesAll.find(c => c.id === l.compteId);
+                const cObj = comptesAll.find(c => 
+                    c.id === l.compteId || 
+                    String(c.id).toLowerCase() === String(l.compteId).toLowerCase() ||
+                    String(c.numeroCompte) === String(l.compteId) ||
+                    `compte_${c.numeroCompte}` === String(l.compteId)
+                );
                 const pseudoStr = cObj ? (cObj.pseudo || '').toLowerCase() : '';
                 const numProxyStr = cObj && cObj.numeroCompte ? String(cObj.numeroCompte).toLowerCase() : '';
+                const emailStr = cObj && cObj.email ? (cObj.email || '').toLowerCase() : '';
+                const telStr = cObj && cObj.telephone ? String(cObj.telephone).toLowerCase() : '';
+
                 const skuStr = (l.sku || '').toLowerCase();
                 const agentStr = (l.agent || '').toLowerCase();
                 const statutStr = (l.statut || '').toLowerCase();
                 const classifStr = (l.classification || '').toLowerCase();
+                const dateStr = (l.date || '').toLowerCase();
+                const heureStr = (l.heurePrevue || '').toLowerCase();
+                const jourStr = (l.jour || '').toLowerCase();
 
-                if (!skuStr.includes(q) && !pseudoStr.includes(q) && !numProxyStr.includes(q) && !agentStr.includes(q) && !statutStr.includes(q) && !classifStr.includes(q)) {
-                    return false;
+                let dateFrStr = '';
+                if (l.date && l.date.includes('-')) {
+                    const parts = l.date.split('-');
+                    if (parts.length === 3) {
+                        dateFrStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    }
                 }
+
+                const matches = (
+                    skuStr.includes(q) ||
+                    pseudoStr.includes(q) ||
+                    numProxyStr.includes(q) ||
+                    emailStr.includes(q) ||
+                    telStr.includes(q) ||
+                    agentStr.includes(q) ||
+                    statutStr.includes(q) ||
+                    classifStr.includes(q) ||
+                    dateStr.includes(q) ||
+                    dateFrStr.includes(q) ||
+                    heureStr.includes(q) ||
+                    jourStr.includes(q)
+                );
+
+                if (!matches) return false;
             }
             return true;
         }).sort((a, b) => {
@@ -582,40 +607,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                             </div>
                         )}
                     </div>
-                    {/* FILTRE / RECHERCHE SKU DÉDIÉE */}
-                    <div style={{ minWidth: '170px', flex: 1.2 }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span>🏷️ Recherche SKU</span>
-                            {filterSku && <span style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 700 }}>Filtré</span>}
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <input
-                                type="text"
-                                className="input"
-                                value={filterSku}
-                                onChange={(e) => setFilterSku(e.target.value)}
-                                placeholder="Recherche par SKU..."
-                                style={{
-                                    paddingRight: filterSku ? '28px' : '10px',
-                                    border: filterSku ? '2px solid var(--primary)' : '1px solid var(--border)',
-                                    fontWeight: filterSku ? 700 : 400,
-                                    fontSize: '13px',
-                                    backgroundColor: filterSku ? 'rgba(9, 177, 186, 0.04)' : 'var(--bg-card)'
-                                }}
-                            />
-                            {filterSku && (
-                                <button
-                                    type="button"
-                                    onClick={() => setFilterSku('')}
-                                    style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '12px' }}
-                                    title="Effacer le filtre SKU"
-                                >
-                                    ✕
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
                     {/* FILTRE DATE */}
                     <div style={{ minWidth: '140px', flex: 1 }}>
                         <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date</label>
