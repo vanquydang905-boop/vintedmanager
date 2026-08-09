@@ -1025,7 +1025,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             list = list.filter(c => c.statut === filterStatutCompte);
         }
         if (filterAgentCompte) {
-            list = list.filter(c => c.agent === filterAgentCompte);
+            list = list.filter(c => (c.agent || '').trim().toLowerCase() === filterAgentCompte.trim().toLowerCase());
         }
         if (filterGereParCompte) {
             list = list.filter(c => (c.gereParInitiales || '').trim().toLowerCase() === filterGereParCompte.trim().toLowerCase());
