@@ -351,7 +351,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
             return sortAsc ? res : -res;
         });
-    }, [baseLines, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, sortField, sortAsc]);
+    }, [baseLines, searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, comptesAll, sortField, sortAsc]);
 
     const isAllSelected = useMemo(() => {
         return filteredLines.length > 0 && filteredLines.every(l => selectedIds.includes(l.id));
