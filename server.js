@@ -259,11 +259,12 @@ app.get('/api/users', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { email, motDePasse } = req.body;
+        const { email, identifiant, username, motDePasse } = req.body;
         const users = await dbService.getUtilisateurs();
         
         let found = null;
-        const loginInput = (email || '').trim().toLowerCase();
+        const rawInput = email || identifiant || username || '';
+        const loginInput = rawInput.trim().toLowerCase();
         if (loginInput && motDePasse) {
             found = users.find(u => 
                 ((u.email && u.email.toLowerCase() === loginInput) ||
