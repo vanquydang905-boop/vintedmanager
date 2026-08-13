@@ -2,7 +2,7 @@
 // REACT COMPONENTS - VINTED MANAGER
 // ============================================================
 
-const { useState, useEffect, useMemo } = React;
+var { useState, useEffect, useMemo, useCallback } = React;
 
 // ------------------- TOAST NOTIFICATION -------------------
 function Toast({ toast }) {

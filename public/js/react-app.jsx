@@ -2,24 +2,6 @@
 // MAIN REACT APP CONTROLLER - VINTED MANAGER
 // ============================================================
 
-const { useState, useEffect, useCallback } = React;
-const {
-    Toast,
-    Sidebar,
-    DashboardView,
-    ComptesView,
-    PlanningView,
-    IncidentsView,
-    ParametresView,
-    UtilisateursView,
-    OrganisationsView,
-    ClassementView,
-    GagnantsView,
-    JournalView,
-    CorbeilleView,
-    LoginView
-} = window.ReactComponents;
-
 function App() {
     const [currentUser, setCurrentUser] = useState(() => {
         try {

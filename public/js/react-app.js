@@ -1,14 +1,9 @@
-import { jsxDEV as _jsxDEV, Fragment as _Fragment } from "react/jsx-dev-runtime";
+(function() {
 // ============================================================
 // MAIN REACT APP CONTROLLER - VINTED MANAGER
 // ============================================================
 
-const {
-  useState,
-  useEffect,
-  useCallback
-} = React;
-const {
+var {
   Toast,
   Sidebar,
   DashboardView,
@@ -457,193 +452,182 @@ function App() {
     }
   };
   if (!currentUser) {
-    return /*#__PURE__*/_jsxDEV("div", {
-      className: "app-container",
-      children: [/*#__PURE__*/_jsxDEV(LoginView, {
-        onLoginSubmit: handleLoginSubmit,
-        loginError: loginError
-      }, void 0, false), /*#__PURE__*/_jsxDEV(Toast, {
-        toast: toast
-      }, void 0, false)]
-    }, void 0, true);
-  }
-  return /*#__PURE__*/_jsxDEV("div", {
-    className: "app-container",
-    children: [/*#__PURE__*/_jsxDEV("button", {
-      type: "button",
-      className: "mobile-menu-btn btn btn-primary",
-      onClick: () => setMobileMenuOpen(!mobileMenuOpen),
-      title: "Menu principal",
-      children: [/*#__PURE__*/_jsxDEV("i", {
-        className: `fa-solid ${mobileMenuOpen ? 'fa-xmark' : 'fa-bars'}`
-      }, void 0, false), " Menu"]
-    }, void 0, true), mobileMenuOpen && /*#__PURE__*/_jsxDEV("div", {
-      className: "sidebar-overlay",
-      onClick: () => setMobileMenuOpen(false),
-      style: {
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.5)',
-        backdropFilter: 'blur(3px)',
-        zIndex: 99
-      }
-    }, void 0, false), /*#__PURE__*/_jsxDEV(Sidebar, {
-      currentUser: currentUser,
-      currentOrgId: currentOrgId,
-      organisations: appState.organisations,
-      activeView: activeView,
-      onSelectView: view => {
-        setActiveView(view);
-        setMobileMenuOpen(false);
-      },
-      onSwitchOrg: handleSwitchOrg,
-      onLogout: handleLogout,
-      onExportJSON: handleExportJSON,
-      onImportJSON: handleImportJSON,
-      corbeilleCount: (appState.corbeille || []).length,
-      isOpen: mobileMenuOpen
-    }, void 0, false), /*#__PURE__*/_jsxDEV("main", {
-      className: "main-content",
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        className: "top-header-actions",
-        style: {
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          gap: '12px',
-          marginBottom: '16px'
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: 'inline-flex',
-            alignItems: 'center',
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '20px',
-            padding: '3px 4px',
-            gap: '2px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          },
-          children: [/*#__PURE__*/_jsxDEV("button", {
-            type: "button",
-            onClick: () => handleSwitchTZ('FR'),
-            style: {
-              border: 'none',
-              borderRadius: '16px',
-              padding: '4px 10px',
-              fontSize: '11.5px',
-              fontWeight: timeZone === 'FR' ? 700 : 500,
-              backgroundColor: timeZone === 'FR' ? 'var(--primary-color)' : 'transparent',
-              color: timeZone === 'FR' ? '#fff' : '#64748b',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            },
-            title: "Fuseau Horaire France (Europe/Paris - UTC+2 / UTC+1)",
-            children: "🇫🇷 FR (UTC+2)"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-            type: "button",
-            onClick: () => handleSwitchTZ('MADA'),
-            style: {
-              border: 'none',
-              borderRadius: '16px',
-              padding: '4px 10px',
-              fontSize: '11.5px',
-              fontWeight: timeZone === 'MADA' ? 700 : 500,
-              backgroundColor: timeZone === 'MADA' ? 'var(--primary-color)' : 'transparent',
-              color: timeZone === 'MADA' ? '#fff' : '#64748b',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            },
-            title: "Fuseau Horaire Madagascar (Indian/Antananarivo - UTC+3)",
-            children: "🇲🇬 MADA (UTC+3)"
-          }, void 0, false)]
-        }, void 0, true), currentUser && currentUser.role === 'admin' && /*#__PURE__*/_jsxDEV(_Fragment, {
-          children: [/*#__PURE__*/_jsxDEV("button", {
-            className: "btn btn-secondary btn-sm",
-            onClick: handleExportJSON,
-            title: "Exporter la base de données en JSON",
-            children: [/*#__PURE__*/_jsxDEV("i", {
-              className: "fa-solid fa-download"
-            }, void 0, false), " Exporter JSON"]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("label", {
-            className: "btn btn-secondary btn-sm",
-            style: {
-              cursor: 'pointer',
-              margin: 0
-            },
-            title: "Importer la base de données depuis un fichier JSON",
-            children: [/*#__PURE__*/_jsxDEV("i", {
-              className: "fa-solid fa-file-import"
-            }, void 0, false), " Importer JSON", /*#__PURE__*/_jsxDEV("input", {
-              type: "file",
-              accept: ".json",
-              onChange: handleImportJSON,
-              style: {
-                display: 'none'
-              }
-            }, void 0, false)]
-          }, void 0, true)]
-        }, void 0, true)]
-      }, void 0, true), activeView === 'dashboard' && /*#__PURE__*/_jsxDEV(DashboardView, {
-        appState: appState,
-        currentUser: currentUser,
-        selectedTZ: timeZone,
-        onUpdateRow: handleUpdateRow,
-        onDeleteRow: handleDeleteRow,
-        onAddRowClick: handleAddRow,
-        onBulkUpdateCalendrier: handleBulkUpdateCalendrier,
-        onBulkDeleteCalendrier: handleBulkDeleteCalendrier
-      }, void 0, false), activeView === 'comptes' && /*#__PURE__*/_jsxDEV(ComptesView, {
-        currentUser: currentUser,
-        appState: appState,
-        onSaveCompte: handleSaveCompte,
-        onDeleteCompte: handleDeleteCompte,
-        onBulkUpdateComptes: handleBulkUpdateComptes,
-        onBulkDeleteComptes: handleBulkDeleteComptes,
-        onOpenQuickAgentModal: () => setActiveView('utilisateurs')
-      }, void 0, false), activeView === 'planning' && /*#__PURE__*/_jsxDEV(PlanningView, {
-        appState: appState,
-        onGeneratePlanning: handleGeneratePlanning
-      }, void 0, false), activeView === 'incidents' && /*#__PURE__*/_jsxDEV(IncidentsView, {
-        appState: appState,
-        onSaveIncident: handleSaveIncident,
-        onBulkDeleteIncidents: handleBulkDeleteIncidents
-      }, void 0, false), activeView === 'parametres' && /*#__PURE__*/_jsxDEV(ParametresView, {
-        appState: appState,
-        onSaveParametres: handleSaveParametres
-      }, void 0, false), activeView === 'utilisateurs' && /*#__PURE__*/_jsxDEV(UtilisateursView, {
-        currentUser: currentUser,
-        appState: appState,
-        onSaveUser: handleSaveUser,
-        onDeleteUser: handleDeleteUser,
-        onBulkDeleteUsers: handleBulkDeleteUsers
-      }, void 0, false), activeView === 'organisations' && /*#__PURE__*/_jsxDEV(OrganisationsView, {
-        appState: appState,
-        onSaveOrg: handleSaveOrg,
-        onDeleteOrg: handleDeleteOrg
-      }, void 0, false), activeView === 'classement' && /*#__PURE__*/_jsxDEV(ClassementView, {
-        appState: appState
-      }, void 0, false), activeView === 'gagnants' && /*#__PURE__*/_jsxDEV(GagnantsView, {
-        appState: appState,
-        onPublishWinner: handlePublishWinner
-      }, void 0, false), activeView === 'journal' && /*#__PURE__*/_jsxDEV(JournalView, {
-        appState: appState
-      }, void 0, false), activeView === 'corbeille' && /*#__PURE__*/_jsxDEV(CorbeilleView, {
-        corbeille: appState.corbeille || [],
-        onRestoreItem: handleRestoreCorbeilleItem,
-        onDeleteItem: handleDeleteCorbeilleItem,
-        onEmptyCorbeille: handleEmptyCorbeille,
-        onRefresh: () => loadData()
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV(Toast, {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "app-container"
+    }, /*#__PURE__*/React.createElement(LoginView, {
+      onLoginSubmit: handleLoginSubmit,
+      loginError: loginError
+    }), /*#__PURE__*/React.createElement(Toast, {
       toast: toast
-    }, void 0, false)]
-  }, void 0, true);
+    }));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "app-container"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "mobile-menu-btn btn btn-primary",
+    onClick: () => setMobileMenuOpen(!mobileMenuOpen),
+    title: "Menu principal"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: `fa-solid ${mobileMenuOpen ? 'fa-xmark' : 'fa-bars'}`
+  }), " Menu"), mobileMenuOpen && /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-overlay",
+    onClick: () => setMobileMenuOpen(false),
+    style: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.5)',
+      backdropFilter: 'blur(3px)',
+      zIndex: 99
+    }
+  }), /*#__PURE__*/React.createElement(Sidebar, {
+    currentUser: currentUser,
+    currentOrgId: currentOrgId,
+    organisations: appState.organisations,
+    activeView: activeView,
+    onSelectView: view => {
+      setActiveView(view);
+      setMobileMenuOpen(false);
+    },
+    onSwitchOrg: handleSwitchOrg,
+    onLogout: handleLogout,
+    onExportJSON: handleExportJSON,
+    onImportJSON: handleImportJSON,
+    corbeilleCount: (appState.corbeille || []).length,
+    isOpen: mobileMenuOpen
+  }), /*#__PURE__*/React.createElement("main", {
+    className: "main-content"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "top-header-actions",
+    style: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      gap: '12px',
+      marginBottom: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      backgroundColor: '#ffffff',
+      border: '1px solid #cbd5e1',
+      borderRadius: '20px',
+      padding: '3px 4px',
+      gap: '2px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => handleSwitchTZ('FR'),
+    style: {
+      border: 'none',
+      borderRadius: '16px',
+      padding: '4px 10px',
+      fontSize: '11.5px',
+      fontWeight: timeZone === 'FR' ? 700 : 500,
+      backgroundColor: timeZone === 'FR' ? 'var(--primary-color)' : 'transparent',
+      color: timeZone === 'FR' ? '#fff' : '#64748b',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease'
+    },
+    title: "Fuseau Horaire France (Europe/Paris - UTC+2 / UTC+1)"
+  }, "🇫🇷 FR (UTC+2)"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => handleSwitchTZ('MADA'),
+    style: {
+      border: 'none',
+      borderRadius: '16px',
+      padding: '4px 10px',
+      fontSize: '11.5px',
+      fontWeight: timeZone === 'MADA' ? 700 : 500,
+      backgroundColor: timeZone === 'MADA' ? 'var(--primary-color)' : 'transparent',
+      color: timeZone === 'MADA' ? '#fff' : '#64748b',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease'
+    },
+    title: "Fuseau Horaire Madagascar (Indian/Antananarivo - UTC+3)"
+  }, "🇲🇬 MADA (UTC+3)")), currentUser && currentUser.role === 'admin' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary btn-sm",
+    onClick: handleExportJSON,
+    title: "Exporter la base de données en JSON"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-download"
+  }), " Exporter JSON"), /*#__PURE__*/React.createElement("label", {
+    className: "btn btn-secondary btn-sm",
+    style: {
+      cursor: 'pointer',
+      margin: 0
+    },
+    title: "Importer la base de données depuis un fichier JSON"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-file-import"
+  }), " Importer JSON", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".json",
+    onChange: handleImportJSON,
+    style: {
+      display: 'none'
+    }
+  })))), activeView === 'dashboard' && /*#__PURE__*/React.createElement(DashboardView, {
+    appState: appState,
+    currentUser: currentUser,
+    selectedTZ: timeZone,
+    onUpdateRow: handleUpdateRow,
+    onDeleteRow: handleDeleteRow,
+    onAddRowClick: handleAddRow,
+    onBulkUpdateCalendrier: handleBulkUpdateCalendrier,
+    onBulkDeleteCalendrier: handleBulkDeleteCalendrier
+  }), activeView === 'comptes' && /*#__PURE__*/React.createElement(ComptesView, {
+    currentUser: currentUser,
+    appState: appState,
+    onSaveCompte: handleSaveCompte,
+    onDeleteCompte: handleDeleteCompte,
+    onBulkUpdateComptes: handleBulkUpdateComptes,
+    onBulkDeleteComptes: handleBulkDeleteComptes,
+    onOpenQuickAgentModal: () => setActiveView('utilisateurs')
+  }), activeView === 'planning' && /*#__PURE__*/React.createElement(PlanningView, {
+    appState: appState,
+    onGeneratePlanning: handleGeneratePlanning
+  }), activeView === 'incidents' && /*#__PURE__*/React.createElement(IncidentsView, {
+    appState: appState,
+    onSaveIncident: handleSaveIncident,
+    onBulkDeleteIncidents: handleBulkDeleteIncidents
+  }), activeView === 'parametres' && /*#__PURE__*/React.createElement(ParametresView, {
+    appState: appState,
+    onSaveParametres: handleSaveParametres
+  }), activeView === 'utilisateurs' && /*#__PURE__*/React.createElement(UtilisateursView, {
+    currentUser: currentUser,
+    appState: appState,
+    onSaveUser: handleSaveUser,
+    onDeleteUser: handleDeleteUser,
+    onBulkDeleteUsers: handleBulkDeleteUsers
+  }), activeView === 'organisations' && /*#__PURE__*/React.createElement(OrganisationsView, {
+    appState: appState,
+    onSaveOrg: handleSaveOrg,
+    onDeleteOrg: handleDeleteOrg
+  }), activeView === 'classement' && /*#__PURE__*/React.createElement(ClassementView, {
+    appState: appState
+  }), activeView === 'gagnants' && /*#__PURE__*/React.createElement(GagnantsView, {
+    appState: appState,
+    onPublishWinner: handlePublishWinner
+  }), activeView === 'journal' && /*#__PURE__*/React.createElement(JournalView, {
+    appState: appState
+  }), activeView === 'corbeille' && /*#__PURE__*/React.createElement(CorbeilleView, {
+    corbeille: appState.corbeille || [],
+    onRestoreItem: handleRestoreCorbeilleItem,
+    onDeleteItem: handleDeleteCorbeilleItem,
+    onEmptyCorbeille: handleEmptyCorbeille,
+    onRefresh: () => loadData()
+  })), /*#__PURE__*/React.createElement(Toast, {
+    toast: toast
+  }));
 }
 
 // Render React App into #root
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(/*#__PURE__*/_jsxDEV(App, {}, void 0, false));
+root.render(/*#__PURE__*/React.createElement(App, null));
+})();
