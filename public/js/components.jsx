@@ -212,6 +212,21 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     const comptesAll = appState.comptes || [];
     const calendrierAll = appState.calendrier || [];
 
+    const agentsUnique = useMemo(() => {
+        const set = new Set();
+        (appState.utilisateurs || []).forEach(u => {
+            if (u.nom) set.add(u.nom.trim());
+            if (u.agentAssigne) set.add(u.agentAssigne.trim());
+        });
+        (appState.comptes || []).forEach(c => {
+            if (c.agent) set.add(c.agent.trim());
+        });
+        (appState.calendrier || []).forEach(l => {
+            if (l.agent) set.add(l.agent.trim());
+        });
+        return Array.from(set).filter(Boolean).sort();
+    }, [appState]);
+
     // Pour un agent, restreindre la liste des comptes uniquement à ses comptes délégués
     const comptes = useMemo(() => {
         if (isAgent && myAgentName) {
