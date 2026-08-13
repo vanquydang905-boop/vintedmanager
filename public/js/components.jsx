@@ -2186,21 +2186,13 @@ function PlanningView({ appState, onGeneratePlanning }) {
 
 // ------------------- VIEW: INCIDENTS -------------------
 function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
-    const todayDateTimeStr = useMemo(() => {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
-    }, []);
-
+    const todayDateTimeStr = new Date().toISOString().slice(0, 16);
     const [compteId, setCompteId] = useState('');
     const [type, setType] = useState('Limitation');
     const [dateHeure, setDateHeure] = useState(todayDateTimeStr);
     const [nbAnnonces, setNbAnnonces] = useState('');
     const [skuAnnonces, setSkuAnnonces] = useState('');
+    const [notesActivites, setNotesActivites] = useState('');
     const [selectedIncidentIds, setSelectedIncidentIds] = useState([]);
 
     const comptes = appState.comptes || [];
@@ -2240,10 +2232,12 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
             type,
             dateHeure,
             nbAnnoncesMasquees: parseInt(nbAnnonces) || 0,
-            skuAnnoncesMasquees: skuAnnonces
+            skuAnnoncesMasquees: skuAnnonces,
+            notesActivites: notesActivites
         });
         setNbAnnonces('');
         setSkuAnnonces('');
+        setNotesActivites('');
     };
 
     return (
@@ -2282,6 +2276,18 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                             <label>Date & Heure du Blocage</label>
                             <input type="datetime-local" value={dateHeure} onChange={(e) => setDateHeure(e.target.value)} required />
                         </div>
+                    </div>
+
+                    {/* SECTION ACTIVITÉ ET NOTES PROVOQUANT L'INCIDENT */}
+                    <div className="form-group" style={{ marginTop: '14px' }}>
+                        <label>Notes & Activités Suspectes (Cause / Actions ayant pu provoquer l'incident)</label>
+                        <input
+                            type="text"
+                            className="input"
+                            value={notesActivites}
+                            onChange={(e) => setNotesActivites(e.target.value)}
+                            placeholder="ex: 5 republications rapides en 10 min, Changement d'IP Proxy Adspower, Message suspect Vinted..."
+                        />
                     </div>
 
                     {/* SECTION CONDITIONNELLE ANNONCES MASQUÉES */}
@@ -2356,6 +2362,7 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                                 <th>Type</th>
                                 <th>Pubs 24h Précédentes</th>
                                 <th>Détail Ventes / Annonces</th>
+                                <th>Cause Suspectée / Activités</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2377,12 +2384,21 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                                             <td><span className={`badge ${badgeClass}`}>{inc.type}</span></td>
                                             <td><b>{inc.nbPubs24h}</b> pubs</td>
                                             <td>{detailsCol}</td>
+                                            <td>
+                                                {inc.notesActivites ? (
+                                                    <span style={{ fontSize: '12px', color: '#334155', fontWeight: 500 }}>
+                                                        📝 {inc.notesActivites}
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>-</span>
+                                                )}
+                                            </td>
                                         </tr>
                                     );
                                 })
                             ) : (
-                                <tr>
-                                    <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                 <tr>
+                                    <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                                         Aucun incident enregistré.
                                     </td>
                                 </tr>

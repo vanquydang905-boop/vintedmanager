@@ -1002,7 +1002,7 @@ app.get('/api/incidents', async (req, res) => {
 
 app.post('/api/incidents', async (req, res) => {
     try {
-        const { compteId, type, dateHeure, organisationId, nbAnnoncesMasquees, skuAnnoncesMasquees } = req.body;
+        const { compteId, type, dateHeure, organisationId, nbAnnoncesMasquees, skuAnnoncesMasquees, notesActivites } = req.body;
         const orgId = organisationId || 'org_default';
         if (!compteId || !dateHeure) return res.status(400).json({ error: "Compte et Date/Heure requis" });
 
@@ -1036,7 +1036,8 @@ app.post('/api/incidents', async (req, res) => {
             nbVentesConnues: ventes24h.length,
             detailVentes: ventes24h,
             nbAnnoncesMasquees: parseInt(nbAnnoncesMasquees) || 0,
-            skuAnnoncesMasquees: skuAnnoncesMasquees || ''
+            skuAnnoncesMasquees: skuAnnoncesMasquees || '',
+            notesActivites: notesActivites || ''
         });
 
         // Mise à jour du statut du compte

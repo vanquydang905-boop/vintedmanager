@@ -92,7 +92,8 @@ CREATE TABLE incidents (
     nbVentesConnues INT DEFAULT 0,
     detailVentes JSONB DEFAULT '[]'::jsonb,
     nbAnnoncesMasquees INT DEFAULT 0,
-    skuAnnoncesMasquees TEXT DEFAULT ''
+    skuAnnoncesMasquees TEXT DEFAULT '',
+    notesActivites TEXT DEFAULT ''
 );
 
 -- 7. Table du Journal d'Activité (Logs)

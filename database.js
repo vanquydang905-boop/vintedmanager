@@ -28,6 +28,7 @@ const camelMap = {
     detailventes: 'detailVentes',
     nbannoncesmasquees: 'nbAnnoncesMasquees',
     skuannoncesmasquees: 'skuAnnoncesMasquees',
+    notesactivites: 'notesActivites',
     contacttype: 'contactType',
     contactnumero: 'contactNumero',
     numerocompte: 'numeroCompte',
