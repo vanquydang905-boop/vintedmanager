@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "build": "echo 'No build step required for Express Node.js'",
+    "build": "node build-js.js",
     "migrate:supabase": "node migrate_to_supabase.js"
   },
   "keywords": [
@@ -20,6 +20,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "^7.23.3",
     "@supabase/supabase-js": "^2.45.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

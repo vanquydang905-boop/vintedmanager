@@ -18,10 +18,9 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/styles.css">
 
-    <!-- React 18 & Babel Standalone -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- React 18 -->
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 </head>
 
 <body>
@@ -29,10 +28,10 @@
     <!-- POINT DE MONTAGE REACT -->
     <div id="root"></div>
 
-    <!-- SCRIPTS APPLICATIFS -->
+    <!-- SCRIPTS APPLICATIFS PRÉ-COMPILÉS (CHARGEMENT ULTRA RAPIDE SANS ÉCRAN BLANC) -->
     <script src="js/api.js"></script>
-    <script type="text/babel" src="js/components.jsx"></script>
-    <script type="text/babel" src="js/react-app.jsx"></script>
+    <script src="js/components.js"></script>
+    <script src="js/react-app.js"></script>
 </body>
 
 </html>
