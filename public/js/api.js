@@ -189,6 +189,13 @@ const API = {
         });
     },
 
+    async updateIncident(id, data) {
+        return this.fetchJSON(`/api/incidents/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+
     // Paramètres
     async getParametres(organisationId = 'org_default') {
         const query = `?organisationId=${encodeURIComponent(organisationId)}`;

@@ -241,8 +241,13 @@ function App() {
 
     const handleSaveIncident = async (incidentData) => {
         try {
-            await API.createIncident({ ...incidentData, organisationId: currentOrgId });
-            showToast("Incident enregistré et statut du compte mis à jour");
+            if (incidentData.id) {
+                await API.updateIncident(incidentData.id, incidentData);
+                showToast("Incident mis à jour avec succès");
+            } else {
+                await API.createIncident({ ...incidentData, organisationId: currentOrgId });
+                showToast("Incident enregistré et statut du compte mis à jour");
+            }
             await loadData();
         } catch (err) {
             showToast("Erreur lors de l'enregistrement de l'incident", true);

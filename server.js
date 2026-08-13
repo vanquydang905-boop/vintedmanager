@@ -1051,6 +1051,29 @@ app.post('/api/incidents', async (req, res) => {
     }
 });
 
+app.put('/api/incidents/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { compteId, type, dateHeure, nbAnnoncesMasquees, skuAnnoncesMasquees, notesActivites } = req.body;
+        const updates = {};
+        if (compteId) updates.compteId = compteId;
+        if (type) updates.type = type;
+        if (dateHeure && dateHeure.includes('T')) {
+            const [d, h] = dateHeure.split('T');
+            updates.dateBlocage = d;
+            updates.heureBlocage = h;
+        }
+        if (nbAnnoncesMasquees !== undefined) updates.nbAnnoncesMasquees = parseInt(nbAnnoncesMasquees) || 0;
+        if (skuAnnoncesMasquees !== undefined) updates.skuAnnoncesMasquees = skuAnnoncesMasquees;
+        if (notesActivites !== undefined) updates.notesActivites = notesActivites;
+
+        await dbService.updateIncident(id, updates);
+        res.json({ success: true, id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ------------------- PARAMETRES -------------------
 app.get('/api/parametres', async (req, res) => {
     try {

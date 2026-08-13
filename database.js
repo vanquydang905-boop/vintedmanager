@@ -931,6 +931,20 @@ const dbService = {
         return payload;
     },
 
+    async updateIncident(id, updates) {
+        const idx = DEFAULT_INCIDENTS.findIndex(i => i.id === id);
+        if (idx >= 0) {
+            DEFAULT_INCIDENTS[idx] = { ...DEFAULT_INCIDENTS[idx], ...updates };
+        }
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const dbPayload = toDbFormat(updates);
+                await supabase.from('incidents').update(dbPayload).eq('id', id);
+            } catch (err) {}
+        }
+        return true;
+    },
+
     // ------------------- JOURNAL -------------------
     async getJournal(organisationId = null) {
         let list = [...DEFAULT_JOURNAL];

@@ -2282,6 +2282,8 @@ function PlanningView({ appState, onGeneratePlanning }) {
 // ------------------- VIEW: INCIDENTS -------------------
 function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
     const todayDateTimeStr = new Date().toISOString().slice(0, 16);
+    const formRef = React.useRef(null);
+    const [editingIncidentId, setEditingIncidentId] = useState('');
     const [compteId, setCompteId] = useState('');
     const [type, setType] = useState('Limitation');
     const [dateHeure, setDateHeure] = useState(todayDateTimeStr);
@@ -2319,10 +2321,36 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
         return c ? c.pseudo : 'Inconnu';
     };
 
+    const handleEditIncident = (inc) => {
+        setEditingIncidentId(inc.id);
+        setCompteId(inc.compteId || '');
+        setType(inc.type || 'Limitation');
+        const d = inc.dateBlocage || '';
+        const h = inc.heureBlocage || '12:00';
+        setDateHeure((d && h) ? `${d}T${h}` : todayDateTimeStr);
+        setNbAnnonces(inc.nbAnnoncesMasquees || '');
+        setSkuAnnonces(inc.skuAnnoncesMasquees || '');
+        setNotesActivites(inc.notesActivites || '');
+        if (formRef.current) {
+            formRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    const handleResetForm = () => {
+        setEditingIncidentId('');
+        setCompteId('');
+        setType('Limitation');
+        setDateHeure(todayDateTimeStr);
+        setNbAnnonces('');
+        setSkuAnnonces('');
+        setNotesActivites('');
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!compteId || !dateHeure) return;
         onSaveIncident({
+            id: editingIncidentId || undefined,
             compteId,
             type,
             dateHeure,
@@ -2330,9 +2358,7 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
             skuAnnoncesMasquees: skuAnnonces,
             notesActivites: notesActivites
         });
-        setNbAnnonces('');
-        setSkuAnnonces('');
-        setNotesActivites('');
+        handleResetForm();
     };
 
     return (
@@ -2340,10 +2366,17 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
             <h2 className="page-title" style={{ marginBottom: '20px' }}>Gestion des Incidents & Limitations</h2>
 
             {/* FORMULAIRE INCIDENT */}
-            <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 className="card-title">
-                    <i className="fa-solid fa-shield-cat" style={{ color: 'var(--danger)', marginRight: '8px' }}></i>
-                    Déclarer un Incident Compte
+            <div className="card" style={{ marginBottom: '24px' }} ref={formRef}>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>
+                        <i className={`fa-solid ${editingIncidentId ? 'fa-pen-to-square' : 'fa-shield-cat'}`} style={{ color: editingIncidentId ? 'var(--primary)' : 'var(--danger)', marginRight: '8px' }}></i>
+                        {editingIncidentId ? 'Modifier l\'Incident' : 'Déclarer un Incident Compte'}
+                    </span>
+                    {editingIncidentId && (
+                        <span className="badge badge-warning" style={{ fontSize: '12px' }}>
+                            Édition Mode : #{editingIncidentId}
+                        </span>
+                    )}
                 </h3>
                 <form onSubmit={handleSubmit}>
                     <div className="grid-3">
@@ -2399,9 +2432,17 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                         </div>
                     )}
 
-                    <button type="submit" className="btn btn-danger" style={{ marginTop: '15px' }}>
-                        <i className="fa-solid fa-triangle-exclamation"></i> Enregistrer l'incident
-                    </button>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
+                        <button type="submit" className={`btn ${editingIncidentId ? 'btn-primary' : 'btn-danger'}`}>
+                            <i className={`fa-solid ${editingIncidentId ? 'fa-floppy-disk' : 'fa-triangle-exclamation'}`} style={{ marginRight: '6px' }}></i>
+                            {editingIncidentId ? 'Mettre à jour l\'incident' : 'Enregistrer l\'incident'}
+                        </button>
+                        {editingIncidentId && (
+                            <button type="button" className="btn btn-secondary" onClick={handleResetForm}>
+                                Annuler la modification
+                            </button>
+                        )}
+                    </div>
                 </form>
             </div>
 
@@ -2458,6 +2499,7 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                                 <th>Pubs 24h Précédentes</th>
                                 <th>Détail Ventes / Annonces</th>
                                 <th>Cause Suspectée / Activités</th>
+                                <th style={{ width: '110px', textAlign: 'center' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2469,8 +2511,10 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                                         ? `🙈 ${inc.nbAnnoncesMasquees || 0} annonces (SKU: ${inc.skuAnnoncesMasquees || 'Non renseigné'})`
                                         : `${inc.nbVentesConnues || 0} ventes (${(inc.detailVentes || []).join(', ')})`;
 
+                                    const isCurrentlyEditing = (inc.id === editingIncidentId);
+
                                     return (
-                                        <tr key={inc.id} style={{ backgroundColor: selectedIncidentIds.includes(inc.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
+                                        <tr key={inc.id} style={{ backgroundColor: isCurrentlyEditing ? 'rgba(99, 102, 241, 0.12)' : (selectedIncidentIds.includes(inc.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent') }}>
                                             <td style={{ textAlign: 'center' }}>
                                                 <input type="checkbox" checked={selectedIncidentIds.includes(inc.id)} onChange={() => toggleSelectIncident(inc.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                                             </td>
@@ -2488,12 +2532,38 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                                                     <span style={{ fontSize: '11px', color: '#94a3b8' }}>-</span>
                                                 )}
                                             </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-primary btn-sm"
+                                                        style={{ padding: '4px 8px', fontSize: '11px' }}
+                                                        onClick={() => handleEditIncident(inc)}
+                                                        title="Éditer les détails de cet incident"
+                                                    >
+                                                        <i className="fa-solid fa-pen"></i>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-danger btn-sm"
+                                                        style={{ padding: '4px 8px', fontSize: '11px' }}
+                                                        onClick={() => {
+                                                            if (window.confirm("Voulez-vous vraiment supprimer cet incident ?")) {
+                                                                onBulkDeleteIncidents([inc.id]);
+                                                            }
+                                                        }}
+                                                        title="Supprimer cet incident"
+                                                    >
+                                                        <i className="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     );
                                 })
                             ) : (
                                  <tr>
-                                    <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                                         Aucun incident enregistré.
                                     </td>
                                 </tr>
