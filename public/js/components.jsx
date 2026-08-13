@@ -179,6 +179,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
     const [filterAgent, setFilterAgent] = useState((currentUser && currentUser.role === 'agent') ? (currentUser.agentAssigne || '') : '');
     const [filterStatut, setFilterStatut] = useState('');
     const [filterClassif, setFilterClassif] = useState('');
+    const [filterOnlyDuplicates, setFilterOnlyDuplicates] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
     const [copiedSkuId, setCopiedSkuId] = useState(null);
     const isAgent = currentUser && currentUser.role === 'agent';
@@ -192,11 +193,12 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         if (!isAgent) setFilterAgent('');
         setFilterStatut('');
         setFilterClassif('');
+        setFilterOnlyDuplicates(false);
     };
 
     const isAnyFilterActive = useMemo(() => {
-        return Boolean(searchTerm || filterDate || filterHeure || filterComptes.length > 0 || (!isAgent && filterAgent) || filterStatut || filterClassif);
-    }, [searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, isAgent]);
+        return Boolean(searchTerm || filterDate || filterHeure || filterComptes.length > 0 || (!isAgent && filterAgent) || filterStatut || filterClassif || filterOnlyDuplicates);
+    }, [searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, filterOnlyDuplicates, isAgent]);
 
     // Fermer dropdown Compte si clic en dehors
     React.useEffect(() => {
@@ -257,10 +259,32 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         }
     };
 
-    const agentsUnique = useMemo(() => [...new Set(comptesAll.map(c => c.agent).filter(Boolean))], [comptesAll]);
+    // Détection des doublons SKU sur l'ensemble du calendrier
+    const skuCounts = useMemo(() => {
+        const counts = {};
+        (calendrierAll || []).forEach(l => {
+            const s = (l.sku || '').trim().toLowerCase();
+            if (s) {
+                counts[s] = (counts[s] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [calendrierAll]);
+
+    const duplicateSkuCount = useMemo(() => {
+        const dupes = new Set();
+        Object.entries(skuCounts).forEach(([sku, count]) => {
+            if (count > 1) dupes.add(sku);
+        });
+        return dupes.size;
+    }, [skuCounts]);
 
     const filteredLines = useMemo(() => {
         return baseLines.filter(l => {
+            if (filterOnlyDuplicates) {
+                const s = (l.sku || '').trim().toLowerCase();
+                if (!s || (skuCounts[s] || 0) <= 1) return false;
+            }
             if (filterDate && l.date !== filterDate) return false;
             if (filterHeure && l.heurePrevue !== filterHeure) return false;
             if (filterComptes.length > 0) {
@@ -351,7 +375,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
 
             return sortAsc ? res : -res;
         });
-    }, [baseLines, searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, comptesAll, sortField, sortAsc]);
+    }, [baseLines, searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, filterOnlyDuplicates, skuCounts, comptesAll, sortField, sortAsc]);
 
     const isAllSelected = useMemo(() => {
         return filteredLines.length > 0 && filteredLines.every(l => selectedIds.includes(l.id));
@@ -659,14 +683,43 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                         </select>
                     </div>
 
+                    {duplicateSkuCount > 0 && (
+                        <div style={{ marginTop: '20px' }}>
+                            <button
+                                type="button"
+                                className="btn btn-sm"
+                                onClick={() => setFilterOnlyDuplicates(!filterOnlyDuplicates)}
+                                style={{
+                                    height: '36px',
+                                    padding: '0 12px',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    borderRadius: '8px',
+                                    border: '1px solid #f97316',
+                                    color: filterOnlyDuplicates ? '#ffffff' : '#c2410c',
+                                    backgroundColor: filterOnlyDuplicates ? '#ea580c' : '#fff7ed',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s ease'
+                                }}
+                                title="Cliquer pour afficher uniquement les lignes avec un SKU en doublon"
+                            >
+                                <i className="fa-solid fa-clone" style={{ color: filterOnlyDuplicates ? '#fff' : '#ea580c' }}></i>
+                                <span>{filterOnlyDuplicates ? '✓ Doublons SKU Filtrés' : `⚠️ ${duplicateSkuCount} SKU${duplicateSkuCount > 1 ? 's' : ''} en doublon`}</span>
+                            </button>
+                        </div>
+                    )}
+
                     {isAnyFilterActive && (
                         <div style={{ marginTop: '20px' }}>
                             <button
                                 type="button"
                                 className="btn btn-secondary btn-sm"
                                 onClick={resetAllFilters}
-                                style={{ color: 'var(--danger)', borderColor: '#fca5a5', backgroundColor: '#fef2f2', fontWeight: 600 }}
-                                title="Réinitialiser tous les filtres active"
+                                style={{ color: 'var(--danger)', borderColor: '#fca5a5', backgroundColor: '#fef2f2', fontWeight: 600, height: '36px' }}
+                                title="Réinitialiser tous les filtres actifs"
                             >
                                 <i className="fa-solid fa-rotate-left"></i> Réinitialiser
                             </button>
@@ -884,35 +937,77 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             })()}
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <input type="text" className="input-table" value={l.sku || ''} placeholder="SKU"
-                                                    disabled={currentUser && currentUser.role === 'agent'}
-                                                    onChange={(e) => onUpdateRow(l.id, { sku: e.target.value })} style={{ flex: 1, minWidth: '70px' }} />
-                                                {l.sku && (
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-secondary btn-sm"
-                                                        style={{ padding: '3px 7px', fontSize: '11px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
-                                                        title="Copier rapidement le SKU"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (navigator.clipboard && navigator.clipboard.writeText) {
-                                                                navigator.clipboard.writeText(l.sku);
-                                                            } else {
-                                                                const el = document.createElement('textarea');
-                                                                el.value = l.sku;
-                                                                document.body.appendChild(el);
-                                                                el.select();
-                                                                document.execCommand('copy');
-                                                                document.body.removeChild(el);
-                                                            }
-                                                            setCopiedSkuId(l.id);
-                                                            setTimeout(() => setCopiedSkuId(null), 1500);
-                                                        }}>
-                                                        <i className={`fa-solid ${copiedSkuId === l.id ? 'fa-check' : 'fa-copy'}`} style={{ color: copiedSkuId === l.id ? '#059669' : 'inherit' }}></i>
-                                                    </button>
-                                                )}
-                                            </div>
+                                            {(() => {
+                                                const sKey = (l.sku || '').trim().toLowerCase();
+                                                const countSku = skuCounts[sKey] || 0;
+                                                const isDuplicate = countSku > 1 && l.classification !== 'Gagnant';
+
+                                                return (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
+                                                        <input
+                                                            type="text"
+                                                            className="input-table"
+                                                            value={l.sku || ''}
+                                                            placeholder="SKU"
+                                                            disabled={currentUser && currentUser.role === 'agent'}
+                                                            onChange={(e) => onUpdateRow(l.id, { sku: e.target.value })}
+                                                            style={{
+                                                                flex: 1,
+                                                                minWidth: '70px',
+                                                                borderColor: isDuplicate ? '#f97316' : '',
+                                                                backgroundColor: isDuplicate ? '#fff7ed' : '',
+                                                                fontWeight: isDuplicate ? 700 : 400
+                                                            }}
+                                                            title={isDuplicate ? `⚠️ ATTENTION : SKU en doublon présent ${countSku} fois dans le planning !` : 'SKU Produit'}
+                                                        />
+                                                        {isDuplicate && (
+                                                            <span
+                                                                style={{
+                                                                    fontSize: '10px',
+                                                                    fontWeight: 700,
+                                                                    backgroundColor: '#ea580c',
+                                                                    color: '#ffffff',
+                                                                    padding: '2px 5px',
+                                                                    borderRadius: '4px',
+                                                                    whiteSpace: 'nowrap',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSearchTerm(l.sku);
+                                                                }}
+                                                                title={`Cliquer pour isoler les ${countSku} occurrences de ce SKU (${l.sku})`}
+                                                            >
+                                                                ⚠️ x{countSku}
+                                                            </span>
+                                                        )}
+                                                        {l.sku && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary btn-sm"
+                                                                style={{ padding: '3px 7px', fontSize: '11px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                                                                title="Copier rapidement le SKU"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                                        navigator.clipboard.writeText(l.sku);
+                                                                    } else {
+                                                                        const el = document.createElement('textarea');
+                                                                        el.value = l.sku;
+                                                                        document.body.appendChild(el);
+                                                                        el.select();
+                                                                        document.execCommand('copy');
+                                                                        document.body.removeChild(el);
+                                                                    }
+                                                                    setCopiedSkuId(l.id);
+                                                                    setTimeout(() => setCopiedSkuId(null), 1500);
+                                                                }}>
+                                                                <i className={`fa-solid ${copiedSkuId === l.id ? 'fa-check' : 'fa-copy'}`} style={{ color: copiedSkuId === l.id ? '#059669' : 'inherit' }}></i>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         <td>
                                             {l.sku && String(l.sku).trim() !== '' ? (
