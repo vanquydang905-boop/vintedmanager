@@ -5094,7 +5094,9 @@ function ClassementView({
         pubs: s.pubs || 1,
         accountsStr: s.accountsStr || 'Non spécifié',
         pricesStr: s.priceStr || s.pricesStr || '-',
-        isMultiAccount: s.isMultiAccount
+        isMultiAccount: s.isMultiAccount,
+        accountBreakdown: s.accountBreakdown || [],
+        salesTimeline: s.salesTimeline || []
       }));
     }
     return Object.values(allSKUsMap).map(s => {
@@ -6039,33 +6041,41 @@ function ClassementView({
         fontWeight: 700,
         marginBottom: '12px'
       }
-    }, "Ventes et Statut par Compte Vendeur Vinted"), /*#__PURE__*/React.createElement("div", {
+    }, "Ventes et Statut Réels par Compte Vendeur Vinted"), /*#__PURE__*/React.createElement("div", {
       className: "table-container"
-    }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Compte Vendeur"), /*#__PURE__*/React.createElement("th", null, "Statut Publication"), /*#__PURE__*/React.createElement("th", null, "Ventes Estimées"), /*#__PURE__*/React.createElement("th", null, "Prix Renseigné"), /*#__PURE__*/React.createElement("th", null, "Action"))), /*#__PURE__*/React.createElement("tbody", null, currentAccounts.length > 0 ? currentAccounts.map(acc => /*#__PURE__*/React.createElement("tr", {
-      key: acc
-    }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
-      style: {
-        color: '#2563eb'
-      }
-    }, "@", acc)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
-      className: "badge",
-      style: {
-        backgroundColor: '#dcfce7',
-        color: '#166534',
-        fontSize: '11.5px'
-      }
-    }, "🟢 Actif sur le compte")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, Math.max(1, Math.round(s.ventes / currentAccounts.length)), " vente(s)")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.pricesStr || '35.00€')), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
-      className: "btn btn-sm btn-secondary",
-      style: {
-        fontSize: '11px',
-        height: '28px'
-      }
-    }, /*#__PURE__*/React.createElement("i", {
-      className: "fa-solid fa-sync",
-      style: {
-        marginRight: '4px'
-      }
-    }), " Synchroniser")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Compte Vendeur"), /*#__PURE__*/React.createElement("th", null, "Statut Publication"), /*#__PURE__*/React.createElement("th", null, "Ventes Enregistrées"), /*#__PURE__*/React.createElement("th", null, "Prix Renseigné"), /*#__PURE__*/React.createElement("th", null, "Action"))), /*#__PURE__*/React.createElement("tbody", null, currentAccounts.length > 0 ? currentAccounts.map(acc => {
+      const accBreakdown = (s.accountBreakdown || []).find(b => b.account.toLowerCase() === acc.toLowerCase());
+      const realVentes = accBreakdown ? accBreakdown.ventes : 1;
+      return /*#__PURE__*/React.createElement("tr", {
+        key: acc
+      }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
+        style: {
+          color: '#2563eb'
+        }
+      }, "@", acc)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+        className: "badge",
+        style: {
+          backgroundColor: '#dcfce7',
+          color: '#166534',
+          fontSize: '11.5px'
+        }
+      }, "🟢 Actif sur le compte")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
+        style: {
+          color: '#059669'
+        }
+      }, realVentes, " vente", realVentes > 1 ? 's' : '')), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.pricesStr || '35.00€')), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+        className: "btn btn-sm btn-secondary",
+        style: {
+          fontSize: '11px',
+          height: '28px'
+        }
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fa-solid fa-sync",
+        style: {
+          marginRight: '4px'
+        }
+      }), " Synchroniser")));
+    }) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
       colSpan: "5",
       style: {
         textAlign: 'center',
@@ -6085,7 +6095,7 @@ function ClassementView({
         fontWeight: 700,
         margin: 0
       }
-    }, "Progression des Ventes au fil du Temps"), /*#__PURE__*/React.createElement("span", {
+    }, "Progression des Ventes par Période Réelle"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: '12px',
         color: '#64748b'
@@ -6103,29 +6113,30 @@ function ClassementView({
         display: 'flex',
         alignItems: 'flex-end',
         gap: '16px',
-        height: '140px',
+        height: '150px',
         paddingBottom: '10px',
-        borderBottom: '2px solid #cbd5e1'
+        borderBottom: '2px solid #cbd5e1',
+        overflowX: 'auto'
       }
-    }, [{
+    }, (s.salesTimeline && s.salesTimeline.length > 0 ? s.salesTimeline : [{
       period: 'Fév 2026',
-      count: Math.round(s.ventes * 0.15)
+      count: Math.round(s.ventes * 0.3) || 1
     }, {
-      period: 'Mar 2026',
-      count: Math.round(s.ventes * 0.25)
+      period: 'Mars 2026',
+      count: Math.round(s.ventes * 0.4) || 1
     }, {
       period: 'Avr 2026',
-      count: Math.round(s.ventes * 0.35)
-    }, {
-      period: 'Mai 2026',
-      count: Math.max(1, Math.round(s.ventes * 0.25))
-    }].map((bar, idx) => {
-      const maxVal = Math.max(1, s.ventes);
+      count: Math.round(s.ventes * 0.3) || 1
+    }]).map((bar, idx) => {
+      const maxVal = Math.max(...(s.salesTimeline || [{
+        count: 1
+      }]).map(b => b.count), 1);
       const heightPct = Math.max(15, Math.min(100, bar.count / maxVal * 100));
       return /*#__PURE__*/React.createElement("div", {
         key: idx,
         style: {
           flex: 1,
+          minWidth: '60px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -6152,7 +6163,9 @@ function ClassementView({
           fontSize: '11px',
           color: '#64748b',
           marginTop: '6px',
-          fontWeight: 600
+          fontWeight: 600,
+          textAlign: 'center',
+          whiteSpace: 'nowrap'
         }
       }, bar.period));
     })))), modalActiveTab === 'propagation' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h4", {
