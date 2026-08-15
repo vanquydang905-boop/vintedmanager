@@ -982,6 +982,53 @@ const dbService = {
         }
     },
 
+    // ------------------- MESSAGES & INBOX VINTED -------------------
+    async getMessages(organisationId = 'org_default') {
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const { data, error } = await supabase
+                    .from('messages_vinted')
+                    .select('*')
+                    .eq('organisationid', organisationId);
+                if (!error && data) {
+                    return data.map(fromDbFormat);
+                }
+            } catch (err) {}
+        }
+        return (global.DEFAULT_MESSAGES || []).filter(m => (m.organisationId || 'org_default') === organisationId);
+    },
+
+    async saveMessage(msgData) {
+        if (!global.DEFAULT_MESSAGES) global.DEFAULT_MESSAGES = [];
+        const item = {
+            id: msgData.id || "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+            organisationId: msgData.organisationId || 'org_default',
+            compteId: msgData.compteId || '',
+            pseudo: msgData.pseudo || '',
+            conversationId: msgData.conversationId || '',
+            auteur: msgData.auteur || '',
+            contenu: msgData.contenu || '',
+            statutLecture: msgData.statutLecture || 'non_lu',
+            dateMessage: msgData.dateMessage || new Date().toISOString().split('T')[0],
+            heureMessage: msgData.heureMessage || new Date().toTimeString().split(' ')[0].substring(0, 5),
+            sku: msgData.sku || ''
+        };
+
+        const existingIdx = global.DEFAULT_MESSAGES.findIndex(m => m.id === item.id || (item.conversationId && m.conversationId === item.conversationId));
+        if (existingIdx >= 0) {
+            global.DEFAULT_MESSAGES[existingIdx] = { ...global.DEFAULT_MESSAGES[existingIdx], ...item };
+        } else {
+            global.DEFAULT_MESSAGES.unshift(item);
+        }
+
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('messages_vinted').upsert([toDbFormat(item)]);
+            } catch (err) {}
+        }
+        return item;
+    },
+
     // ------------------- RESTORE COMPLET -------------------
     async restoreFullDatabase({ parametres, organisations, utilisateurs, comptes, calendrier, incidents, journal }) {
         if (parametres) await this.saveParametres(parametres);

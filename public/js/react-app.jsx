@@ -601,6 +601,12 @@ function App() {
                     />
                 )}
 
+                {activeView === 'messagerie' && (
+                    <MessagerieView
+                        appState={appState}
+                    />
+                )}
+
                 {activeView === 'parametres' && (
                     <ParametresView
                         appState={appState}

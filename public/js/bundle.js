@@ -179,7 +179,12 @@ function Sidebar({
     onClick: () => onSelectView('incidents')
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-triangle-exclamation"
-  }), " Incidents"), isAdmin && /*#__PURE__*/React.createElement("button", {
+  }), " Incidents"), /*#__PURE__*/React.createElement("button", {
+    className: `nav-btn ${activeView === 'messagerie' ? 'active' : ''}`,
+    onClick: () => onSelectView('messagerie')
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-comments"
+  }), " Messagerie Vinted"), isAdmin && /*#__PURE__*/React.createElement("button", {
     className: `nav-btn ${activeView === 'organisations' ? 'active' : ''}`,
     onClick: () => onSelectView('organisations')
   }, /*#__PURE__*/React.createElement("i", {
@@ -3712,8 +3717,10 @@ function ParametresView({
   const [delaiRepost, setDelaiRepost] = useState(p.delaiProchainRepostMinutes || 30);
   const [joursDefaut, setJoursDefaut] = useState(p.nbJoursPlanningParDefaut || 7);
 
-  // Clé API Full Access DotB unique centralisée
+  // Clé API Full Access DotB unique centralisée & Options Avancées
   const [dotbApiKey, setDotbApiKey] = useState(p.dotbApiKey || 'dotb_pk_pmXggjdukM3FR-YCw2cXsgug2YrtJa_0ZBX9s5J6Wf8');
+  const [dotbPeriod, setDotbPeriod] = useState('all');
+  const [dotbDataTypes, setDotbDataTypes] = useState(['items_published', 'items_drafts', 'items_hidden', 'messages', 'orders', 'views_likes', 'incidents']);
   const handleSubmit = e => {
     e.preventDefault();
     onSaveParametres({
@@ -3947,6 +3954,122 @@ function ParametresView({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gap: '15px',
+      marginBottom: '16px',
+      backgroundColor: '#ffffff',
+      padding: '12px 14px',
+      borderRadius: '8px',
+      border: '1px solid #cbd5e1'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '12.5px',
+      fontWeight: 700,
+      color: 'var(--text-main)',
+      marginBottom: '4px',
+      display: 'block'
+    }
+  }, "📅 Période des Données à Récupérer :"), /*#__PURE__*/React.createElement("select", {
+    className: "select",
+    value: dotbPeriod,
+    onChange: e => setDotbPeriod(e.target.value),
+    style: {
+      width: '100%',
+      fontSize: '12.5px',
+      height: '36px'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "today"
+  }, "Aujourd'hui (Dernières 24h)"), /*#__PURE__*/React.createElement("option", {
+    value: "7days"
+  }, "7 Derniers Jours"), /*#__PURE__*/React.createElement("option", {
+    value: "30days"
+  }, "30 Derniers Jours"), /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Tout l'historique (Complet)"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '12.5px',
+      fontWeight: 700,
+      color: 'var(--text-main)',
+      marginBottom: '4px',
+      display: 'block'
+    }
+  }, "📦 Types de Données à Récupérer :"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '10px',
+      fontSize: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: dotbDataTypes.includes('items_published'),
+    onChange: e => {
+      setDotbDataTypes(prev => e.target.checked ? [...prev, 'items_published'] : prev.filter(t => t !== 'items_published'));
+    }
+  }), " 🟢 Publiés & SKUs"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: dotbDataTypes.includes('items_drafts'),
+    onChange: e => {
+      setDotbDataTypes(prev => e.target.checked ? [...prev, 'items_drafts'] : prev.filter(t => t !== 'items_drafts'));
+    }
+  }), " 📝 Brouillons"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: dotbDataTypes.includes('items_hidden'),
+    onChange: e => {
+      setDotbDataTypes(prev => e.target.checked ? [...prev, 'items_hidden'] : prev.filter(t => t !== 'items_hidden'));
+    }
+  }), " 🚫 Masqués"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: dotbDataTypes.includes('messages'),
+    onChange: e => {
+      setDotbDataTypes(prev => e.target.checked ? [...prev, 'messages'] : prev.filter(t => t !== 'messages'));
+    }
+  }), " 💬 Messages"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: dotbDataTypes.includes('orders'),
+    onChange: e => {
+      setDotbDataTypes(prev => e.target.checked ? [...prev, 'orders'] : prev.filter(t => t !== 'orders'));
+    }
+  }), " 🛒 Ventes")))), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -3966,7 +4089,7 @@ function ParametresView({
       color: 'var(--text-muted)',
       marginLeft: '10px'
     }
-  }, "Endpoint: ", /*#__PURE__*/React.createElement("code", null, "POST /api/dotb/sync"))), /*#__PURE__*/React.createElement("div", {
+  }, "Endpoint: ", /*#__PURE__*/React.createElement("code", null, "POST /api/dotb/fetch-live"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '8px',
@@ -3983,14 +4106,16 @@ function ParametresView({
     },
     onClick: async () => {
       try {
-        if (window.showToast) window.showToast("⏳ Interrogation de l'API DotB Cloud v1 en cours...");
+        if (window.showToast) window.showToast(`⏳ Synchro DotB Cloud v1 (${dotbPeriod}, ${dotbDataTypes.length} types) en cours...`);
         const res = await fetch('/api/dotb/fetch-live', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            token: dotbApiKey
+            token: dotbApiKey,
+            period: dotbPeriod,
+            selectedTypes: dotbDataTypes
           })
         });
         const data = await res.json();
@@ -5803,6 +5928,248 @@ function CorbeilleView({
   })))));
 }
 
+// ------------------- MESSAGERIE & INBOX VINTED VIEW -------------------
+function MessagerieView({
+  appState
+}) {
+  const [messages, setMessages] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCompte, setSelectedCompte] = useState('all');
+  const [selectedStatut, setSelectedStatut] = useState('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const loadMessages = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/messages');
+      const data = await res.json();
+      if (Array.isArray(data)) setMessages(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  useEffect(() => {
+    loadMessages();
+  }, []);
+  const toggleStatus = async msg => {
+    const newStatus = msg.statutLecture === 'lu' ? 'non_lu' : 'lu';
+    try {
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...msg,
+          statutLecture: newStatus
+        })
+      });
+      setMessages(prev => prev.map(m => m.id === msg.id ? {
+        ...m,
+        statutLecture: newStatus
+      } : m));
+      if (window.showToast) window.showToast(`Statut du message mis à jour (${newStatus === 'lu' ? 'Lu' : 'Non Lu'}) !`);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  const filteredMessages = useMemo(() => {
+    return messages.filter(m => {
+      const matchesSearch = !searchTerm || m.contenu && m.contenu.toLowerCase().includes(searchTerm.toLowerCase()) || m.pseudo && m.pseudo.toLowerCase().includes(searchTerm.toLowerCase()) || m.sku && m.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCompte = selectedCompte === 'all' || m.pseudo === selectedCompte;
+      const matchesStatut = selectedStatut === 'all' || m.statutLecture === selectedStatut;
+      return matchesSearch && matchesCompte && matchesStatut;
+    });
+  }, [messages, searchTerm, selectedCompte, selectedStatut]);
+  const unreadCount = messages.filter(m => m.statutLecture === 'non_lu').length;
+  const readCount = messages.filter(m => m.statutLecture === 'lu').length;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "view-container"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "page-header",
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '15px'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", null, "💬 Messagerie & Registre des Messages Vinted"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '13px'
+    }
+  }, "Détecteur et enregistreur automatique de toutes les conversations et messages d'acheteurs/vendeurs via l'API DotB Cloud.")), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: loadMessages,
+    disabled: isLoading
+  }, /*#__PURE__*/React.createElement("i", {
+    className: `fa-solid fa-rotate ${isLoading ? 'fa-spin' : ''}`
+  }), " Actualiser la boîte de réception")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: '15px',
+      marginBottom: '20px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: '16px',
+      background: 'linear-gradient(135deg, #09b1ba 0%, #0d9488 100%)',
+      color: '#fff'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      opacity: 0.9
+    }
+  }, "📩 Total Messages Capturés"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '24px',
+      fontWeight: 800
+    }
+  }, messages.length)), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: '16px',
+      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+      color: '#fff'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      opacity: 0.9
+    }
+  }, "💬 Non Lus (Action requise)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '24px',
+      fontWeight: 800
+    }
+  }, unreadCount)), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: '16px',
+      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+      color: '#fff'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      opacity: 0.9
+    }
+  }, "🟢 Lus & Traités"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '24px',
+      fontWeight: 800
+    }
+  }, readCount))), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: '16px',
+      marginBottom: '20px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '12px',
+      flexWrap: 'wrap',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: '220px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "input",
+    placeholder: "🔍 Rechercher par mot-clé, pseudo Vinted ou SKU...",
+    value: searchTerm,
+    onChange: e => setSearchTerm(e.target.value)
+  })), /*#__PURE__*/React.createElement("select", {
+    className: "select",
+    style: {
+      width: '180px'
+    },
+    value: selectedCompte,
+    onChange: e => setSelectedCompte(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Tous les comptes Vinted"), (appState.comptes || []).map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.pseudo
+  }, "@", c.pseudo || c.id))), /*#__PURE__*/React.createElement("select", {
+    className: "select",
+    style: {
+      width: '150px'
+    },
+    value: selectedStatut,
+    onChange: e => setSelectedStatut(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Tous les statuts"), /*#__PURE__*/React.createElement("option", {
+    value: "non_lu"
+  }, "🔴 Non Lus"), /*#__PURE__*/React.createElement("option", {
+    value: "lu"
+  }, "🟢 Lus")))), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "table-responsive"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Date & Heure"), /*#__PURE__*/React.createElement("th", null, "Compte Vinted"), /*#__PURE__*/React.createElement("th", null, "Auteur"), /*#__PURE__*/React.createElement("th", null, "SKU Associé"), /*#__PURE__*/React.createElement("th", null, "Message"), /*#__PURE__*/React.createElement("th", null, "Statut"), /*#__PURE__*/React.createElement("th", null, "Action"))), /*#__PURE__*/React.createElement("tbody", null, filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: "7",
+    style: {
+      textAlign: 'center',
+      padding: '30px',
+      color: 'var(--text-muted)'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-inbox",
+    style: {
+      fontSize: '24px',
+      marginBottom: '8px',
+      display: 'block'
+    }
+  }), "Aucun message trouvé pour cette sélection.")) : filteredMessages.map(msg => /*#__PURE__*/React.createElement("tr", {
+    key: msg.id,
+    style: {
+      backgroundColor: msg.statutLecture === 'non_lu' ? '#fef2f2' : 'transparent'
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontSize: '12.5px',
+      whiteSpace: 'nowrap'
+    }
+  }, "📅 ", msg.dateMessage, " ", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '11px'
+    }
+  }, "⏰ ", msg.heureMessage)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-secondary"
+  }, "@", msg.pseudo)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    className: `badge ${msg.auteur === 'Acheteur' ? 'badge-primary' : 'badge-secondary'}`
+  }, msg.auteur || 'Acheteur')), /*#__PURE__*/React.createElement("td", {
+    style: {
+      fontFamily: 'monospace',
+      fontWeight: 700
+    }
+  }, msg.sku || '-'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      maxWidth: '300px',
+      fontSize: '13px'
+    }
+  }, msg.contenu), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    className: `badge ${msg.statutLecture === 'non_lu' ? 'badge-danger' : 'badge-gagnant'}`
+  }, msg.statutLecture === 'non_lu' ? '🔴 Non lu' : '🟢 Lu')), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+    className: `btn btn-xs ${msg.statutLecture === 'non_lu' ? 'btn-primary' : 'btn-secondary'}`,
+    onClick: () => toggleStatus(msg)
+  }, msg.statutLecture === 'non_lu' ? '✔ Marquer Lu' : '↩ Marquer Non Lu')))))))));
+}
+
 // Export global React components
 window.ReactComponents = {
   Toast,
@@ -5811,6 +6178,7 @@ window.ReactComponents = {
   ComptesView,
   PlanningView,
   IncidentsView,
+  MessagerieView,
   ParametresView,
   UtilisateursView,
   OrganisationsView,
@@ -6402,6 +6770,8 @@ function App() {
     appState: appState,
     onSaveIncident: handleSaveIncident,
     onBulkDeleteIncidents: handleBulkDeleteIncidents
+  }), activeView === 'messagerie' && /*#__PURE__*/React.createElement(MessagerieView, {
+    appState: appState
   }), activeView === 'parametres' && /*#__PURE__*/React.createElement(ParametresView, {
     appState: appState,
     onSaveParametres: handleSaveParametres

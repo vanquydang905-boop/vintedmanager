@@ -90,6 +90,10 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                     <i className="fa-solid fa-triangle-exclamation"></i> Incidents
                 </button>
 
+                <button className={`nav-btn ${activeView === 'messagerie' ? 'active' : ''}`} onClick={() => onSelectView('messagerie')}>
+                    <i className="fa-solid fa-comments"></i> Messagerie Vinted
+                </button>
+
                 {isAdmin && (
                     <button className={`nav-btn ${activeView === 'organisations' ? 'active' : ''}`} onClick={() => onSelectView('organisations')}>
                         <i className="fa-solid fa-sitemap"></i> Organisations
@@ -2616,8 +2620,10 @@ function ParametresView({ appState, onSaveParametres }) {
     const [delaiRepost, setDelaiRepost] = useState(p.delaiProchainRepostMinutes || 30);
     const [joursDefaut, setJoursDefaut] = useState(p.nbJoursPlanningParDefaut || 7);
 
-    // Clé API Full Access DotB unique centralisée
+    // Clé API Full Access DotB unique centralisée & Options Avancées
     const [dotbApiKey, setDotbApiKey] = useState(p.dotbApiKey || 'dotb_pk_pmXggjdukM3FR-YCw2cXsgug2YrtJa_0ZBX9s5J6Wf8');
+    const [dotbPeriod, setDotbPeriod] = useState('all');
+    const [dotbDataTypes, setDotbDataTypes] = useState(['items_published', 'items_drafts', 'items_hidden', 'messages', 'orders', 'views_likes', 'incidents']);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -2744,13 +2750,65 @@ function ParametresView({ appState, onSaveParametres }) {
                 </div>
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                    {/* OPTIONS AVANCÉES DE SYNCHRO : PÉRIODE ET TYPES DE DONNÉES */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px', marginBottom: '16px', backgroundColor: '#ffffff', padding: '12px 14px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                        <div>
+                            <label style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px', display: 'block' }}>
+                                📅 Période des Données à Récupérer :
+                            </label>
+                            <select
+                                className="select"
+                                value={dotbPeriod}
+                                onChange={(e) => setDotbPeriod(e.target.value)}
+                                style={{ width: '100%', fontSize: '12.5px', height: '36px' }}
+                            >
+                                <option value="today">Aujourd'hui (Dernières 24h)</option>
+                                <option value="7days">7 Derniers Jours</option>
+                                <option value="30days">30 Derniers Jours</option>
+                                <option value="all">Tout l'historique (Complet)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '4px', display: 'block' }}>
+                                📦 Types de Données à Récupérer :
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '12px' }}>
+                                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <input type="checkbox" checked={dotbDataTypes.includes('items_published')} onChange={(e) => {
+                                        setDotbDataTypes(prev => e.target.checked ? [...prev, 'items_published'] : prev.filter(t => t !== 'items_published'));
+                                    }} /> 🟢 Publiés & SKUs
+                                </label>
+                                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <input type="checkbox" checked={dotbDataTypes.includes('items_drafts')} onChange={(e) => {
+                                        setDotbDataTypes(prev => e.target.checked ? [...prev, 'items_drafts'] : prev.filter(t => t !== 'items_drafts'));
+                                    }} /> 📝 Brouillons
+                                </label>
+                                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <input type="checkbox" checked={dotbDataTypes.includes('items_hidden')} onChange={(e) => {
+                                        setDotbDataTypes(prev => e.target.checked ? [...prev, 'items_hidden'] : prev.filter(t => t !== 'items_hidden'));
+                                    }} /> 🚫 Masqués
+                                </label>
+                                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <input type="checkbox" checked={dotbDataTypes.includes('messages')} onChange={(e) => {
+                                        setDotbDataTypes(prev => e.target.checked ? [...prev, 'messages'] : prev.filter(t => t !== 'messages'));
+                                    }} /> 💬 Messages
+                                </label>
+                                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <input type="checkbox" checked={dotbDataTypes.includes('orders')} onChange={(e) => {
+                                        setDotbDataTypes(prev => e.target.checked ? [...prev, 'orders'] : prev.filter(t => t !== 'orders'));
+                                    }} /> 🛒 Ventes
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
                         <div>
                             <span className="badge badge-gagnant" style={{ fontSize: '12px', padding: '4px 10px' }}>
                                 🟢 Service API DotB Actif
                             </span>
                             <span style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginLeft: '10px' }}>
-                                Endpoint: <code>POST /api/dotb/sync</code>
+                                Endpoint: <code>POST /api/dotb/fetch-live</code>
                             </span>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -2760,11 +2818,15 @@ function ParametresView({ appState, onSaveParametres }) {
                                 style={{ fontSize: '12px', padding: '6px 14px', backgroundColor: '#09b1ba', borderColor: '#09b1ba' }}
                                 onClick={async () => {
                                     try {
-                                        if (window.showToast) window.showToast("⏳ Interrogation de l'API DotB Cloud v1 en cours...");
+                                        if (window.showToast) window.showToast(`⏳ Synchro DotB Cloud v1 (${dotbPeriod}, ${dotbDataTypes.length} types) en cours...`);
                                         const res = await fetch('/api/dotb/fetch-live', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ token: dotbApiKey })
+                                            body: JSON.stringify({
+                                                token: dotbApiKey,
+                                                period: dotbPeriod,
+                                                selectedTypes: dotbDataTypes
+                                            })
                                         });
                                         const data = await res.json();
                                         if (data.success && window.showToast) {
@@ -4066,6 +4128,185 @@ function CorbeilleView({ corbeille = [], onRestoreItem, onDeleteItem, onEmptyCor
     );
 }
 
+// ------------------- MESSAGERIE & INBOX VINTED VIEW -------------------
+function MessagerieView({ appState }) {
+    const [messages, setMessages] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCompte, setSelectedCompte] = useState('all');
+    const [selectedStatut, setSelectedStatut] = useState('all');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const loadMessages = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch('/api/messages');
+            const data = await res.json();
+            if (Array.isArray(data)) setMessages(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadMessages();
+    }, []);
+
+    const toggleStatus = async (msg) => {
+        const newStatus = msg.statutLecture === 'lu' ? 'non_lu' : 'lu';
+        try {
+            await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...msg, statutLecture: newStatus })
+            });
+            setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, statutLecture: newStatus } : m));
+            if (window.showToast) window.showToast(`Statut du message mis à jour (${newStatus === 'lu' ? 'Lu' : 'Non Lu'}) !`);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const filteredMessages = useMemo(() => {
+        return messages.filter(m => {
+            const matchesSearch = !searchTerm || 
+                (m.contenu && m.contenu.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (m.pseudo && m.pseudo.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (m.sku && m.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+            const matchesCompte = selectedCompte === 'all' || m.pseudo === selectedCompte;
+            const matchesStatut = selectedStatut === 'all' || m.statutLecture === selectedStatut;
+            return matchesSearch && matchesCompte && matchesStatut;
+        });
+    }, [messages, searchTerm, selectedCompte, selectedStatut]);
+
+    const unreadCount = messages.filter(m => m.statutLecture === 'non_lu').length;
+    const readCount = messages.filter(m => m.statutLecture === 'lu').length;
+
+    return (
+        <div className="view-container">
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+                <div>
+                    <h2>💬 Messagerie & Registre des Messages Vinted</h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                        Détecteur et enregistreur automatique de toutes les conversations et messages d'acheteurs/vendeurs via l'API DotB Cloud.
+                    </p>
+                </div>
+                <button className="btn btn-secondary" onClick={loadMessages} disabled={isLoading}>
+                    <i className={`fa-solid fa-rotate ${isLoading ? 'fa-spin' : ''}`}></i> Actualiser la boîte de réception
+                </button>
+            </div>
+
+            {/* Badges Statistiques */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px' }}>
+                <div className="card" style={{ padding: '16px', background: 'linear-gradient(135deg, #09b1ba 0%, #0d9488 100%)', color: '#fff' }}>
+                    <div style={{ fontSize: '12px', opacity: 0.9 }}>📩 Total Messages Capturés</div>
+                    <div style={{ fontSize: '24px', fontWeight: 800 }}>{messages.length}</div>
+                </div>
+                <div className="card" style={{ padding: '16px', background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#fff' }}>
+                    <div style={{ fontSize: '12px', opacity: 0.9 }}>💬 Non Lus (Action requise)</div>
+                    <div style={{ fontSize: '24px', fontWeight: 800 }}>{unreadCount}</div>
+                </div>
+                <div className="card" style={{ padding: '16px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff' }}>
+                    <div style={{ fontSize: '12px', opacity: 0.9 }}>🟢 Lus & Traités</div>
+                    <div style={{ fontSize: '24px', fontWeight: 800 }}>{readCount}</div>
+                </div>
+            </div>
+
+            {/* Filtres & Recherche */}
+            <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ flex: 1, minWidth: '220px' }}>
+                        <input
+                            type="text"
+                            className="input"
+                            placeholder="🔍 Rechercher par mot-clé, pseudo Vinted ou SKU..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <select className="select" style={{ width: '180px' }} value={selectedCompte} onChange={(e) => setSelectedCompte(e.target.value)}>
+                        <option value="all">Tous les comptes Vinted</option>
+                        {(appState.comptes || []).map(c => (
+                            <option key={c.id} value={c.pseudo}>@{c.pseudo || c.id}</option>
+                        ))}
+                    </select>
+                    <select className="select" style={{ width: '150px' }} value={selectedStatut} onChange={(e) => setSelectedStatut(e.target.value)}>
+                        <option value="all">Tous les statuts</option>
+                        <option value="non_lu">🔴 Non Lus</option>
+                        <option value="lu">🟢 Lus</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Table des Messages */}
+            <div className="card">
+                <div className="table-responsive">
+                    <table className="table">
+                        <thead>
+                            <tr>
+                                <th>Date & Heure</th>
+                                <th>Compte Vinted</th>
+                                <th>Auteur</th>
+                                <th>SKU Associé</th>
+                                <th>Message</th>
+                                <th>Statut</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredMessages.length === 0 ? (
+                                <tr>
+                                    <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                                        <i className="fa-solid fa-inbox" style={{ fontSize: '24px', marginBottom: '8px', display: 'block' }}></i>
+                                        Aucun message trouvé pour cette sélection.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredMessages.map(msg => (
+                                    <tr key={msg.id} style={{ backgroundColor: msg.statutLecture === 'non_lu' ? '#fef2f2' : 'transparent' }}>
+                                        <td style={{ fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                                            📅 {msg.dateMessage} <br />
+                                            <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>⏰ {msg.heureMessage}</span>
+                                        </td>
+                                        <td>
+                                            <span className="badge badge-secondary">@{msg.pseudo}</span>
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${msg.auteur === 'Acheteur' ? 'badge-primary' : 'badge-secondary'}`}>
+                                                {msg.auteur || 'Acheteur'}
+                                            </span>
+                                        </td>
+                                        <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                                            {msg.sku || '-'}
+                                        </td>
+                                        <td style={{ maxWidth: '300px', fontSize: '13px' }}>
+                                            {msg.contenu}
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${msg.statutLecture === 'non_lu' ? 'badge-danger' : 'badge-gagnant'}`}>
+                                                {msg.statutLecture === 'non_lu' ? '🔴 Non lu' : '🟢 Lu'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button
+                                                className={`btn btn-xs ${msg.statutLecture === 'non_lu' ? 'btn-primary' : 'btn-secondary'}`}
+                                                onClick={() => toggleStatus(msg)}
+                                            >
+                                                {msg.statutLecture === 'non_lu' ? '✔ Marquer Lu' : '↩ Marquer Non Lu'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // Export global React components
 window.ReactComponents = {
     Toast,
@@ -4074,6 +4315,7 @@ window.ReactComponents = {
     ComptesView,
     PlanningView,
     IncidentsView,
+    MessagerieView,
     ParametresView,
     UtilisateursView,
     OrganisationsView,
