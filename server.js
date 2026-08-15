@@ -1270,7 +1270,11 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                 if (item.status === 'imported') activeCount++;
                 else if (item.status === 'pending') draftsCount++;
 
-                const ownerAccount = updatedComptesList.find(c => c.id === item.vinted_account_id || (c.numeroCompte && String(c.numeroCompte) === String(item.vinted_account_id)));
+                const ownerAccount = updatedComptesList.find(c => 
+                    (item.account && c.pseudo && c.pseudo.toLowerCase() === (item.account.login || '').toLowerCase()) ||
+                    (c.numeroCompte && String(c.numeroCompte) === String(item.vinted_account_id)) ||
+                    (c.id === item.vinted_account_id)
+                );
                 const compteId = ownerAccount ? ownerAccount.id : (updatedComptesList[0] ? updatedComptesList[0].id : 'c_default');
                 const normItemTitle = normalizeTitle(item.title);
                 const existingTitleMatch = allCal.find(l => l.produit && normalizeTitle(l.produit) === normItemTitle && l.sku && String(l.sku).trim() !== '');
