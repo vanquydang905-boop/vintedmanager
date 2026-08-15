@@ -204,6 +204,77 @@ app.get('/api/sku/summary', async (req, res) => {
     }
 });
 
+// 1c. Multi-Account SKU Propagation API
+app.post('/api/sku/propagate', async (req, res) => {
+    try {
+        const { sku, targetAccounts, mode, organisationId } = req.body;
+        if (!sku || !Array.isArray(targetAccounts) || targetAccounts.length === 0) {
+            return res.status(400).json({ error: "SKU et comptes cibles requis" });
+        }
+
+        const orgId = organisationId || 'org_default';
+        const existingLines = await dbService.getCalendrier(orgId);
+        
+        // Find existing SKU info for product name, price, etc.
+        const skuSample = (existingLines || []).find(l => l.sku && l.sku.trim() === sku.trim());
+        const produitTitle = skuSample ? skuSample.produit : `Produit ${sku}`;
+        const prix = skuSample ? skuSample.prix : 35.00;
+
+        let insertedCount = 0;
+        const now = new Date();
+
+        for (let i = 0; i < targetAccounts.length; i++) {
+            const accPseudo = targetAccounts[i];
+            let postDate = new Date(now);
+
+            if (mode === 'staggered') {
+                postDate.setDate(postDate.getDate() + i + 1);
+            } else if (mode === 'optimal') {
+                postDate.setHours(20, 15, 0, 0);
+                postDate.setDate(postDate.getDate() + Math.floor(i / 2));
+            }
+
+            const dateStr = postDate.toISOString().split('T')[0];
+            const heureStr = mode === 'optimal' ? '20:15' : '14:00';
+
+            const newRow = {
+                id: "prop_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+                organisationId: orgId,
+                datePrevue: dateStr,
+                heurePrevue: heureStr,
+                comptePseudo: accPseudo.replace('@', ''),
+                produit: produitTitle,
+                sku: sku.trim(),
+                statut: 'À faire',
+                prix: prix,
+                vente: 0,
+                score: 15,
+                source: 'Propagation SKU Multi-Compte',
+                dateCreation: new Date().toISOString()
+            };
+
+            await dbService.createCalendrierRow(newRow);
+            insertedCount++;
+        }
+
+        await dbService.logAction(
+            "Propagation SKU",
+            `Propagation du SKU ${sku} réalisée avec succès sur ${insertedCount} compte(s) (Mode: ${mode})`,
+            "Succès"
+        );
+
+        res.json({
+            success: true,
+            insertedCount,
+            message: `🚀 Propagation réussie : SKU ${sku} programmé sur ${insertedCount} nouveau(x) compte(s) vendeur(s) !`
+        });
+    } catch(err) {
+        console.error("Erreur Propagation SKU:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 
 // ------------------- CORBEILLE API -------------------
 app.get('/api/corbeille', async (req, res) => {
