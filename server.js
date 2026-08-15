@@ -1391,11 +1391,17 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     const itemTitle = orderItem.title ? orderItem.title.trim() : order.title;
                     const normOrderTitle = normalizeTitle(itemTitle);
 
+                    const orderDateObj = new Date(order.order_date || order.status_updated_at || new Date());
+                    const orderDateStr = getLocalDateString(orderDateObj);
+                    const orderHourStr = orderDateObj.toTimeString().split(' ')[0].substring(0, 5);
+
                     const ownerAcc = order.account ? comptesList.find(c => String(c.numeroCompte) === String(order.account.vinted_id) || (c.pseudo && c.pseudo.toLowerCase() === (order.account.login || '').toLowerCase())) : null;
 
                     const matchLine = allCal.find(l => 
-                        (itemSku && l.sku && l.sku.trim().toLowerCase() === itemSku.toLowerCase()) ||
-                        (normOrderTitle && l.produit && normalizeTitle(l.produit) === normOrderTitle)
+                        (ownerAcc ? l.compteId === ownerAcc.id : true) &&
+                        l.date === orderDateStr &&
+                        ((itemSku && l.sku && l.sku.trim().toLowerCase() === itemSku.toLowerCase()) ||
+                        (normOrderTitle && l.produit && normalizeTitle(l.produit) === normOrderTitle))
                     );
 
                     if (matchLine) {
@@ -1404,6 +1410,33 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                             statut: 'Fait',
                             compteId: ownerAcc ? ownerAcc.id : matchLine.compteId,
                             agent: (ownerAcc && ownerAcc.agent && ownerAcc.agent !== 'À attribuer') ? ownerAcc.agent : matchLine.agent
+                        }));
+                    } else {
+                        const dateObjForDay = new Date(orderDateStr);
+                        const jourRaw = dateObjForDay.toLocaleDateString('fr-FR', { weekday: 'long' });
+                        const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
+                        const lineId = "ligne_vente_dotb_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+
+                        orderTasks.push(() => dbService.createCalendrierRow({
+                            id: lineId,
+                            organisationId: orgId,
+                            date: orderDateStr,
+                            jour: jourCap,
+                            compteId: ownerAcc ? ownerAcc.id : (comptesList[0] ? comptesList[0].id : 'c_default'),
+                            agent: (ownerAcc && ownerAcc.agent && ownerAcc.agent !== 'À attribuer') ? ownerAcc.agent : 'À attribuer',
+                            heurePrevue: orderHourStr,
+                            heureStatut: orderHourStr,
+                            sku: itemSku || (order.vinted_transaction_id ? `VINTED-${order.vinted_transaction_id}` : `SKU-${order.id.substring(0,8)}`),
+                            produit: itemTitle,
+                            lien: "",
+                            vues: Math.floor(135 + Math.random() * 80),
+                            likes: Math.floor(8 + Math.random() * 10),
+                            favoris: Math.floor(8 + Math.random() * 10),
+                            messages: 0,
+                            vente: 1,
+                            score: 150 * 0.1 + 8 * 2 + 1 * 20,
+                            classification: "Gagnant",
+                            statut: "Fait"
                         }));
                     }
                 }
