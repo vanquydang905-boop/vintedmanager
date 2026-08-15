@@ -1266,6 +1266,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
             const allCal = await dbService.getCalendrier(orgId);
             const updatedComptesList = await dbService.getComptes(orgId);
             const todayStr = getLocalDateString(new Date());
+            const dbTasks = [];
 
             for (const item of dotbItems) {
                 if (!item.title) continue;
@@ -1306,7 +1307,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
 
                 if (matchLine) {
                     const targetAgent = ownerAccount && ownerAccount.agent && ownerAccount.agent !== 'À attribuer' ? ownerAccount.agent : matchLine.agent;
-                    await dbService.updateCalendrierRow(matchLine.id, {
+                    dbTasks.push(() => dbService.updateCalendrierRow(matchLine.id, {
                         compteId: ownerAccount ? ownerAccount.id : matchLine.compteId,
                         agent: targetAgent,
                         sku: itemSku,
@@ -1316,7 +1317,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         heureStatut: matchLine.heureStatut || realHourStr,
                         score,
                         classification: classif
-                    });
+                    }));
                     updatedItemsCount++;
                 } else {
                     const dateObjForDay = new Date(realDateStr);
@@ -1324,7 +1325,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
                     const lineId = "ligne_dotb_live_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
 
-                    await dbService.createCalendrierRow({
+                    dbTasks.push(() => dbService.createCalendrierRow({
                         id: lineId,
                         organisationId: orgId,
                         date: realDateStr,
@@ -1344,9 +1345,14 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         score,
                         classification: classif,
                         statut: 'Fait'
-                    });
+                    }));
                     createdItemsCount++;
                 }
+            }
+
+            // Exécution ultra-rapide par blocs de 20 requêtes simultanées
+            for (let i = 0; i < dbTasks.length; i += 20) {
+                await Promise.all(dbTasks.slice(i, i + 20).map(task => task()));
             }
         }
 
@@ -1356,6 +1362,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
             try {
                 const allCal = await dbService.getCalendrier(orgId);
                 const comptesList = await dbService.getComptes(orgId);
+                const orderTasks = [];
 
                 for (const order of orders) {
                     if (!order.items || order.items.length === 0) continue;
@@ -1372,13 +1379,17 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     );
 
                     if (matchLine) {
-                        await dbService.updateCalendrierRow(matchLine.id, {
+                        orderTasks.push(() => dbService.updateCalendrierRow(matchLine.id, {
                             vente: 1,
                             statut: 'Fait',
                             compteId: ownerAcc ? ownerAcc.id : matchLine.compteId,
                             agent: (ownerAcc && ownerAcc.agent && ownerAcc.agent !== 'À attribuer') ? ownerAcc.agent : matchLine.agent
-                        });
+                        }));
                     }
+                }
+
+                for (let i = 0; i < orderTasks.length; i += 20) {
+                    await Promise.all(orderTasks.slice(i, i + 20).map(t => t()));
                 }
             } catch (e) {
                 console.warn("[DotB Orders Processing Warning]", e.message);
