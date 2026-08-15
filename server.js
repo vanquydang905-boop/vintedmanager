@@ -398,7 +398,19 @@ app.put('/api/comptes/:id', async (req, res) => {
             pseudo, agent, lienProfil, statut, dateCreation, notes, organisationId,
             numeroCompte, telephone, email, motDePasse, gereParInitiales, dateStatutCompte
         });
-        await dbService.logAction("Gestion Compte", `Modification du compte ${pseudo || id}`, "Succès", organisationId || 'org_default');
+
+        // Cascade automatique : Aligner l'agent sur toutes les lignes du calendrier liées à ce compte
+        if (agent && agent !== 'À attribuer') {
+            const orgId = organisationId || (updated ? updated.organisationId : 'org_default');
+            const allCal = await dbService.getCalendrier(orgId);
+            const matchingRows = allCal.filter(l => l.compteId === id);
+            if (matchingRows.length > 0) {
+                const rowIds = matchingRows.map(l => l.id);
+                await dbService.bulkUpdateCalendrierRows(rowIds, { agent });
+            }
+        }
+
+        await dbService.logAction("Gestion Compte", `Modification du compte ${pseudo || id} (Cascade agent sur calendrier)`, "Succès", organisationId || 'org_default');
         res.json(updated);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -442,13 +454,18 @@ app.post('/api/calendrier', async (req, res) => {
         const jourRaw = dateObj.toLocaleDateString('fr-FR', { weekday: 'long' });
         const jour = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
 
+        const targetCompte = comptes.find(c => c.id === (req.body.compteId || firstCompte.id));
+        const agentName = (targetCompte && targetCompte.agent && targetCompte.agent !== 'À attribuer')
+            ? targetCompte.agent
+            : (req.body.agent || firstCompte.agent || 'À attribuer');
+
         const newLine = {
             id,
             organisationId: orgId,
             date,
             jour,
-            compteId: req.body.compteId || firstCompte.id,
-            agent: req.body.agent || firstCompte.agent,
+            compteId: targetCompte ? targetCompte.id : (req.body.compteId || firstCompte.id),
+            agent: agentName,
             heurePrevue: req.body.heurePrevue || "12:00",
             sku: req.body.sku || "",
             produit: req.body.produit || "",
@@ -1194,7 +1211,10 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
             const classif = getClassification(score, item.status === 'imported' ? 1 : 0, params);
 
             if (matchLine) {
+                const targetAgent = ownerAccount && ownerAccount.agent && ownerAccount.agent !== 'À attribuer' ? ownerAccount.agent : matchLine.agent;
                 await dbService.updateCalendrierRow(matchLine.id, {
+                    compteId: ownerAccount ? ownerAccount.id : matchLine.compteId,
+                    agent: targetAgent,
                     sku: itemSku,
                     produit: item.title,
                     score,
