@@ -4948,12 +4948,16 @@ function ClassementView({
       if (!map[skuClean]) {
         map[skuClean] = {
           sku: skuClean,
+          produit: l.produit || '',
           classification: l.classification || 'Nouveau produit',
           scoreCumule: 0,
           ventes: 0,
           pubs: 0,
           lineIds: []
         };
+      }
+      if (l.produit && (!map[skuClean].produit || map[skuClean].produit.length < l.produit.length)) {
+        map[skuClean].produit = l.produit;
       }
       map[skuClean].scoreCumule += l.score || 0;
       map[skuClean].ventes += l.vente || 0;
@@ -4971,7 +4975,7 @@ function ClassementView({
     }
     if (skuSearchTerm.trim()) {
       const q = skuSearchTerm.trim().toLowerCase();
-      list = list.filter(s => s.sku.toLowerCase().includes(q) || s.classification.toLowerCase().includes(q));
+      list = list.filter(s => s.sku.toLowerCase().includes(q) || s.produit && s.produit.toLowerCase().includes(q) || s.classification && s.classification.toLowerCase().includes(q));
     }
     return list;
   }, [skuList, skuSearchTerm, skuFilterClassif]);
@@ -5340,7 +5344,8 @@ function ClassementView({
   }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
     style: {
       color: 'var(--primary)'
-    }
+    },
+    title: s.produit || s.sku
   }, s.sku)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
     className: `badge ${s.classification === 'Gagnant' ? 'badge-gagnant' : s.classification === 'Écarté' ? 'badge-ecarte' : s.classification === 'Nouveau produit' ? 'badge-nouveau' : 'badge-retester'}`
   }, s.classification)), /*#__PURE__*/React.createElement("td", null, s.pubs, " pub", s.pubs > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.ventes), " vente", s.ventes > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.scoreCumule.toFixed(1), " pts")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
@@ -5350,7 +5355,7 @@ function ClassementView({
       padding: '20px',
       color: 'var(--text-muted)'
     }
-  }, "Aucun SKU enregistré dans la base.")))))), /*#__PURE__*/React.createElement("div", {
+  }, "Aucun SKU trouvé pour ce filtre.")))))), /*#__PURE__*/React.createElement("div", {
     className: "grid-2"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card"

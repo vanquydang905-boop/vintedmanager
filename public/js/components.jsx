@@ -3422,12 +3422,16 @@ function ClassementView({ appState, onUpdateRow }) {
             if (!map[skuClean]) {
                 map[skuClean] = {
                     sku: skuClean,
+                    produit: l.produit || '',
                     classification: l.classification || 'Nouveau produit',
                     scoreCumule: 0,
                     ventes: 0,
                     pubs: 0,
                     lineIds: []
                 };
+            }
+            if (l.produit && (!map[skuClean].produit || map[skuClean].produit.length < l.produit.length)) {
+                map[skuClean].produit = l.produit;
             }
             map[skuClean].scoreCumule += (l.score || 0);
             map[skuClean].ventes += (l.vente || 0);
@@ -3447,7 +3451,11 @@ function ClassementView({ appState, onUpdateRow }) {
         }
         if (skuSearchTerm.trim()) {
             const q = skuSearchTerm.trim().toLowerCase();
-            list = list.filter(s => s.sku.toLowerCase().includes(q) || s.classification.toLowerCase().includes(q));
+            list = list.filter(s => 
+                s.sku.toLowerCase().includes(q) || 
+                (s.produit && s.produit.toLowerCase().includes(q)) ||
+                (s.classification && s.classification.toLowerCase().includes(q))
+            );
         }
         return list;
     }, [skuList, skuSearchTerm, skuFilterClassif]);
@@ -3699,7 +3707,7 @@ function ClassementView({ appState, onUpdateRow }) {
                             {filteredSKUList.length > 0 ? (
                                 filteredSKUList.map(s => (
                                     <tr key={s.sku}>
-                                        <td><b style={{ color: 'var(--primary)' }}>{s.sku}</b></td>
+                                        <td><b style={{ color: 'var(--primary)' }} title={s.produit || s.sku}>{s.sku}</b></td>
                                         <td>
                                             <span className={`badge ${
                                                 s.classification === 'Gagnant' ? 'badge-gagnant' :
@@ -3718,7 +3726,7 @@ function ClassementView({ appState, onUpdateRow }) {
                             ) : (
                                 <tr>
                                     <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
-                                        Aucun SKU enregistré dans la base.
+                                        Aucun SKU trouvé pour ce filtre.
                                     </td>
                                 </tr>
                             )}
