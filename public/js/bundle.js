@@ -881,7 +881,7 @@ function DashboardView({
       color: filterComptes.includes(c.id) ? 'var(--primary)' : 'var(--text-main)',
       fontSize: '13px'
     }
-  }, c.pseudo), c.numeroCompte && /*#__PURE__*/React.createElement("span", {
+  }, c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`)), c.numeroCompte && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: '11px',
       color: 'var(--text-muted)',
@@ -1384,7 +1384,7 @@ function DashboardView({
   }, "(aucun compte)"), comptesAll.map(c => /*#__PURE__*/React.createElement("option", {
     key: c.id,
     value: c.id
-  }, c.pseudo)))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("select", {
+  }, c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`))))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("select", {
     className: "input-table",
     style: {
       width: '100%',
@@ -3354,7 +3354,8 @@ function IncidentsView({
   };
   const getComptePseudo = cId => {
     const c = comptes.find(comp => comp.id === cId);
-    return c ? c.pseudo : 'Inconnu';
+    if (!c) return cId || 'Inconnu';
+    return c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`);
   };
   const handleEditIncident = inc => {
     setEditingIncidentId(inc.id);
@@ -4551,6 +4552,54 @@ function ClassementView({
       scoreMoyen: h.pubs > 0 ? (h.scoreTotal / h.pubs).toFixed(1) : 0
     })).sort((a, b) => b.scoreMoyen - a.scoreMoyen);
   }, [calendrier]);
+
+  // Classement et performance des agents par score et publications
+  const agentRanking = useMemo(() => {
+    const statsMap = {};
+    (appState.utilisateurs || []).forEach(u => {
+      const name = (u.nom || u.agentAssigne || '').trim();
+      if (name && !statsMap[name.toLowerCase()]) {
+        statsMap[name.toLowerCase()] = {
+          name,
+          role: u.role || 'agent',
+          pubsFaites: 0,
+          pubsTotales: 0,
+          ventes: 0,
+          scoreTotal: 0
+        };
+      }
+    });
+    calendrier.forEach(l => {
+      if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
+      const agentName = (l.agent || '').trim();
+      if (!agentName) return;
+      const key = agentName.toLowerCase();
+      if (!statsMap[key]) {
+        statsMap[key] = {
+          name: agentName,
+          role: 'agent',
+          pubsFaites: 0,
+          pubsTotales: 0,
+          ventes: 0,
+          scoreTotal: 0
+        };
+      }
+      statsMap[key].pubsTotales += 1;
+      if (l.statut === 'Publié' || l.statut === '✓ Fait' || l.done) {
+        statsMap[key].pubsFaites += 1;
+      }
+      statsMap[key].ventes += l.vente || 0;
+      statsMap[key].scoreTotal += l.score || 0;
+    });
+    return Object.values(statsMap).map(a => ({
+      ...a,
+      taux: a.pubsTotales > 0 ? Math.round(a.pubsFaites / a.pubsTotales * 100) : 0
+    })).sort((a, b) => {
+      if (b.scoreTotal !== a.scoreTotal) return b.scoreTotal - a.scoreTotal;
+      if (b.pubsFaites !== a.pubsFaites) return b.pubsFaites - a.pubsFaites;
+      return b.ventes - a.ventes;
+    });
+  }, [calendrier, appState.utilisateurs]);
   const handleRegisterSKU = async e => {
     e.preventDefault();
     if (!newSkuInput.trim()) return;
@@ -4588,6 +4637,97 @@ function ClassementView({
       marginBottom: '20px'
     }
   }, "Classements & Gestion des SKUs"), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      marginBottom: '24px'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "card-title",
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-trophy",
+    style: {
+      color: '#f59e0b'
+    }
+  }), "Classement & Performance des Agents"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '13.5px',
+      marginBottom: '16px'
+    }
+  }, "Suivi en temps réel du volume de publications réalisées, des ventes enregistrées et du score de performance par agent."), /*#__PURE__*/React.createElement("div", {
+    className: "table-container"
+  }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      width: '60px'
+    }
+  }, "Rang"), /*#__PURE__*/React.createElement("th", null, "Agent"), /*#__PURE__*/React.createElement("th", null, "Publications"), /*#__PURE__*/React.createElement("th", null, "Taux Réussite"), /*#__PURE__*/React.createElement("th", null, "Ventes Total"), /*#__PURE__*/React.createElement("th", null, "Score Cumulé"))), /*#__PURE__*/React.createElement("tbody", null, agentRanking.length > 0 ? agentRanking.map((a, idx) => /*#__PURE__*/React.createElement("tr", {
+    key: a.name
+  }, /*#__PURE__*/React.createElement("td", null, idx === 0 ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '18px'
+    },
+    title: "1er Place"
+  }, "🥇") : idx === 1 ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '18px'
+    },
+    title: "2ème Place"
+  }, "🥈") : idx === 2 ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '18px'
+    },
+    title: "3ème Place"
+  }, "🥉") : /*#__PURE__*/React.createElement("b", null, "#", idx + 1)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: 'var(--text-primary)'
+    }
+  }, a.name), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11px',
+      color: 'var(--text-muted)',
+      marginLeft: '6px'
+    }
+  }, "(", a.role, ")")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, a.pubsFaites), " / ", a.pubsTotales, " pub", a.pubsTotales > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      backgroundColor: '#e2e8f0',
+      borderRadius: '4px',
+      height: '8px',
+      overflow: 'hidden',
+      minWidth: '60px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: `${a.taux}%`,
+      backgroundColor: a.taux >= 80 ? '#10b981' : a.taux >= 50 ? '#f59e0b' : '#ef4444',
+      height: '100%'
+    }
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 600
+    }
+  }, a.taux, "%"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, a.ventes), " vente", a.ventes > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-gagnant"
+  }, a.scoreTotal.toFixed(1), " pts")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: "6",
+    style: {
+      textAlign: 'center',
+      color: 'var(--text-muted)',
+      padding: '16px'
+    }
+  }, "Aucun agent ou activité enregistrée.")))))), /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: '24px'

@@ -630,7 +630,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                     >
                                         <input type="checkbox" readOnly checked={filterComptes.includes(c.id)} style={{ width: '14px', height: '14px', accentColor: 'var(--primary)' }} />
                                         <span style={{ fontWeight: filterComptes.includes(c.id) ? 600 : 400, color: filterComptes.includes(c.id) ? 'var(--primary)' : 'var(--text-main)', fontSize: '13px' }}>
-                                            {c.pseudo}
+                                            {c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`)}
                                         </span>
                                         {c.numeroCompte && <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>N°{c.numeroCompte}</span>}
                                     </div>
@@ -892,7 +892,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             }}>
                                                 <option value="">(aucun compte)</option>
                                                 {comptesAll.map(c => (
-                                                    <option key={c.id} value={c.id}>{c.pseudo}</option>
+                                                    <option key={c.id} value={c.id}>{c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`)}</option>
                                                 ))}
                                             </select>
                                         </td>
@@ -2333,7 +2333,8 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
 
     const getComptePseudo = (cId) => {
         const c = comptes.find(comp => comp.id === cId);
-        return c ? c.pseudo : 'Inconnu';
+        if (!c) return cId || 'Inconnu';
+        return c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`);
     };
 
     const handleEditIncident = (inc) => {
@@ -3237,6 +3238,56 @@ function ClassementView({ appState, onUpdateRow }) {
         })).sort((a, b) => b.scoreMoyen - a.scoreMoyen);
     }, [calendrier]);
 
+    // Classement et performance des agents par score et publications
+    const agentRanking = useMemo(() => {
+        const statsMap = {};
+        (appState.utilisateurs || []).forEach(u => {
+            const name = (u.nom || u.agentAssigne || '').trim();
+            if (name && !statsMap[name.toLowerCase()]) {
+                statsMap[name.toLowerCase()] = {
+                    name,
+                    role: u.role || 'agent',
+                    pubsFaites: 0,
+                    pubsTotales: 0,
+                    ventes: 0,
+                    scoreTotal: 0
+                };
+            }
+        });
+
+        calendrier.forEach(l => {
+            if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
+            const agentName = (l.agent || '').trim();
+            if (!agentName) return;
+            const key = agentName.toLowerCase();
+            if (!statsMap[key]) {
+                statsMap[key] = {
+                    name: agentName,
+                    role: 'agent',
+                    pubsFaites: 0,
+                    pubsTotales: 0,
+                    ventes: 0,
+                    scoreTotal: 0
+                };
+            }
+            statsMap[key].pubsTotales += 1;
+            if (l.statut === 'Publié' || l.statut === '✓ Fait' || l.done) {
+                statsMap[key].pubsFaites += 1;
+            }
+            statsMap[key].ventes += (l.vente || 0);
+            statsMap[key].scoreTotal += (l.score || 0);
+        });
+
+        return Object.values(statsMap).map(a => ({
+            ...a,
+            taux: a.pubsTotales > 0 ? Math.round((a.pubsFaites / a.pubsTotales) * 100) : 0
+        })).sort((a, b) => {
+            if (b.scoreTotal !== a.scoreTotal) return b.scoreTotal - a.scoreTotal;
+            if (b.pubsFaites !== a.pubsFaites) return b.pubsFaites - a.pubsFaites;
+            return b.ventes - a.ventes;
+        });
+    }, [calendrier, appState.utilisateurs]);
+
     const handleRegisterSKU = async (e) => {
         e.preventDefault();
         if (!newSkuInput.trim()) return;
@@ -3266,6 +3317,68 @@ function ClassementView({ appState, onUpdateRow }) {
     return (
         <section className="view">
             <h2 className="page-title" style={{ marginBottom: '20px' }}>Classements & Gestion des SKUs</h2>
+
+            {/* CLASSEMENT DES AGENTS */}
+            <div className="card" style={{ marginBottom: '24px' }}>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <i className="fa-solid fa-trophy" style={{ color: '#f59e0b' }}></i>
+                    Classement & Performance des Agents
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '16px' }}>
+                    Suivi en temps réel du volume de publications réalisées, des ventes enregistrées et du score de performance par agent.
+                </p>
+                <div className="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style={{ width: '60px' }}>Rang</th>
+                                <th>Agent</th>
+                                <th>Publications</th>
+                                <th>Taux Réussite</th>
+                                <th>Ventes Total</th>
+                                <th>Score Cumulé</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {agentRanking.length > 0 ? (
+                                agentRanking.map((a, idx) => (
+                                    <tr key={a.name}>
+                                        <td>
+                                            {idx === 0 ? <span style={{ fontSize: '18px' }} title="1er Place">🥇</span> :
+                                             idx === 1 ? <span style={{ fontSize: '18px' }} title="2ème Place">🥈</span> :
+                                             idx === 2 ? <span style={{ fontSize: '18px' }} title="3ème Place">🥉</span> :
+                                             <b>#{idx + 1}</b>}
+                                        </td>
+                                        <td>
+                                            <b style={{ color: 'var(--text-primary)' }}>{a.name}</b>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>({a.role})</span>
+                                        </td>
+                                        <td>
+                                            <b>{a.pubsFaites}</b> / {a.pubsTotales} pub{a.pubsTotales > 1 ? 's' : ''}
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ flex: 1, backgroundColor: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden', minWidth: '60px' }}>
+                                                    <div style={{ width: `${a.taux}%`, backgroundColor: a.taux >= 80 ? '#10b981' : a.taux >= 50 ? '#f59e0b' : '#ef4444', height: '100%' }}></div>
+                                                </div>
+                                                <span style={{ fontSize: '12px', fontWeight: 600 }}>{a.taux}%</span>
+                                            </div>
+                                        </td>
+                                        <td><b>{a.ventes}</b> vente{a.ventes > 1 ? 's' : ''}</td>
+                                        <td><span className="badge badge-gagnant">{a.scoreTotal.toFixed(1)} pts</span></td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
+                                        Aucun agent ou activité enregistrée.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             {/* SECTION DÉDIÉE SKU AVEC CLASSIFICATION */}
             <div className="card" style={{ marginBottom: '24px' }}>
