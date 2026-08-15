@@ -1,0 +1,105 @@
+const fs = require("fs");
+const path = require("path");
+
+const newRawLines = [
+"20257991111,2026-06-07 13:48:16,elsa_vay,Suspendu,2026-06-22 11:00:00,Shop2Shop by Chronopost,XU161247663JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/a9c3c997-48db-4adc-832e-366fedbfe5c4/shipping-label-2i81ajw0yfjxplpn0xrtyqzgfbz1,1,Top Beige – col Carré liseré noir péplum,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/a9c3c997-48db-4adc-832e-366fedbfe5c4/27fc432a-e6e5-492c-80a8-86a199457e1b/1780816868.webp,,,,9107486975,mollybyrooms,,,ES",
+"20840211661,2026-07-09 09:12:35,elsa_vay,Suspendu,2026-07-21 23:08:39,Shop2Shop by Chronopost,ZW004420312TS,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/10fa497a-9091-4737-81fb-459229846f98/shipping-label-donvs50xzzoy0iql2ucrfuticmgn,1,Blouse Élégante En dentelle – col halter dos nu noir,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/10fa497a-9091-4737-81fb-459229846f98/78753993-a122-4c8e-90a1-a3bf1fa4478b/1783521596.webp,,,,9352371368,flo35238,,,FR",
+"20842654774,2026-07-09 07:55:27,lisa_llc,Suspendu,2026-07-23 11:00:00,Shop2Shop by Chronopost,XU168862001JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/bc61780b-38c0-436a-ac2e-c2ffd1af0598/4841da78-bb71-467b-8bf2-e14c6a8a9af9/shipping-label-b8chbh43een9s7l13minn05kwx4k,1,Maillot 1 pièce Bandeau – noir & blanc – ceinture perles,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/4841da78-bb71-467b-8bf2-e14c6a8a9af9/10268f4e-ea63-4faf-bb69-4f438c789a6d/1783527143.webp,sz25092563631802666,,,9353238156,madk,,,NL",
+"20924672245,2026-07-13 23:36:22,lisa_llc,Suspendu,2026-07-28 11:00:00,Mondial Relay,58032518,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/bc61780b-38c0-436a-ac2e-c2ffd1af0598/1b1e35f7-a941-4597-8e87-a78decf38ee2/shipping-label-9f1xg7q8t8898h40v95nlvqznqcx,2,Top denim halter – Boucle Métal – Y2K,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/1b1e35f7-a941-4597-8e87-a78decf38ee2/6ba0d1a9-72fd-4efc-8311-bdce540eb5c8/1783692294.webp,sz25043011958169970,,,9366888070,leslyshona,,,FR",
+"20924672245,,,,,,,,,Body dos Nu – bordeaux décolleté plongeant,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/1b1e35f7-a941-4597-8e87-a78decf38ee2/d7b38b97-b77a-4974-874d-2707178c7d84/1783837010.webp,sz260105143081682663757,,,9377721533,,,,",
+"21061624104,2026-07-23 22:56:02,elsa_vay,Suspendu,2026-08-05 17:08:18,Shop2Shop by Chronopost,XU171840142JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/a8ffb384-3a1c-4516-bed9-8d478d56531b/shipping-label-3kgb79wut7k1kq3u4f9szjj907pu,1,Jort à Carreaux Oversize – Poches cargo style y2k,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/a8ffb384-3a1c-4516-bed9-8d478d56531b/5f7d182b-1325-40fa-8520-33c28985b263/1784557576.webp,,,,9445990921,floor2ndhand,,,NL",
+"21424935030,2026-08-08 19:15:33,isis_mlf,Étiquette envoyée,2026-08-17 11:00:00,Mondial Relay,63165459,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/26aaaf00-91d1-4fa6-9ff2-2bd9833b04d2/cce4df50-8983-4da1-beea-872025610bb6/shipping-label-65k4ixlew6bf8cpvomfdgwfgnd2y,1,Top bandeau tweed multicolore chic bouton doré,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/cce4df50-8983-4da1-beea-872025610bb6/b188596e-2b53-4bd9-ab9e-d48307c208f1/1785951684.webp,sz25043045503959301,,,9584203496,jessicagoncalves94,,,FR",
+"21238032215,2026-07-30 12:04:56,lisa_llc,Étiquette envoyée,2026-08-19 08:16:23,Mondial Relay,61178369,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/bc61780b-38c0-436a-ac2e-c2ffd1af0598/ad1703b3-5ce4-45bb-96bb-c29ee209c8bd/shipping-label-zdzhb1sta01aemiwqh9p2p0haki3,3,Top bandeau noir Brodé – sequins dorés – Y2K,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/ad1703b3-5ce4-45bb-96bb-c29ee209c8bd/4d7d44ce-9b5e-4850-8e5c-384d6b2b14a2/1785304591.webp,sz25021230906068107,,,9519125430,julia9870101,,,FR",
+"21238032215,,,,,,,,,Top halter – Pois marine,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/ad1703b3-5ce4-45bb-96bb-c29ee209c8bd/6f0fa100-0c3f-411e-823a-42d757af08d9/1785311423.webp,sz260325175419292054218,,,9519558548,,,,",
+"21238032215,,,,,,,,,Maillot 1 pièce bandeau – noir & blanc – Ceinture perles,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/ad1703b3-5ce4-45bb-96bb-c29ee209c8bd/89bf13ef-37e0-4264-af93-ba2e40758237/1785333606.webp,sz25092563631802666,,,9522586644,,,,",
+"21509971021,2026-08-12 19:35:01,elsa_vay,Étiquette envoyée,2026-08-19 19:35:00,Shop2Shop by Chronopost,XU175607171JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/a531bae7-17dd-4a6d-adf7-9490e6fdb0dd/shipping-label-hwvmxadw1taj00o9masg9zvai7hd,2,Short bermuda jean imprimé vache – tabac Style western,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/a531bae7-17dd-4a6d-adf7-9490e6fdb0dd/1b603189-eefc-4257-a0a3-2df9251208a3/1786537628.webp,sz260416174675107661843,,,9643216652,andre.tiberius,,,DE",
+"21509971021,,,,,,,,,Short jean rose léopard – ample genou streetwear,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/a531bae7-17dd-4a6d-adf7-9490e6fdb0dd/92894aac-94dc-4f84-a271-c4a771b86d64/1784469244.webp,,,,9436722865,,,,",
+"21520074002,2026-08-13 11:20:44,lisa_llc,Étiquette envoyée,2026-08-20 11:20:00,Mondial Relay,64087021,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/bc61780b-38c0-436a-ac2e-c2ffd1af0598/726b7f72-e525-4f6a-a458-dc824c2fcc2e/shipping-label-5c7psqlyck1qfiuypn9qha0vtcrj,3,Nude – blouse Boutonnée Brodée fleurs,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/726b7f72-e525-4f6a-a458-dc824c2fcc2e/31404b69-2e77-4e1b-bc79-817e173673d2/1786448359.webp,sz260107140818633989761,,,9633690974,marinalamba,,,FR",
+"21520074002,,,,,,,,,Chemise courte – rouge vichy Fleurs brodées,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/726b7f72-e525-4f6a-a458-dc824c2fcc2e/94c0f5b1-4bd5-49ac-acac-ae213616b3c2/1785311200.webp,sz251111988559346989,,,9519539257,,,,",
+"21520074002,,,,,,,,,Caraco broderie florale – Écru bohème chic,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/726b7f72-e525-4f6a-a458-dc824c2fcc2e/e45dafe1-c766-4460-8b25-a3794e82c89d/1785790215.webp,sz25032281369555881,,,9568099262,,,,",
+"21540195559,2026-08-14 11:44:01,elsa_vay,Étiquette envoyée,2026-08-21 11:44:00,Mondial Relay,64287843,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/c35643dd-66a3-41a0-ad4f-e7b1bdbcdaed/shipping-label-88qildwtqq6z4hyojjkbiaqqkyaf,1,Chemise à Carreaux Verte – manches Courtes gaufrée,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/c35643dd-66a3-41a0-ad4f-e7b1bdbcdaed/8447d010-9751-4be5-9132-738445b4842b/1786545813.webp,sz251208633066667871,,,9644613334,valere_00,,,NL",
+"21546372748,2026-08-14 18:22:31,elsa_vay,Étiquette envoyée,2026-08-21 18:22:00,Mondial Relay,64372240,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/2dba5b10-2466-4aa8-a5c0-c995a4d39915/shipping-label-x9zig520llp0bmam1st9wvezv522,3,Top Dos nu floral – noué devant Style Y2K,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/2dba5b10-2466-4aa8-a5c0-c995a4d39915/1ccd6f63-ec37-4c50-a519-836971e7ae94/1784383808.webp,sz25092309585535301,,,9428234966,hobbbi,,,FR",
+"21546372748,,,,,,,,,Top dos nu orange – Broderie brillante col V,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/2dba5b10-2466-4aa8-a5c0-c995a4d39915/720d88c4-2a8f-48d6-b78b-995b45987de1/1786377819.webp,sz25070752352500203,,,9627299488,,,,",
+"21546372748,,,,,,,,,Top halter Rayé – rouge nœuds corset asymétrique,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/2dba5b10-2466-4aa8-a5c0-c995a4d39915/8943b6fc-3a77-4004-96e5-b715a4e9101c/1786536420.webp,sz251212095359809300145,,,9643020972,,,,",
+"21451186300,2026-08-10 01:06:44,isis_mlf,Étiquette envoyée,2026-08-24 11:00:00,Mondial Relay,63434396,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/26aaaf00-91d1-4fa6-9ff2-2bd9833b04d2/a966c7aa-9b73-491c-9be9-c41fbad65000/shipping-label-3knx7xbnfqa49zz9xa9e4nr1qnbv,1,Top rayé bleu clair boutons perle col carré chic,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/a966c7aa-9b73-491c-9be9-c41fbad65000/a8b336b4-7106-4a9c-87ef-7c3bf9b665f8/1785954702.webp,sz260316133164586471035,,,9584683784,silviasfp,,,IT",
+"21441419868,2026-08-09 16:03:56,isis_mlf,Étiquette envoyée,2026-08-24 11:00:00,Shop2Shop by Chronopost,XU175054138JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/26aaaf00-91d1-4fa6-9ff2-2bd9833b04d2/a1e20827-cf5d-4020-bdef-607de772b6a0/shipping-label-j9qlca6d0z7apyl9gcihms1ibh9j,1,Top corail rouge dégradé asymétrique une épaule drapé chic,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/a1e20827-cf5d-4020-bdef-607de772b6a0/02b0774a-42c2-4309-b228-4657c535908c/1786201057.webp,sz25052192076941772,,,9607965442,mikkiever,,,NL",
+"21411007042,2026-08-08 10:20:44,isis_mlf,Étiquette envoyée,2026-08-24 11:00:00,Shop2Shop by Chronopost,XU174977140JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/26aaaf00-91d1-4fa6-9ff2-2bd9833b04d2/22e8f87c-d2d5-4f25-b5e5-91db9e6f7027/shipping-label-cbquggbayg1vb23emteb9zkrbkwz,2,Chemisier bleu marine rayé col montant dos nu chic,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/22e8f87c-d2d5-4f25-b5e5-91db9e6f7027/6bff6f13-35cb-408d-a8cf-67e17b631fa1/1785953612.webp,,,,9584512087,merel7749,,,NL",
+"21411007042,,,,,,,,,Top dos nu bordeaux imprimé géométrique à nouer,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/22e8f87c-d2d5-4f25-b5e5-91db9e6f7027/c9b76b96-3288-4e18-a53f-a1795a7c0ea7/1785953152.webp,sz260323190974588361694,,,9584439905,,,,",
+"21465015039,2026-08-10 17:28:43,elsa_vay,Étiquette envoyée,2026-08-24 17:28:00,Shop2Shop by Chronopost,XU175253978JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/654400f3-2b56-46e8-a86d-3ad2e06f6e18/shipping-label-hv9yn35un2uz6ptzmttmcpkpa2lh,1,Short bermuda jean Imprimé vache – Tabac Style western,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/654400f3-2b56-46e8-a86d-3ad2e06f6e18/98d12f6a-af5a-41b5-bac8-db8846122778/1786302699.webp,sz260316133164586471035,,,9620121610,amellinchen,,,DE",
+"21480935742,2026-08-11 12:50:28,isis_mlf,Étiquette envoyée,2026-08-25 12:50:00,Shop2Shop by Chronopost,XW523833099TS,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/26aaaf00-91d1-4fa6-9ff2-2bd9833b04d2/3098eb72-1d55-4205-9c11-3789f18b086e/shipping-label-0ogsyb8zyogisqakviw9yejqb39p,1,Top bandeau tweed Multicolore chic bouton doré,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/3098eb72-1d55-4205-9c11-3789f18b086e/1a837f02-9ffd-4175-9fe0-46fddb632e34/1786207984.webp,sz25043045503959301,,,9609115645,lilicath111,,,FR",
+"21484273115,2026-08-11 18:59:42,isis_mlf,Étiquette envoyée,2026-08-25 18:59:00,Shop2Shop by Chronopost,XW524192175TS,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/26aaaf00-91d1-4fa6-9ff2-2bd9833b04d2/c69706c0-d5d0-40b8-9172-d0664360697d/shipping-label-1odd9um9pgj8o32x5ybvt8829c9p,1,Top crochet ajouré sans manches à boutons,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/c69706c0-d5d0-40b8-9172-d0664360697d/4bca5d49-53e0-4c7a-b367-75e62d510ac5/1786268743.webp,sz260117120964765602576,,,9613379020,tibirouck01,,,FR",
+"21504930551,2026-08-12 17:38:53,elsa_vay,Étiquette envoyée,2026-08-26 17:38:00,Shop2Shop by Chronopost,XU175590961JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/0f155b44-83a5-4afd-ae05-d9c150d6d238/shipping-label-ill462cdxb5xuda6agizeaeihr9w,2,Chemise à Carreaux Verte – manches courtes gaufrée,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/0f155b44-83a5-4afd-ae05-d9c150d6d238/e9224880-83b9-4470-b5ea-e17195732b49/1785952244.webp,sz251208633066667871,,,9584294505,katarinastimactomic,,,ES",
+"21504930551,,,,,,,,,Top rouge foncé  – encolure carrée fente avant,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/0f155b44-83a5-4afd-ae05-d9c150d6d238/ebe31d97-3353-4e16-abe3-abd08ffe7181/1784617005.webp,,,,9450883556,,,,",
+"21468930264,2026-08-13 17:11:23,isis_mlf,Étiquette envoyée,2026-08-27 17:11:00,Shop2Shop by Chronopost,XW525877591TS,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/26aaaf00-91d1-4fa6-9ff2-2bd9833b04d2/00e45bbe-bcc7-415d-b56f-c98f8ca2ce42/shipping-label-n33797b49tbv0bdnlw43ksen9abf,1,Top corset bustier Blanc boutons vintage chic,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/00e45bbe-bcc7-415d-b56f-c98f8ca2ce42/1cca380d-168a-44a6-9f3e-2872175838fd/1786041812.webp,sz251227112029703123831,,,9593485378,cecilou926,,,FR",
+"21535142116,2026-08-14 10:52:51,lisa_llc,Étiquette envoyée,2026-08-28 11:00:00,Shop2Shop by Chronopost,XW526420689TS,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/bc61780b-38c0-436a-ac2e-c2ffd1af0598/849c3296-6823-4e29-b46d-63e0a593f67a/shipping-label-12h3oxqy9objpwn5m6h8w80u6lr7,2,Short fluide taille haute en lin – Rose bonbon,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/849c3296-6823-4e29-b46d-63e0a593f67a/12acc003-59f4-4969-b39d-ed34711efd81/1785905598.webp,sz251225104819445953830,,,9577975170,earthsystem,,,FR",
+"21535142116,,,,,,,,,Nude – blouse boutonnée brodée fleurs,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/849c3296-6823-4e29-b46d-63e0a593f67a/e60885a8-a561-4efc-ac0d-b0f066aff684/1786632975.webp,sz260107140818633989761,,,9652957544,,,,",
+"21539241845,2026-08-14 10:23:51,isis_mlf,Étiquette envoyée,2026-08-28 11:00:00,Shop2Shop by Chronopost,XU175793862JF,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/26aaaf00-91d1-4fa6-9ff2-2bd9833b04d2/d55067ce-4d25-428b-a8e9-48b78b8be1d8/shipping-label-2h7g7qzmvi7diltm4pzca3da4fzi,4,Chemisier rayé vert et blanc – dos noué,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/d55067ce-4d25-428b-a8e9-48b78b8be1d8/1eca215a-b739-448e-a9b5-8804930fee86/1786541946.webp,sz25042351426286276,,,9643941246,tsehaiw,,,NL",
+"21539241845,,,,,,,,,Top vert sapin sans manches – col carré,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/d55067ce-4d25-428b-a8e9-48b78b8be1d8/56c9c2f6-be30-4b9d-aa03-f05df2ad611e/1786630060.webp,sz260615135543484784574,,,9652463079,,,,",
+"21539241845,,,,,,,,,Top bandeau Tweed multicolore chic bouton doré,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/d55067ce-4d25-428b-a8e9-48b78b8be1d8/6507dbe6-5345-4e3b-adc8-f56c76769492/1786450017.webp,sz25043045503959301,,,9633959954,,,,",
+"21539241845,,,,,,,,,Top nude nœud contrasté,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/d55067ce-4d25-428b-a8e9-48b78b8be1d8/c55c1efd-49e1-4896-bfd3-75616768b5e9/1786541660.webp,sz251219203628478770840,,,9643892228,,,,",
+"21540923523,2026-08-14 12:06:50,elsa_vay,Étiquette envoyée,2026-08-28 12:06:00,Shop2Shop by Chronopost,XW526481688TS,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/44891da1-8ba8-4484-9fde-54c7e5beaf3f/shipping-label-ic2iuwklxq9k9fmnagk1zw81cbjt,2,Short bermuda jean imprimé Vache – Tabac style western,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/44891da1-8ba8-4484-9fde-54c7e5beaf3f/535027f7-53be-4abf-b242-8995a6e90a81/1786625480.webp,sz260416174675107661843,,,9651703467,jolie-emeute,,,FR",
+"21540923523,,,,,,,,,Top bandeau Dentelle – blanc franges bohème,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/44891da1-8ba8-4484-9fde-54c7e5beaf3f/73a67b82-3be1-4cdb-95d8-1018a1dce6ca/1786303124.webp,sz260518174388523781443,,,9620189059,,,,",
+"21541322105,2026-08-14 19:22:22,elsa_vay,Étiquette envoyée,2026-08-28 19:22:00,Shop2Shop by Chronopost,XW526881955TS,https://dotb-storage.s3.eu-central-003.backblazeb2.com/orders/ce407bd2-8e62-4475-a4f8-89cfdc46493d/ccdbea0c-82e9-4c66-893c-0145e8b46d56/shipping-label-193j2z9ckxfc0wc15eqp1k2mucbf,1,Rouge Et blanc – jean taille basse jambes larges imprimé fleurs,https://dotb-storage.s3.eu-central-003.backblazeb2.com/order-items/ccdbea0c-82e9-4c66-893c-0145e8b46d56/4729d47b-07bb-4dec-a48e-e3215482d348/1786452852.webp,sz251206489996033640,,,9634435889,jozefa,,,FR"
+];
+
+async function enrichNewBatch() {
+    console.log("=== ENRICHISSEMENT DE LA NOUVELLE BATCH DE COMMANDES DU USER ===");
+    
+    let currentOrderDateStr = "2026-06-07";
+    const reportTable = [];
+    const enrichedLines = [];
+
+    newRawLines.forEach((line, idx) => {
+        const parts = line.split(",");
+        const dateCol = parts[1] ? parts[1].trim() : "";
+        if (dateCol) {
+            currentOrderDateStr = dateCol.split(" ")[0]; // e.g. "2026-06-07"
+        }
+
+        const title = parts[9] ? parts[9].trim() : "";
+        let existingSku = parts[11] ? parts[11].trim() : "";
+        const vintedId = parts[14] ? parts[14].trim() : "";
+
+        let finalSku = existingSku;
+
+        if (!finalSku && vintedId) {
+            // Formule officielle DotB SKU : sz + AA MM JJ + VintedID
+            const dateParts = currentOrderDateStr.split("-");
+            const yy = dateParts[0] ? dateParts[0].substring(2) : "26";
+            const mm = dateParts[1] || "06";
+            const dd = dateParts[2] || "07";
+            finalSku = `sz${yy}${mm}${dd}${vintedId}`;
+        }
+
+        parts[11] = finalSku;
+        enrichedLines.push(parts.join(","));
+
+        reportTable.push({
+            idx: idx + 1,
+            date: currentOrderDateStr,
+            compte: parts[2] ? parts[2].trim() : "-",
+            vintedId: vintedId || "-",
+            title: title || "-",
+            sku: finalSku || "N/A",
+            status: existingSku ? "PRÉSENT DANS EXPORT" : "GÉNÉRÉ FORMULE DOTB"
+        });
+    });
+
+    console.log(`Nombre de nouvelles lignes traitées : ${reportTable.length}`);
+    console.log(JSON.stringify(reportTable, null, 2));
+
+    const newBatchPath = path.join(__dirname, "export_dotb_batch2_enrichi.csv");
+    const headerStr = "ID Transaction,Date de commande,Compte,Statut,À expédier avant,Nom du transporteur,Numéro de suivi,Lien du bordereau,Nombre d'articles,Titre de l'article,URL de la photo de l'article,SKU article,Emplacement de l'article,Lien fournisseur de l'article,ID Vinted de l'article,Acheteur,Nom du destinataire,Ville de livraison,Pays de livraison";
+    fs.writeFileSync(newBatchPath, headerStr + "\n" + enrichedLines.join("\n"), "utf8");
+
+    // Fusionner avec le fichier complet précédent
+    const prevFilePath = path.join(__dirname, "export_dotb_complet_avec_skus.csv");
+    if (fs.existsSync(prevFilePath)) {
+        fs.appendFileSync(prevFilePath, "\n" + enrichedLines.join("\n"), "utf8");
+    }
+
+    console.log(`\n✅ Batch 2 sauvegardée à : ${newBatchPath}`);
+    console.log(`✅ Fichier global mis à jour à : ${prevFilePath}`);
+}
+
+enrichNewBatch();
