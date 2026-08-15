@@ -185,6 +185,162 @@ app.post('/api/import', async (req, res) => {
     }
 });
 
+// 2b. Import DotB Order CSV with Anti-Doublons & Automated Storage
+app.post('/api/import-orders-csv', async (req, res) => {
+    try {
+        const { csvText, organisationId } = req.body;
+        if (!csvText || typeof csvText !== 'string' || !csvText.trim()) {
+            return res.status(400).json({ error: "Contenu CSV requis" });
+        }
+
+        const orgId = organisationId || 'org_default';
+        const existingLines = await dbService.getCalendrier(orgId);
+
+        // Build anti-duplicate sets
+        const existingSet = new Set();
+        (existingLines || []).forEach(l => {
+            if (l.transactionId && l.vintedId) {
+                existingSet.add(`${l.transactionId}_${l.vintedId}`.toLowerCase());
+            }
+            if (l.transactionId && l.produit) {
+                existingSet.add(`${l.transactionId}_${l.produit}`.toLowerCase().trim());
+            }
+            if (l.sku && l.datePrevue && l.acheteur) {
+                existingSet.add(`${l.sku}_${l.datePrevue}_${l.acheteur}`.toLowerCase().trim());
+            }
+        });
+
+        // Helper to parse CSV lines with quotes
+        function parseLine(lineStr) {
+            const res = [];
+            let cur = '';
+            let inQ = false;
+            for (let i = 0; i < lineStr.length; i++) {
+                const c = lineStr[i];
+                if (c === '"') {
+                    if (inQ && lineStr[i + 1] === '"') {
+                        cur += '"';
+                        i++;
+                    } else {
+                        inQ = !inQ;
+                    }
+                } else if (c === ',' && !inQ) {
+                    res.push(cur.trim());
+                    cur = '';
+                } else {
+                    cur += c;
+                }
+            }
+            res.push(cur.trim());
+            return res;
+        }
+
+        const rawLines = csvText.trim().split(/\r?\n/);
+        let parsedCount = 0;
+        let insertedCount = 0;
+        let duplicateCount = 0;
+        let generatedSkusCount = 0;
+        let currentDateStr = new Date().toISOString().split('T')[0];
+
+        for (let i = 0; i < rawLines.length; i++) {
+            const line = rawLines[i].trim();
+            if (!line) continue;
+            const parts = parseLine(line);
+
+            // Skip header if line 1 contains "ID Transaction"
+            if (i === 0 && (parts[0] || '').toLowerCase().includes('transaction')) continue;
+            parsedCount++;
+
+            const transactionId = parts[0] ? parts[0].trim() : '';
+            const dateCol = parts[1] ? parts[1].trim() : '';
+            if (dateCol) currentDateStr = dateCol.split(' ')[0];
+
+            const comptePseudo = parts[2] ? parts[2].trim() : '';
+            const statut = parts[3] ? parts[3].trim() : 'Emballé';
+            const transporteur = parts[5] ? parts[5].trim() : '';
+            const numeroSuivi = parts[6] ? parts[6].trim() : '';
+            const bordereauUrl = parts[7] ? parts[7].trim() : '';
+            const titreArticle = parts[9] ? parts[9].trim() : '';
+            const photoUrl = parts[10] ? parts[10].trim() : '';
+            let sku = parts[11] ? parts[11].trim() : '';
+            const vintedId = parts[14] ? parts[14].trim() : '';
+            const acheteur = parts[15] ? parts[15].trim() : '';
+            const pays = parts[18] ? parts[18].trim() : 'FR';
+
+            // Anti-doublon check
+            const key1 = transactionId && vintedId ? `${transactionId}_${vintedId}`.toLowerCase() : '';
+            const key2 = transactionId && titreArticle ? `${transactionId}_${titreArticle}`.toLowerCase().trim() : '';
+            const key3 = sku && currentDateStr && acheteur ? `${sku}_${currentDateStr}_${acheteur}`.toLowerCase().trim() : '';
+
+            if ((key1 && existingSet.has(key1)) || (key2 && existingSet.has(key2)) || (key3 && existingSet.has(key3))) {
+                duplicateCount++;
+                continue;
+            }
+
+            // SKU Generation if empty
+            if (!sku && vintedId) {
+                const dp = currentDateStr.split('-');
+                const yy = dp[0] ? dp[0].substring(2) : '26';
+                const mm = dp[1] || '02';
+                const dd = dp[2] || '09';
+                sku = `sz${yy}${mm}${dd}${vintedId}`;
+                generatedSkusCount++;
+            }
+
+            const newRow = {
+                id: "cmd_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+                organisationId: orgId,
+                transactionId: transactionId,
+                datePrevue: currentDateStr,
+                heurePrevue: dateCol && dateCol.includes(' ') ? dateCol.split(' ')[1].substring(0, 5) : '12:00',
+                comptePseudo: comptePseudo || 'DotB Cloud',
+                produit: titreArticle || 'Produit sans titre',
+                sku: sku || '',
+                vintedId: vintedId || '',
+                statut: statut || 'Emballé',
+                prix: 35.00,
+                vente: 1,
+                score: 15,
+                source: 'Import CSV DotB',
+                acheteur: acheteur || '',
+                transporteur: transporteur || '',
+                numeroSuivi: numeroSuivi || '',
+                bordereauUrl: bordereauUrl || '',
+                photoUrl: photoUrl || '',
+                pays: pays || 'FR',
+                classification: '🏆 Gagnant',
+                dateCreation: new Date().toISOString()
+            };
+
+            await dbService.createCalendrierRow(newRow);
+            if (key1) existingSet.add(key1);
+            if (key2) existingSet.add(key2);
+            if (key3) existingSet.add(key3);
+            insertedCount++;
+        }
+
+        await dbService.logAction(
+            "Import CSV Commandes",
+            `Importation CSV réalisée : ${insertedCount} insérées, ${duplicateCount} doublons ignorés, ${generatedSkusCount} SKUs générés sur ${parsedCount} lignes lues.`,
+            "Succès"
+        );
+
+        res.json({
+            success: true,
+            parsedCount,
+            insertedCount,
+            duplicateCount,
+            generatedSkusCount,
+            message: `✅ Importation réussie : ${insertedCount} nouvelles commandes stockées en base, ${duplicateCount} doublons ignorés, ${generatedSkusCount} SKUs auto-générés.`
+        });
+    } catch (err) {
+        console.error("Erreur Import CSV Commandes:", err);
+        await dbService.logAction("Import CSV Commandes", "Échec d'importation: " + err.message, "Échec");
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // ------------------- ORGANISATIONS -------------------
 app.get('/api/organisations', async (req, res) => {
     try {

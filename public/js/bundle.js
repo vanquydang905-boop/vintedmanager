@@ -4939,6 +4939,53 @@ function ClassementView({
   const [skuFilterClassif, setSkuFilterClassif] = useState('');
   const [skuFilterVentes, setSkuFilterVentes] = useState('all');
   const [skuSortBy, setSkuSortBy] = useState('score');
+
+  // CSV Import State
+  const [csvInputText, setCsvInputText] = useState('');
+  const [isImportingCsv, setIsImportingCsv] = useState(false);
+  const [csvImportResult, setCsvImportResult] = useState(null);
+  const handleImportCsvOrders = async e => {
+    e.preventDefault();
+    if (!csvInputText.trim()) return;
+    setIsImportingCsv(true);
+    setCsvImportResult(null);
+    const userOrgId = appState.currentUser && appState.currentUser.organisationId || 'org_default';
+    try {
+      const res = await fetch('/api/import-orders-csv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          csvText: csvInputText,
+          organisationId: userOrgId
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCsvImportResult(data);
+        if (window.showToast) window.showToast(data.message);
+        if (window.loadAppState) await window.loadAppState();
+        setCsvInputText('');
+      } else {
+        if (window.showToast) window.showToast(`❌ Erreur : ${data.error || 'Échec de l\'importation'}`);
+      }
+    } catch (err) {
+      console.error("Erreur Import CSV:", err);
+      if (window.showToast) window.showToast(`❌ Erreur réseau lors de l'importation`);
+    } finally {
+      setIsImportingCsv(false);
+    }
+  };
+  const handleFileUpload = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      setCsvInputText(evt.target.result || '');
+    };
+    reader.readAsText(file);
+  };
   const comptesAll = appState.comptes || [];
   const comptesMap = useMemo(() => {
     const map = {};
@@ -5211,6 +5258,149 @@ function ClassementView({
       padding: '16px'
     }
   }, "Aucun agent ou activité enregistrée.")))))), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      marginBottom: '24px',
+      border: '1px solid #cbd5e1',
+      background: 'linear-gradient(to right, #ffffff, #f8fafc)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "card-title",
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      color: '#1e293b'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-file-csv",
+    style: {
+      color: '#2563eb',
+      fontSize: '22px'
+    }
+  }), "Importation de Commandes CSV DotB Cloud (Anti-Doublons & Auto-SKU)"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '13.5px',
+      marginBottom: '16px',
+      lineHeight: '1.5'
+    }
+  }, "Importez directement vos exports de commandes DotB Cloud (19 colonnes). Les commandes déjà existantes seront ", /*#__PURE__*/React.createElement("b", null, "automatiquement filtrées (anti-doublons)"), " et les ", /*#__PURE__*/React.createElement("b", null, "SKUs manquants auto-générés"), " avant d'être stockés en base de données."), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleImportCsvOrders,
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '12px',
+      alignItems: 'center',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "btn btn-secondary",
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      height: '40px',
+      fontSize: '13px',
+      padding: '0 18px',
+      border: '1px solid #cbd5e1',
+      backgroundColor: '#fff'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-cloud-arrow-up",
+    style: {
+      color: '#2563eb'
+    }
+  }), " Sélectionner un fichier CSV (.csv)", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".csv,text/csv",
+    onChange: handleFileUpload,
+    style: {
+      display: 'none'
+    }
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      color: 'var(--text-muted)'
+    }
+  }, "ou collez les données CSV brutes ci-dessous :")), /*#__PURE__*/React.createElement("textarea", {
+    className: "input",
+    rows: "5",
+    value: csvInputText,
+    onChange: e => setCsvInputText(e.target.value),
+    placeholder: "Collez votre export CSV DotB ici...\nEx:\nID Transaction,Date de commande,Compte,Statut,...\n17967064088,2026-02-09 10:38:00,alchemy354,Suspendu,...",
+    style: {
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      lineHeight: '1.45',
+      backgroundColor: '#fff',
+      border: '1px solid #cbd5e1'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "btn btn-primary",
+    disabled: isImportingCsv || !csvInputText.trim(),
+    style: {
+      height: '42px',
+      padding: '0 24px',
+      fontSize: '13.5px',
+      fontWeight: 600,
+      backgroundColor: '#2563eb',
+      border: 'none',
+      borderRadius: '8px'
+    }
+  }, isImportingCsv ? /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-spinner fa-spin",
+    style: {
+      marginRight: '8px'
+    }
+  }), " Filtrage Doublons & Stockage Base...") : /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-database",
+    style: {
+      marginRight: '8px'
+    }
+  }), " Lancer l'importation & Stocker en Base")), csvImportResult && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '10px',
+      fontSize: '12.5px',
+      fontWeight: 600,
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-gagnant",
+    style: {
+      padding: '6px 12px',
+      fontSize: '12px'
+    }
+  }, "📥 ", csvImportResult.insertedCount, " Stockées"), /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-ecarte",
+    style: {
+      padding: '6px 12px',
+      fontSize: '12px'
+    }
+  }, "🛑 ", csvImportResult.duplicateCount, " Doublons ignorés"), /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-nouveau",
+    style: {
+      padding: '6px 12px',
+      fontSize: '12px'
+    }
+  }, "✨ ", csvImportResult.generatedSkusCount, " SKUs générés"))))), /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: '24px'
