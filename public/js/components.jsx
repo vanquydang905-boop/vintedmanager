@@ -1513,14 +1513,9 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                             </div>
 
                             <div className="form-group">
-                                <label>🔑 Clé / Token API DotB (Optionnel)</label>
-                                <input type="text" value={dotbApiKey || ''} onChange={(e) => setDotbApiKey(e.target.value)} placeholder="ex: dotb_token_live_..." />
+                                <label>Notes & Observations (Adspower, Ventes, etc.)</label>
+                                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ex: connecté à Adspower le 05/08/26, 1 article en vente" />
                             </div>
-                        </div>
-
-                        <div className="form-group" style={{ marginBottom: '16px' }}>
-                            <label>Notes & Observations (Adspower, Ventes, etc.)</label>
-                            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ex: connecté à Adspower le 05/08/26, 1 article en vente" />
                         </div>
 
                         <div style={{ display: 'flex', gap: '10px' }}>
@@ -2621,6 +2616,9 @@ function ParametresView({ appState, onSaveParametres }) {
     const [delaiRepost, setDelaiRepost] = useState(p.delaiProchainRepostMinutes || 30);
     const [joursDefaut, setJoursDefaut] = useState(p.nbJoursPlanningParDefaut || 7);
 
+    // Clé API Full Access DotB unique centralisée
+    const [dotbApiKey, setDotbApiKey] = useState(p.dotbApiKey || 'dotb_live_full_access_sec_8849');
+
     const handleSubmit = (e) => {
         e.preventDefault();
         onSaveParametres({
@@ -2641,6 +2639,7 @@ function ParametresView({ appState, onSaveParametres }) {
             creneauxParJour: parseInt(creneaux) || 3,
             delaiProchainRepostMinutes: parseInt(delaiRepost) || 30,
             nbJoursPlanningParDefaut: parseInt(joursDefaut) || 7,
+            dotbApiKey: dotbApiKey.trim()
         });
     };
 
@@ -2701,9 +2700,48 @@ function ParametresView({ appState, onSaveParametres }) {
                     <i className="fa-solid fa-robot" style={{ color: 'var(--primary)' }}></i>
                     🤖 Préparation & Configuration de l'API DotB Automation
                 </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '16px' }}>
-                    Centralisez la collecte automatique de toutes les informations disponibles depuis le Bot DotB (Vues, Likes, Messages, Ventes, Articles Masqués/Brouillons, SKUs & Incidents).
-                </p>
+                {/* CHAMP CLÉ API UNIQUE ET SÉCURISÉE */}
+                <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '10px', border: '1.5px solid var(--primary)', marginBottom: '20px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px', display: 'block' }}>
+                        🔑 Clé API Full Access DotB (Saisie unique globale)
+                    </label>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                            type="text"
+                            className="input"
+                            value={dotbApiKey}
+                            onChange={(e) => setDotbApiKey(e.target.value)}
+                            placeholder="ex: dotb_live_full_access_sec_8849"
+                            style={{ flex: 1, minWidth: '240px', fontFamily: 'monospace', fontWeight: 600, height: '40px', fontSize: '13px' }}
+                        />
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ height: '40px', fontSize: '12.5px' }}
+                            onClick={() => {
+                                const newKey = 'dotb_live_sec_' + Math.random().toString(36).substr(2, 10) + Date.now().toString(36);
+                                setDotbApiKey(newKey);
+                                if (window.showToast) window.showToast("🔑 Nouvelle clé API DotB générée ! N'oubliez pas de sauvegarder.");
+                            }}
+                        >
+                            🎲 Générer une clé
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ height: '40px', fontSize: '12.5px' }}
+                            onClick={() => {
+                                navigator.clipboard.writeText(dotbApiKey);
+                                if (window.showToast) window.showToast("📋 Clé API DotB copiée dans le presse-papier !");
+                            }}
+                        >
+                            📋 Copier la clé
+                        </button>
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0 }}>
+                        Cette clé unique donne un accès complet (Full Access) à DotB pour envoyer les vues, likes, favoris, ventes, articles et auto-détecter les incidents sur tous vos comptes Vinted.
+                    </p>
+                </div>
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>

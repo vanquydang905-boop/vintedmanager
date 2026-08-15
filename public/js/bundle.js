@@ -2125,22 +2125,12 @@ function ComptesView({
     value: o.id
   }, o.nom)))), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
-  }, /*#__PURE__*/React.createElement("label", null, "🔑 Clé / Token API DotB (Optionnel)"), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    value: dotbApiKey || '',
-    onChange: e => setDotbApiKey(e.target.value),
-    placeholder: "ex: dotb_token_live_..."
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "form-group",
-    style: {
-      marginBottom: '16px'
-    }
   }, /*#__PURE__*/React.createElement("label", null, "Notes & Observations (Adspower, Ventes, etc.)"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: notes,
     onChange: e => setNotes(e.target.value),
     placeholder: "ex: connecté à Adspower le 05/08/26, 1 article en vente"
-  })), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '10px'
@@ -3721,6 +3711,9 @@ function ParametresView({
   const [creneaux, setCreneaux] = useState(p.creneauxParJour || 3);
   const [delaiRepost, setDelaiRepost] = useState(p.delaiProchainRepostMinutes || 30);
   const [joursDefaut, setJoursDefaut] = useState(p.nbJoursPlanningParDefaut || 7);
+
+  // Clé API Full Access DotB unique centralisée
+  const [dotbApiKey, setDotbApiKey] = useState(p.dotbApiKey || 'dotb_live_full_access_sec_8849');
   const handleSubmit = e => {
     e.preventDefault();
     onSaveParametres({
@@ -3740,7 +3733,8 @@ function ParametresView({
       },
       creneauxParJour: parseInt(creneaux) || 3,
       delaiProchainRepostMinutes: parseInt(delaiRepost) || 30,
-      nbJoursPlanningParDefaut: parseInt(joursDefaut) || 7
+      nbJoursPlanningParDefaut: parseInt(joursDefaut) || 7,
+      dotbApiKey: dotbApiKey.trim()
     });
   };
   return /*#__PURE__*/React.createElement("section", {
@@ -3876,13 +3870,74 @@ function ParametresView({
     style: {
       color: 'var(--primary)'
     }
-  }), "🤖 Préparation & Configuration de l'API DotB Automation"), /*#__PURE__*/React.createElement("p", {
+  }), "🤖 Préparation & Configuration de l'API DotB Automation"), /*#__PURE__*/React.createElement("div", {
     style: {
-      color: 'var(--text-muted)',
-      fontSize: '13.5px',
-      marginBottom: '16px'
+      backgroundColor: '#ffffff',
+      padding: '16px',
+      borderRadius: '10px',
+      border: '1.5px solid var(--primary)',
+      marginBottom: '20px'
     }
-  }, "Centralisez la collecte automatique de toutes les informations disponibles depuis le Bot DotB (Vues, Likes, Messages, Ventes, Articles Masqués/Brouillons, SKUs & Incidents)."), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '13px',
+      fontWeight: 700,
+      color: 'var(--text-main)',
+      marginBottom: '6px',
+      display: 'block'
+    }
+  }, "🔑 Clé API Full Access DotB (Saisie unique globale)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '10px',
+      alignItems: 'center',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "input",
+    value: dotbApiKey,
+    onChange: e => setDotbApiKey(e.target.value),
+    placeholder: "ex: dotb_live_full_access_sec_8849",
+    style: {
+      flex: 1,
+      minWidth: '240px',
+      fontFamily: 'monospace',
+      fontWeight: 600,
+      height: '40px',
+      fontSize: '13px'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    style: {
+      height: '40px',
+      fontSize: '12.5px'
+    },
+    onClick: () => {
+      const newKey = 'dotb_live_sec_' + Math.random().toString(36).substr(2, 10) + Date.now().toString(36);
+      setDotbApiKey(newKey);
+      if (window.showToast) window.showToast("🔑 Nouvelle clé API DotB générée ! N'oubliez pas de sauvegarder.");
+    }
+  }, "🎲 Générer une clé"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    style: {
+      height: '40px',
+      fontSize: '12.5px'
+    },
+    onClick: () => {
+      navigator.clipboard.writeText(dotbApiKey);
+      if (window.showToast) window.showToast("📋 Clé API DotB copiée dans le presse-papier !");
+    }
+  }, "📋 Copier la clé")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: '12px',
+      color: 'var(--text-muted)',
+      marginTop: '8px',
+      marginBottom: 0
+    }
+  }, "Cette clé unique donne un accès complet (Full Access) à DotB pour envoyer les vues, likes, favoris, ventes, articles et auto-détecter les incidents sur tous vos comptes Vinted.")), /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: '#f8fafc',
       padding: '16px',
