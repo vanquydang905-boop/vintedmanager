@@ -1240,10 +1240,22 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
 
                 const ownerAccount = updatedComptesList.find(c => c.id === item.vinted_account_id || (c.numeroCompte && String(c.numeroCompte) === String(item.vinted_account_id)));
                 const compteId = ownerAccount ? ownerAccount.id : (updatedComptesList[0] ? updatedComptesList[0].id : 'c_default');
-                const itemSku = item.sku ? item.sku.trim() : `SKU-${item.id ? item.id.substring(0, 8) : Math.floor(1000 + Math.random() * 9000)}`;
+                const itemSku = (item.sku && String(item.sku).trim()) ? String(item.sku).trim() : (item.vinted_id ? `VINTED-${item.vinted_id}` : `SKU-${item.id ? item.id.substring(0, 8) : Math.floor(1000 + Math.random() * 9000)}`);
 
-                // Calcul de l'heure de publication exacte (source DotB ou heure courante)
-                const currentHour = new Date().toTimeString().split(' ')[0].substring(0, 5);
+                // Extraire la vraie date et la vraie heure depuis l'horodatage DotB
+                const itemRawDate = item.status_updated_at || item.created_at || item.order_date;
+                let realDateStr = todayStr;
+                let realHourStr = new Date().toTimeString().split(' ')[0].substring(0, 5);
+
+                if (itemRawDate) {
+                    try {
+                        const dObj = new Date(itemRawDate);
+                        if (!isNaN(dObj.getTime())) {
+                            realDateStr = getLocalDateString(dObj);
+                            realHourStr = dObj.toTimeString().split(' ')[0].substring(0, 5);
+                        }
+                    } catch (e) {}
+                }
 
                 const matchLine = allCal.find(l => 
                     (l.sku && item.sku && l.sku.toLowerCase() === item.sku.toLowerCase()) ||
@@ -1260,26 +1272,28 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         agent: targetAgent,
                         sku: itemSku,
                         produit: item.title,
-                        heurePrevue: matchLine.heurePrevue || currentHour,
-                        heureStatut: matchLine.heureStatut || currentHour,
+                        date: matchLine.date || realDateStr,
+                        heurePrevue: matchLine.heurePrevue || realHourStr,
+                        heureStatut: matchLine.heureStatut || realHourStr,
                         score,
                         classification: classif
                     });
                     updatedItemsCount++;
                 } else {
-                    const jourRaw = new Date().toLocaleDateString('fr-FR', { weekday: 'long' });
+                    const dateObjForDay = new Date(realDateStr);
+                    const jourRaw = dateObjForDay.toLocaleDateString('fr-FR', { weekday: 'long' });
                     const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
                     const lineId = "ligne_dotb_live_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
 
                     await dbService.createCalendrierRow({
                         id: lineId,
                         organisationId: orgId,
-                        date: todayStr,
+                        date: realDateStr,
                         jour: jourCap,
                         compteId,
                         agent: (ownerAccount && ownerAccount.agent && ownerAccount.agent !== 'Bot DotB') ? ownerAccount.agent : 'À attribuer',
-                        heurePrevue: currentHour,
-                        heureStatut: currentHour,
+                        heurePrevue: realHourStr,
+                        heureStatut: realHourStr,
                         sku: itemSku,
                         produit: item.title,
                         lien: "",
