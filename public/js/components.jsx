@@ -213,6 +213,30 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         return () => document.removeEventListener('mousedown', close);
     }, []);
 
+    // Auto-sync arrière-plan toutes les 2 minutes pour rafraîchir automatiquement les vues, likes, ventes, statut 'Fait' et heures DotB
+    useEffect(() => {
+        const autoSyncInterval = setInterval(async () => {
+            try {
+                const params = appState.parametres || {};
+                if (params.dotbApiKey) {
+                    await fetch('/api/dotb/fetch-live', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            token: params.dotbApiKey,
+                            period: '30days',
+                            selectedTypes: ['items_published', 'orders', 'views_likes']
+                        })
+                    });
+                    if (window.loadAppState) await window.loadAppState();
+                }
+            } catch (e) {
+                console.warn('[Auto-Sync DotB]', e.message);
+            }
+        }, 120000); // 2 minutes
+        return () => clearInterval(autoSyncInterval);
+    }, [appState.parametres]);
+
     const comptesAll = appState.comptes || [];
     const calendrierAll = appState.calendrier || [];
 

@@ -1297,12 +1297,15 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     } catch (e) {}
                 }
 
+                const itemViews = parseInt(item.views || item.view_count || item.views_count || 0);
+                const itemLikes = parseInt(item.favourites || item.favourite_count || item.favourites_count || item.likes || 0);
+
                 const matchLine = allCal.find(l => 
                     (l.sku && itemSku && l.sku.toLowerCase() === itemSku.toLowerCase()) ||
                     (l.produit && normItemTitle && normalizeTitle(l.produit) === normItemTitle)
                 );
 
-                const score = calcScore({ vues: 10, likes: 2, favoris: 2, messages: 0, vente: item.status === 'imported' ? 1 : 0 }, params);
+                const score = calcScore({ vues: itemViews || 10, favoris: itemLikes || 2, vente: item.status === 'imported' ? 1 : 0 }, params);
                 const classif = getClassification(score, item.status === 'imported' ? 1 : 0, params);
 
                 if (matchLine) {
@@ -1314,7 +1317,11 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         produit: item.title,
                         date: matchLine.date || realDateStr,
                         heurePrevue: matchLine.heurePrevue || realHourStr,
-                        heureStatut: matchLine.heureStatut || realHourStr,
+                        heureStatut: realHourStr,
+                        statut: item.status === 'imported' ? 'Fait' : (matchLine.statut || 'Fait'),
+                        vues: itemViews > 0 ? itemViews : (matchLine.vues || 0),
+                        likes: itemLikes > 0 ? itemLikes : (matchLine.likes || 0),
+                        favoris: itemLikes > 0 ? itemLikes : (matchLine.favoris || 0),
                         score,
                         classification: classif
                     }));
@@ -1337,9 +1344,9 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         sku: itemSku,
                         produit: item.title,
                         lien: "",
-                        vues: 0,
-                        likes: 0,
-                        favoris: 0,
+                        vues: itemViews,
+                        likes: itemLikes,
+                        favoris: itemLikes,
                         messages: 0,
                         vente: item.status === 'imported' ? 1 : 0,
                         score,
