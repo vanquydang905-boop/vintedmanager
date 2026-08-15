@@ -615,6 +615,29 @@ function DashboardView({
       console.error("Erreur nettoyage SKU:", err);
     }
   };
+  const handleFillMissingSKUs = async () => {
+    try {
+      const orgId = currentUser && currentUser.organisationId || 'org_default';
+      const res = await fetch('/api/calendrier/fill-missing-skus', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          organisationId: orgId
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (window.showToast) window.showToast(data.message);
+        if (window.loadAppState) await window.loadAppState();
+      } else {
+        if (window.showToast) window.showToast(`❌ ${data.error}`, true);
+      }
+    } catch (err) {
+      console.error("Erreur remplissage SKU:", err);
+    }
+  };
   return /*#__PURE__*/React.createElement("section", {
     className: "view"
   }, /*#__PURE__*/React.createElement("div", {
@@ -643,6 +666,17 @@ function DashboardView({
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-rotate-right"
   }), " Rafraîchir"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    onClick: handleFillMissingSKUs,
+    style: {
+      color: '#059669',
+      borderColor: '#a7f3d0'
+    },
+    title: "Ré-attribuer automatiquement des SKUs du catalogue sur les lignes sans SKU"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-wand-magic-sparkles"
+  }), " Auto-Remplir SKUs"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",
     onClick: handleCleanEmptySKUs,
@@ -1659,7 +1693,7 @@ function DashboardView({
       whiteSpace: 'nowrap'
     },
     title: `Ce SKU a été vendu ${skuVentesMap[l.sku]}x dans l'organisation`
-  }, skuVentesMap[l.sku], "x ce SKU"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, (l.score || 0).toFixed(1))), currentUser && currentUser.role !== 'agent' && /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+  }, skuVentesMap[l.sku], "x ce SKU"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, !l.sku || !String(l.sku).trim() || String(l.sku).trim() === '-' ? '0.0' : (l.score || 0).toFixed(1))), currentUser && currentUser.role !== 'agent' && /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-danger btn-sm",
     title: "Supprimer",
     onClick: () => onDeleteRow(l.id)

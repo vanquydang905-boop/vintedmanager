@@ -28,6 +28,9 @@ function normalizeTitle(t) {
 }
 
 function calcScore(item, params) {
+    if (!item || !item.sku || !String(item.sku).trim() || String(item.sku).trim() === '-' || String(item.sku).trim().toLowerCase() === 'aucun') {
+        return 0.0;
+    }
     const isDone = item.statut === 'Fait' || item.statut === '✓ Fait' || item.statut === 'Publié' || item.done;
     const isSold = item.vente === 1;
     const pointsPub = isDone ? 5.0 : 0.0;
@@ -1176,6 +1179,24 @@ app.post('/api/calendrier/generate', async (req, res) => {
         const winnerSKUsMap = {};
         const accountPublishedSKUs = {};
 
+        // Charge l'ensemble des SKUs du catalogue DotB et de la base pour garantier un SKU sur 100% des lignes
+        const fastCheckPath = path.join(__dirname, "fast_check_sku_results.json");
+        const allCatalogSKUs = [];
+        if (fs.existsSync(fastCheckPath)) {
+            try {
+                const fcData = JSON.parse(fs.readFileSync(fastCheckPath, "utf8"));
+                fcData.forEach(item => {
+                    if (item.sku && String(item.sku).trim()) {
+                        allCatalogSKUs.push({
+                            sku: item.sku.trim(),
+                            produit: item.title || '',
+                            classification: item.classification || 'Nouveau produit'
+                        });
+                    }
+                });
+            } catch(e) {}
+        }
+
         activeCal.forEach(l => {
             if (!l.compteId) return;
             if (!accountPublishedSKUs[l.compteId]) {
@@ -1184,7 +1205,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
             if (l.sku && String(l.sku).trim() !== '') {
                 accountPublishedSKUs[l.compteId].add(String(l.sku).trim());
             }
-            if (includeWinnerSKUs && l.classification === 'Gagnant' && l.sku && String(l.sku).trim() !== '') {
+            if (includeWinnerSKUs && (l.classification === 'Gagnant' || l.vente > 0) && l.sku && String(l.sku).trim() !== '') {
                 const cleanSku = String(l.sku).trim();
                 winnerSKUsMap[cleanSku] = {
                     sku: cleanSku,
@@ -1244,7 +1265,7 @@ app.post('/api/calendrier/generate', async (req, res) => {
                     const mStr = String(targetMinutes % 60).padStart(2, '0');
                     const chosenHour = `${hStr}:${mStr}`;
 
-                    // Auto-assignation d'un SKU Gagnant disponible si présent
+                    // Auto-assignation d'un SKU Gagnant disponible si présent ou Fallback Catalogue
                     let assignedSku = "";
                     let assignedProduit = "";
                     let assignedClassif = "Nouveau produit";
@@ -1258,6 +1279,16 @@ app.post('/api/calendrier/generate', async (req, res) => {
                         skusAssignedToday.add(wObj.sku);
                         winnerIdx++;
                         winnersAssignedCount++;
+                    } else if (allCatalogSKUs.length > 0) {
+                        const fallbackList = allCatalogSKUs.filter(item => !skusAssignedToday.has(item.sku) && !accountSessionSKUs[compte.id].has(item.sku));
+                        const candidate = fallbackList.length > 0 ? fallbackList[Math.floor(Math.random() * fallbackList.length)] : allCatalogSKUs[Math.floor(Math.random() * allCatalogSKUs.length)];
+                        if (candidate) {
+                            assignedSku = candidate.sku;
+                            assignedProduit = candidate.produit;
+                            assignedClassif = candidate.classification || "Nouveau produit";
+                            accountSessionSKUs[compte.id].add(candidate.sku);
+                            skusAssignedToday.add(candidate.sku);
+                        }
                     }
 
                     const id = "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5);
@@ -1328,6 +1359,73 @@ app.post('/api/calendrier/clean-empty-skus', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Auto-Remplir les SKUs manquants sur les lignes sans SKU avec des produits du catalogue
+app.post('/api/calendrier/fill-missing-skus', async (req, res) => {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const orgId = req.body.organisationId || 'org_default';
+        const allCal = await dbService.getCalendrier(orgId);
+
+
+        const emptyRows = allCal.filter(l => 
+            !l.isDeleted && !l.supprime && l.statut !== 'Supprimé' && l.statut !== 'Corbeille' &&
+            (!l.sku || String(l.sku).trim() === '' || String(l.sku).trim() === '-' || String(l.sku).trim().toLowerCase() === 'aucun')
+        );
+
+        if (emptyRows.length === 0) {
+            return res.json({ success: true, message: "Aucune ligne sans SKU trouvée dans le planning.", filledCount: 0 });
+        }
+
+        const fastCheckPath = path.join(__dirname, "fast_check_sku_results.json");
+        const catalogSKUs = [];
+        if (fs.existsSync(fastCheckPath)) {
+            try {
+                const fcData = JSON.parse(fs.readFileSync(fastCheckPath, "utf8"));
+                fcData.forEach(item => {
+                    if (item.sku && String(item.sku).trim()) {
+                        catalogSKUs.push({
+                            sku: item.sku.trim(),
+                            produit: item.title || '',
+                            classification: item.classification || 'Nouveau produit'
+                        });
+                    }
+                });
+            } catch(e) {}
+        }
+
+        if (catalogSKUs.length === 0) {
+            return res.status(400).json({ error: "Aucun SKU disponible dans le catalogue pour effectuer le remplissage." });
+        }
+
+        let filledCount = 0;
+        for (let i = 0; i < emptyRows.length; i++) {
+            const row = emptyRows[i];
+            const candidate = catalogSKUs[i % catalogSKUs.length];
+            
+            const isDone = row.statut === 'Fait' || row.statut === '✓ Fait' || row.statut === 'Publié';
+            const isSold = row.vente === 1;
+            const pointsPub = isDone ? 5.0 : 0.0;
+            const pointsVente = isSold ? 20.0 : 0.0;
+            const score = pointsPub + pointsVente;
+
+            await dbService.updateCalendrierRow(row.id, {
+                sku: candidate.sku,
+                produit: candidate.produit,
+                classification: candidate.classification,
+                score
+            });
+            filledCount++;
+        }
+
+        await dbService.logAction("Remplissage SKU", `${filledCount} ligne(s) sans SKU ré-attribuée(s) avec des produits du catalogue`, "Succès", orgId);
+        res.json({ success: true, message: `✨ ${filledCount} ligne(s) sans SKU ré-attribuée(s) avec succès !`, filledCount });
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Publication produit gagnant sur tous les comptes actifs sans ce SKU
 app.post('/api/calendrier/publish-winner', async (req, res) => {

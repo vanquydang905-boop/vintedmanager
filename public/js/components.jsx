@@ -548,6 +548,26 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         }
     };
 
+    const handleFillMissingSKUs = async () => {
+        try {
+            const orgId = (currentUser && currentUser.organisationId) || 'org_default';
+            const res = await fetch('/api/calendrier/fill-missing-skus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ organisationId: orgId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (window.showToast) window.showToast(data.message);
+                if (window.loadAppState) await window.loadAppState();
+            } else {
+                if (window.showToast) window.showToast(`❌ ${data.error}`, true);
+            }
+        } catch (err) {
+            console.error("Erreur remplissage SKU:", err);
+        }
+    };
+
     return (
         <section className="view">
             <div className="header-actions">
@@ -560,6 +580,9 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                         <button type="button" className="btn btn-secondary" onClick={async () => { if (window.loadAppState) await window.loadAppState(); if (window.showToast) window.showToast("Données rafraîchies !"); }} title="Rafraîchir les données">
                             <i className="fa-solid fa-rotate-right"></i> Rafraîchir
                         </button>
+                        <button type="button" className="btn btn-secondary" onClick={handleFillMissingSKUs} style={{ color: '#059669', borderColor: '#a7f3d0' }} title="Ré-attribuer automatiquement des SKUs du catalogue sur les lignes sans SKU">
+                            <i className="fa-solid fa-wand-magic-sparkles"></i> Auto-Remplir SKUs
+                        </button>
                         <button type="button" className="btn btn-secondary" onClick={handleCleanEmptySKUs} style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} title="Supprimer toutes les lignes sans SKU">
                             <i className="fa-solid fa-broom"></i> Nettoyer (sans SKU)
                         </button>
@@ -569,6 +592,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                     </div>
                 )}
             </div>
+
 
             {/* FILTRES & KPI METRIQUES */}
             <div className="metrics-grid">
@@ -1134,7 +1158,7 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 )}
                                             </div>
                                         </td>
-                                        <td><b>{(l.score || 0).toFixed(1)}</b></td>
+                                        <td><b>{(!l.sku || !String(l.sku).trim() || String(l.sku).trim() === '-') ? '0.0' : (l.score || 0).toFixed(1)}</b></td>
                                         {(currentUser && currentUser.role !== 'agent') && (
                                             <td>
                                                 <button className="btn btn-danger btn-sm" title="Supprimer" onClick={() => onDeleteRow(l.id)}>
