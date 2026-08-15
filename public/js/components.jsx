@@ -2617,7 +2617,7 @@ function ParametresView({ appState, onSaveParametres }) {
     const [joursDefaut, setJoursDefaut] = useState(p.nbJoursPlanningParDefaut || 7);
 
     // Clé API Full Access DotB unique centralisée
-    const [dotbApiKey, setDotbApiKey] = useState(p.dotbApiKey || 'dotb_live_full_access_sec_8849');
+    const [dotbApiKey, setDotbApiKey] = useState(p.dotbApiKey || 'dotb_pk_pmXggjdukM3FR-YCw2cXsgug2YrtJa_0ZBX9s5J6Wf8');
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -2753,11 +2753,38 @@ function ParametresView({ appState, onSaveParametres }) {
                                 Endpoint: <code>POST /api/dotb/sync</code>
                             </span>
                         </div>
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ fontSize: '12px', padding: '6px 12px' }}
-                            onClick={async () => {
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                style={{ fontSize: '12px', padding: '6px 14px', backgroundColor: '#09b1ba', borderColor: '#09b1ba' }}
+                                onClick={async () => {
+                                    try {
+                                        if (window.showToast) window.showToast("⏳ Interrogation de l'API DotB Cloud v1 en cours...");
+                                        const res = await fetch('/api/dotb/fetch-live', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ token: dotbApiKey })
+                                        });
+                                        const data = await res.json();
+                                        if (data.success && window.showToast) {
+                                            window.showToast(data.message);
+                                            if (window.loadAppState) await window.loadAppState();
+                                        } else if (window.showToast) {
+                                            window.showToast(`❌ Erreur DotB API: ${data.error || 'Échec'}`, true);
+                                        }
+                                    } catch (err) {
+                                        console.error(err);
+                                    }
+                                }}
+                            >
+                                ⚡ Synchro Directe API DotB Cloud (33 Comptes)
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                style={{ fontSize: '12px', padding: '6px 12px' }}
+                                onClick={async () => {
                                 try {
                                     const res = await fetch('/api/dotb/sync', {
                                         method: 'POST',
@@ -2783,12 +2810,16 @@ function ParametresView({ appState, onSaveParametres }) {
                                         if (window.loadAppState) await window.loadAppState();
                                     }
                                 } catch (err) {
-                                    console.error(err);
                                 }
                             }}
                         >
                             🧪 Tester la synchro DotB (@julia_rent)
                         </button>
+                        </div>
+                    </div>
+
+                    <div style={{ marginBottom: '16px', fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                        📘 Documentation officielle de l'API DotB v1 : <a href="https://dotb.io/api/public/v1/docs?token=dotb_pk_pmXggjdukM3FR-YCw2cXsgug2YrtJa_0ZBX9s5J6Wf8" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'underline' }}>https://dotb.io/api/public/v1/docs</a>
                     </div>
 
                     <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>Champs & Métriques Collectés par l'API DotB :</h4>

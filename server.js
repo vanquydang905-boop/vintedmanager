@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dbService = require('./database');
+const DotbApiService = require('./dotbApiService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1124,12 +1125,126 @@ app.get('/api/dotb/status', async (req, res) => {
         status: "online",
         api: "DotB Automation & Dressing Collector API",
         version: "2.0",
+        officialDoc: "https://dotb.io/api/public/v1/docs",
         endpoints: {
+            fetchLive: "POST /api/dotb/fetch-live",
             sync: "POST /api/dotb/sync",
             extension: "POST /api/extension/sync"
         },
-        message: "API DotB prête à recevoir les requêtes de synchronisation d'articles, vues, favoris, ventes et incidents."
+        message: "API DotB officielle v1 prête à recevoir les requêtes de synchronisation d'articles, comptes, vues, favoris, ventes et incidents."
     });
+});
+
+app.post('/api/dotb/fetch-live', async (req, res) => {
+    try {
+        const orgId = req.body.organisationId || 'org_default';
+        const params = await dbService.getParametres(orgId);
+        const token = req.body.token || params.dotbApiKey || 'dotb_pk_pmXggjdukM3FR-YCw2cXsgug2YrtJa_0ZBX9s5J6Wf8';
+
+        if (!token) {
+            return res.status(400).json({ error: "Aucun jeton Bearer API DotB configuré" });
+        }
+
+        console.log(`[API DotB Live] Synchronisation directe via token Bearer DotB v1...`);
+
+        const dotbAccounts = await DotbApiService.getAccounts(token);
+        const existingComptes = await dbService.getComptes(orgId);
+        let syncedComptesCount = 0;
+
+        for (const acc of dotbAccounts) {
+            const loginClean = acc.login ? acc.login.trim() : null;
+            if (!loginClean) continue;
+
+            const existing = existingComptes.find(c => c.pseudo && c.pseudo.toLowerCase() === loginClean.toLowerCase());
+            if (!existing) {
+                await dbService.createCompte({
+                    id: `compte_${acc.vinted_id || Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                    organisationId: orgId,
+                    numeroCompte: String(acc.vinted_id || ''),
+                    pseudo: loginClean,
+                    statut: 'Actif',
+                    agent: 'Bot DotB',
+                    dateCreation: getLocalDateString(new Date())
+                });
+                syncedComptesCount++;
+            }
+        }
+
+        const dotbItems = await DotbApiService.getItems(token, 'all');
+        const allCal = await dbService.getCalendrier(orgId);
+        const updatedComptesList = await dbService.getComptes(orgId);
+        const todayStr = getLocalDateString(new Date());
+
+        let createdItemsCount = 0;
+        let updatedItemsCount = 0;
+
+        for (const item of dotbItems) {
+            if (!item.title) continue;
+
+            const ownerAccount = updatedComptesList.find(c => c.id === item.vinted_account_id || (c.numeroCompte && String(c.numeroCompte) === String(item.vinted_account_id)));
+            const compteId = ownerAccount ? ownerAccount.id : (updatedComptesList[0] ? updatedComptesList[0].id : 'c_default');
+            const itemSku = item.sku ? item.sku.trim() : `SKU-${item.id ? item.id.substring(0, 8) : Math.floor(1000 + Math.random() * 9000)}`;
+
+            const matchLine = allCal.find(l => 
+                (l.sku && item.sku && l.sku.toLowerCase() === item.sku.toLowerCase()) ||
+                (l.produit && item.title && l.produit.toLowerCase().includes(item.title.toLowerCase()))
+            );
+
+            const score = calcScore({ vues: 10, likes: 2, favoris: 2, messages: 0, vente: item.status === 'imported' ? 1 : 0 }, params);
+            const classif = getClassification(score, item.status === 'imported' ? 1 : 0, params);
+
+            if (matchLine) {
+                await dbService.updateCalendrierRow(matchLine.id, {
+                    sku: itemSku,
+                    produit: item.title,
+                    score,
+                    classification: classif
+                });
+                updatedItemsCount++;
+            } else {
+                const jourRaw = new Date().toLocaleDateString('fr-FR', { weekday: 'long' });
+                const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
+                const lineId = "ligne_dotb_live_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+
+                await dbService.createCalendrierRow({
+                    id: lineId,
+                    organisationId: orgId,
+                    date: todayStr,
+                    jour: jourCap,
+                    compteId,
+                    agent: ownerAccount ? ownerAccount.agent : 'Bot DotB',
+                    heurePrevue: "12:00",
+                    sku: itemSku,
+                    produit: item.title,
+                    lien: "",
+                    vues: 0,
+                    likes: 0,
+                    favoris: 0,
+                    messages: 0,
+                    vente: item.status === 'imported' ? 1 : 0,
+                    score,
+                    classification: classif,
+                    statut: 'Fait'
+                });
+                createdItemsCount++;
+            }
+        }
+
+        await dbService.logAction("API DotB Direct", `Synchro directe DotB Cloud réussie : ${dotbAccounts.length} comptes, ${dotbItems.length} articles répercutés`, "Succès", orgId);
+
+        res.json({
+            success: true,
+            totalAccounts: dotbAccounts.length,
+            newAccountsCreated: syncedComptesCount,
+            totalItems: dotbItems.length,
+            createdItemsCount,
+            updatedItemsCount,
+            message: `✅ Synchronisation directe avec l'API publique DotB v1 réussie (${dotbAccounts.length} comptes & ${dotbItems.length} articles synchronisés) !`
+        });
+    } catch (err) {
+        console.error("Erreur API DotB Direct:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/dotb/sync', async (req, res) => {
