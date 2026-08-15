@@ -4943,8 +4943,12 @@ function ClassementView({
     const map = {};
     calendrier.forEach(l => {
       if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
-      if (!l.sku || !String(l.sku).trim()) return;
-      const skuClean = String(l.sku).trim();
+      let skuClean = l.sku && String(l.sku).trim() ? String(l.sku).trim() : null;
+      if (!skuClean && l.produit && String(l.produit).trim()) {
+        const slug = String(l.produit).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").substring(0, 24);
+        skuClean = `SKU-${slug.toUpperCase()}`;
+      }
+      if (!skuClean) return;
       if (!map[skuClean]) {
         map[skuClean] = {
           sku: skuClean,

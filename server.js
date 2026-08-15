@@ -1389,10 +1389,22 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         (normOrderTitle && l.produit && normalizeTitle(l.produit) === normOrderTitle))
                     );
 
+                    let finalOrderSku = itemSku;
+                    if (!finalOrderSku || finalOrderSku.startsWith('VINTED-')) {
+                        const existingTitleMatch = allCal.find(l => l.produit && normalizeTitle(l.produit) === normOrderTitle && l.sku && !l.sku.startsWith('VINTED-'));
+                        if (existingTitleMatch) {
+                            finalOrderSku = existingTitleMatch.sku;
+                        } else {
+                            const cleanSlug = itemTitle.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").substring(0, 24);
+                            finalOrderSku = `SKU-${cleanSlug.toUpperCase()}`;
+                        }
+                    }
+
                     if (matchLine) {
                         orderTasks.push(() => dbService.updateCalendrierRow(matchLine.id, {
                             vente: 1,
                             statut: 'Fait',
+                            sku: finalOrderSku,
                             compteId: ownerAcc ? ownerAcc.id : matchLine.compteId,
                             agent: (ownerAcc && ownerAcc.agent && ownerAcc.agent !== 'À attribuer') ? ownerAcc.agent : matchLine.agent
                         }));
@@ -1411,15 +1423,15 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                             agent: (ownerAcc && ownerAcc.agent && ownerAcc.agent !== 'À attribuer') ? ownerAcc.agent : 'À attribuer',
                             heurePrevue: orderHourStr,
                             heureStatut: orderHourStr,
-                            sku: itemSku || (order.vinted_transaction_id ? `VINTED-${order.vinted_transaction_id}` : `SKU-${order.id.substring(0,8)}`),
+                            sku: finalOrderSku,
                             produit: itemTitle,
                             lien: "",
-                            vues: Math.floor(135 + Math.random() * 80),
-                            likes: Math.floor(8 + Math.random() * 10),
-                            favoris: Math.floor(8 + Math.random() * 10),
+                            vues: 0,
+                            likes: 0,
+                            favoris: 0,
                             messages: 0,
                             vente: 1,
-                            score: 150 * 0.1 + 8 * 2 + 1 * 20,
+                            score: 25.0,
                             classification: "Gagnant",
                             statut: "Fait"
                         }));
