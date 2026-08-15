@@ -81,7 +81,7 @@ class DotbApiService {
      * Récupère les commandes / ventes gérées sur DotB
      */
     static async getOrders(token) {
-        const data = await this.request('/orders?limit=100', token);
+        const data = await this.request('/orders?limit=100&include=account,items', token);
         return data.data || [];
     }
 }
