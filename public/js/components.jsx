@@ -2685,6 +2685,95 @@ function ParametresView({ appState, onSaveParametres }) {
                     </button>
                 </form>
             </div>
+
+            {/* INTÉGRATION API DOTB & BOT AUTOMATION */}
+            <div className="card" style={{ marginTop: '24px' }}>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <i className="fa-solid fa-robot" style={{ color: 'var(--primary)' }}></i>
+                    🤖 Préparation & Configuration de l'API DotB Automation
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '16px' }}>
+                    Centralisez la collecte automatique de toutes les informations disponibles depuis le Bot DotB (Vues, Likes, Messages, Ventes, Articles Masqués/Brouillons, SKUs & Incidents).
+                </p>
+
+                <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                            <span className="badge badge-gagnant" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                🟢 Service API DotB Actif
+                            </span>
+                            <span style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginLeft: '10px' }}>
+                                Endpoint: <code>POST /api/dotb/sync</code>
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                            onClick={async () => {
+                                try {
+                                    const res = await fetch('/api/dotb/sync', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            pseudo: 'julia_rent',
+                                            vues: 1450,
+                                            likes: 88,
+                                            messages: 14,
+                                            ventes: 5,
+                                            actifsCount: 58,
+                                            masquesCount: 0,
+                                            brouillonsCount: 2,
+                                            itemsCount: 60,
+                                            items: [
+                                                { sku: 'sz26001', title: 'Robe Rose Bonbon', price: '25 €', vues: 160, likes: 15, statut: 'publié' }
+                                            ]
+                                        })
+                                    });
+                                    const data = await res.json();
+                                    if (data.success && window.showToast) {
+                                        window.showToast(`✅ Test API DotB réussi pour @${data.pseudo} !`);
+                                        if (window.loadAppState) await window.loadAppState();
+                                    }
+                                } catch (err) {
+                                    console.error(err);
+                                }
+                            }}
+                        >
+                            🧪 Tester la synchro DotB (@julia_rent)
+                        </button>
+                    </div>
+
+                    <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>Champs & Métriques Collectés par l'API DotB :</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', fontSize: '12.5px' }}>
+                        <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>👁️ <b>Vues Totales & par SKU</b></div>
+                        <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>❤️ <b>Likes & Favoris</b></div>
+                        <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>💬 <b>Messages Non Lus</b></div>
+                        <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>🛒 <b>Ventes Réalisées</b></div>
+                        <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>📦 <b>Articles Actifs / Brouillons</b></div>
+                        <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>🚫 <b>Articles Masqués & Bloqués</b></div>
+                        <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>🚨 <b>Auto-Détection des Incidents</b></div>
+                        <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>🏷️ <b>Qualifications SKUs Auto</b></div>
+                    </div>
+                </div>
+
+                <div style={{ backgroundColor: '#1e293b', color: '#f8fafc', padding: '14px', borderRadius: '8px', fontSize: '12px', fontFamily: 'monospace', overflowX: 'auto' }}>
+                    <div style={{ color: '#94a3b8', marginBottom: '4px' }}>// Exemple de requête JSON transmise par le Bot DotB ou cURL :</div>
+                    <pre style={{ margin: 0 }}>{`curl -X POST https://vintedmanager-bkgg.vercel.app/api/dotb/sync \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "pseudo": "julia_rent",
+    "statutCompte": "Actif",
+    "vues": 1450,
+    "likes": 88,
+    "messages": 14,
+    "ventes": 5,
+    "items": [
+      { "sku": "sz26001", "title": "Robe Rose", "price": "25 €", "vues": 160, "likes": 15, "statut": "publié" }
+    ]
+  }'`}</pre>
+                </div>
+            </div>
         </section>
     );
 }

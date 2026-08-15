@@ -1118,6 +1118,193 @@ app.get('/api/journal', async (req, res) => {
     }
 });
 
+// ------------------- API DOTB & BOT AUTOMATION INTEGRATION -------------------
+app.get('/api/dotb/status', async (req, res) => {
+    res.json({
+        status: "online",
+        api: "DotB Automation & Dressing Collector API",
+        version: "2.0",
+        endpoints: {
+            sync: "POST /api/dotb/sync",
+            extension: "POST /api/extension/sync"
+        },
+        message: "API DotB prête à recevoir les requêtes de synchronisation d'articles, vues, favoris, ventes et incidents."
+    });
+});
+
+app.post('/api/dotb/sync', async (req, res) => {
+    try {
+        const {
+            apiKey,
+            pseudo,
+            organisationId,
+            statutCompte,
+            vues,
+            likes,
+            favoris,
+            messages,
+            ventes,
+            actifsCount,
+            masquesCount,
+            brouillonsCount,
+            itemsCount,
+            items
+        } = req.body;
+
+        const orgId = organisationId || 'org_default';
+
+        if (!pseudo || !String(pseudo).trim()) {
+            return res.status(400).json({ error: "Pseudo Vinted obligatoire pour la synchronisation DotB" });
+        }
+
+        const cleanPseudo = String(pseudo).trim();
+        const comptes = await dbService.getComptes(orgId);
+        let compte = comptes.find(c => c.pseudo && c.pseudo.toLowerCase() === cleanPseudo.toLowerCase());
+
+        if (!compte) {
+            const newCompteId = "compte_dotb_" + Date.now();
+            compte = await dbService.createCompte({
+                id: newCompteId,
+                organisationId: orgId,
+                pseudo: cleanPseudo,
+                statut: statutCompte || 'Actif',
+                agent: 'Bot DotB',
+                dateCreation: getLocalDateString(new Date())
+            });
+            await dbService.logAction("API DotB", `Création automatique du compte @${cleanPseudo} via l'API DotB`, "Succès", orgId);
+        } else if (statutCompte && compte.statut !== statutCompte) {
+            await dbService.updateCompte(compte.id, {
+                statut: statutCompte,
+                dateStatutCompte: getLocalDateString(new Date())
+            });
+        }
+
+        const todayStr = getLocalDateString(new Date());
+        const allCal = await dbService.getCalendrier(orgId);
+        const params = await dbService.getParametres(orgId);
+
+        const countVues = parseInt(vues) || 0;
+        const countLikes = parseInt(likes || favoris) || 0;
+        const countMessages = parseInt(messages) || 0;
+        const countVentes = parseInt(ventes) || 0;
+
+        let updatedCount = 0;
+        let createdCount = 0;
+        let incidentsCount = 0;
+
+        if (Array.isArray(items) && items.length > 0) {
+            for (const item of items) {
+                const itemSku = item.sku ? String(item.sku).trim() : null;
+                const itemTitle = item.title || item.produit || '';
+
+                if (!itemSku && !itemTitle) continue;
+
+                const matchLine = allCal.find(l => 
+                    l.compteId === compte.id && (
+                        (itemSku && l.sku && String(l.sku).trim().toLowerCase() === itemSku.toLowerCase()) ||
+                        (itemTitle && l.produit && l.produit.toLowerCase().includes(itemTitle.toLowerCase()))
+                    )
+                );
+
+                const itemVues = parseInt(item.vues) || countVues;
+                const itemLikes = parseInt(item.likes) || countLikes;
+                const itemVente = (item.statut === 'vendu' || item.vente > 0) ? 1 : 0;
+                const finalSku = itemSku || `SKU-${Math.floor(10000 + Math.random() * 90000)}`;
+
+                const score = calcScore({ vues: itemVues, likes: itemLikes, favoris: itemLikes, messages: countMessages, vente: itemVente }, params);
+                const classif = getClassification(score, itemVente, params);
+
+                if (matchLine) {
+                    await dbService.updateCalendrierRow(matchLine.id, {
+                        sku: finalSku,
+                        produit: itemTitle || matchLine.produit,
+                        vues: Math.max(matchLine.vues || 0, itemVues),
+                        likes: Math.max(matchLine.likes || 0, itemLikes),
+                        favoris: Math.max(matchLine.favoris || 0, itemLikes),
+                        messages: Math.max(matchLine.messages || 0, countMessages),
+                        vente: Math.max(matchLine.vente || 0, itemVente),
+                        score,
+                        classification: classif
+                    });
+                    updatedCount++;
+                } else {
+                    const jourRaw = new Date().toLocaleDateString('fr-FR', { weekday: 'long' });
+                    const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
+                    const lineId = "ligne_dotb_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+
+                    await dbService.createCalendrierRow({
+                        id: lineId,
+                        organisationId: orgId,
+                        date: todayStr,
+                        jour: jourCap,
+                        compteId: compte.id,
+                        agent: compte.agent || 'Bot DotB',
+                        heurePrevue: "12:00",
+                        sku: finalSku,
+                        produit: itemTitle || "Article Vinted DotB",
+                        lien: item.lien || "",
+                        vues: itemVues,
+                        likes: itemLikes,
+                        favoris: itemLikes,
+                        messages: countMessages,
+                        vente: itemVente,
+                        score,
+                        classification: classif,
+                        statut: item.statut === 'masqué' ? 'Non fait' : 'Fait'
+                    });
+                    createdCount++;
+                }
+            }
+        }
+
+        const isIncidentState = ['Masqué', 'Limité', 'Bloqué'].includes(statutCompte) || (masquesCount && masquesCount > 0);
+        if (isIncidentState) {
+            const allIncidents = await dbService.getIncidents(orgId);
+            const activeInc = allIncidents.find(i => i.compteId === compte.id && i.dateBlocage === todayStr);
+            if (!activeInc) {
+                const incId = "inc_dotb_" + Date.now();
+                await dbService.createIncident({
+                    id: incId,
+                    organisationId: orgId,
+                    compteId: compte.id,
+                    pseudo: cleanPseudo,
+                    type: statutCompte === 'Bloqué' ? 'Bannissement permanent' : 'Masquage / Détection Bot',
+                    dateBlocage: todayStr,
+                    heureBlocage: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                    nbPubs24h: itemsCount || 0,
+                    nbAnnoncesMasquees: masquesCount || 0,
+                    notesActivites: `Détecté automatiquement par l'API DotB. Statut compte: ${statutCompte || 'Masqué'}. Articles masqués: ${masquesCount || 0}.`
+                });
+                incidentsCount++;
+            }
+        }
+
+        await dbService.logAction("API DotB", `Synchro DotB réussie pour @${cleanPseudo} (${updatedCount} MàJ, ${createdCount} créés, ${incidentsCount} incident)`, "Succès", orgId);
+
+        res.json({
+            success: true,
+            pseudo: cleanPseudo,
+            compteId: compte.id,
+            metrics: {
+                vues: countVues,
+                likes: countLikes,
+                messages: countMessages,
+                ventes: countVentes,
+                actifsCount: actifsCount || 0,
+                masquesCount: masquesCount || 0,
+                brouillonsCount: brouillonsCount || 0,
+                itemsCount: itemsCount || (Array.isArray(items) ? items.length : 0)
+            },
+            updatedRows: updatedCount,
+            createdRows: createdCount,
+            incidentsCreated: incidentsCount,
+            message: `✅ Synchronisation API DotB réussie pour @${cleanPseudo} !`
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ------------------- CHROME EXTENSION SYNC -------------------
 app.get('/api/extension/sync', (req, res) => {
     res.json({
