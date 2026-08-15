@@ -5749,9 +5749,50 @@ function ClassementView({
     }
   }, "Données insuffisantes."))))))), selectedSkuDetail && (() => {
     const s = selectedSkuDetail;
-    const allAvailableComptes = (appState.comptes || []).map(c => c.pseudo).filter(Boolean);
-    const currentAccounts = (s.accountsStr || '').split(',').map(a => a.trim().replace('@', '')).filter(Boolean);
-    const missingAccounts = allAvailableComptes.filter(acc => !currentAccounts.includes(acc));
+
+    // 1. Ensemble de TOUS les comptes ayant DÉJÀ publié ou vendu ce SKU (Case-insensitive)
+    const publishedAccountsSet = new Set();
+    (s.accountsStr || '').split(',').forEach(a => {
+      const clean = a.trim().replace('@', '').toLowerCase();
+      if (clean && clean !== 'non spécifié') publishedAccountsSet.add(clean);
+    });
+    if (Array.isArray(s.accounts)) {
+      s.accounts.forEach(a => {
+        const clean = String(a).trim().replace('@', '').toLowerCase();
+        if (clean) publishedAccountsSet.add(clean);
+      });
+    }
+    (appState.calendrier || []).forEach(l => {
+      if (l.sku && String(l.sku).trim().toLowerCase() === String(s.sku).trim().toLowerCase()) {
+        if (l.comptePseudo) {
+          const clean = String(l.comptePseudo).trim().replace('@', '').toLowerCase();
+          if (clean && clean !== 'non spécifié') publishedAccountsSet.add(clean);
+        }
+      }
+    });
+    const currentAccounts = Array.from(publishedAccountsSet);
+
+    // 2. Filtre strict des comptes cibles de propagation disponibles :
+    // - EXCLURE les comptes BANNIS, SUSPENDUS, BLOQUÉS ou INACTIFS
+    // - EXCLURE les comptes qui ont DÉJÀ publié/vendu cet article
+    // - EXCLURE les comptes NON ATTRIBUÉS (sans pseudo valide)
+    const validTargetComptes = (appState.comptes || []).filter(c => {
+      if (!c || !c.pseudo || !String(c.pseudo).trim()) return false;
+      const cleanPseudo = String(c.pseudo).trim().replace('@', '').toLowerCase();
+
+      // Filtrer par statut de compte (Banni, Suspendu, Bloqué, Inactif)
+      const statusLower = (c.statut || c.status || '').toLowerCase();
+      if (statusLower.includes('bann') || statusLower.includes('suspend') || statusLower.includes('bloq') || statusLower.includes('inactif')) {
+        return false;
+      }
+
+      // Exclure si le compte a DÉJÀ publié ou vendu ce SKU
+      if (publishedAccountsSet.has(cleanPseudo)) {
+        return false;
+      }
+      return true;
+    });
+    const missingAccounts = validTargetComptes.map(c => c.pseudo.trim().replace('@', ''));
     return /*#__PURE__*/React.createElement("div", {
       className: "modal-backdrop",
       style: {
