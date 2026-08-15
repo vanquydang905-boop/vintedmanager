@@ -1555,6 +1555,12 @@ app.post('/api/extension/sync', async (req, res) => {
     }
 });
 
+// Middleware de secours pour les erreurs serveur (Garantie de réponse 200/500 JSON propre sur Vercel)
+app.use((err, req, res, next) => {
+    console.error('[Vercel Serverless Error]:', err);
+    res.status(500).json({ error: "Erreur serveur", message: err.message || "Une erreur est survenue sur le serveur Vercel." });
+});
+
 // SPA Fallback Route
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
