@@ -1212,8 +1212,27 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
 
         console.log(`[API DotB Live] Synchro ciblée (Période: ${period}, Types: ${selectedTypes.join(',')})...`);
 
-        // 1. Synchronisation des Comptes
-        const dotbAccounts = await DotbApiService.getAccounts(token);
+        // 1. Appels Parallèles vers l'API DotB Cloud (Réponse Ultra-rapide < 4s pour éviter le timeout Vercel)
+        let fromDate = null;
+        if (period === '30days' || period === 'all' || period === 'july1') {
+            fromDate = '2026-07-01';
+        } else if (period === '7days') {
+            const d7 = new Date();
+            d7.setDate(d7.getDate() - 7);
+            fromDate = getLocalDateString(d7);
+        } else if (period === 'today') {
+            fromDate = getLocalDateString(new Date());
+        }
+
+        const shouldFetchItems = selectedTypes.includes('items_published') || selectedTypes.includes('items_drafts') || selectedTypes.includes('items_hidden');
+        const shouldFetchOrders = selectedTypes.includes('orders');
+
+        const [dotbAccounts, dotbItems, orders] = await Promise.all([
+            DotbApiService.getAccounts(token),
+            shouldFetchItems ? DotbApiService.getItems(token, 'all', { from: fromDate, maxPages: 3 }) : Promise.resolve([]),
+            shouldFetchOrders ? DotbApiService.getOrders(token, { from: fromDate || '2026-07-01', maxPages: 3 }) : Promise.resolve([])
+        ]);
+
         const existingComptes = await dbService.getComptes(orgId);
         let syncedComptesCount = 0;
 
@@ -1236,26 +1255,14 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
             }
         }
 
-        // 2. Synchronisation des Articles (Publiés, Brouillons, Masqués)
+        // 2. Traitement des Articles
         let createdItemsCount = 0;
         let updatedItemsCount = 0;
         let draftsCount = 0;
         let hiddenCount = 0;
         let activeCount = 0;
 
-        let fromDate = null;
-        if (period === '30days' || period === 'all' || period === 'july1') {
-            fromDate = '2026-07-01';
-        } else if (period === '7days') {
-            const d7 = new Date();
-            d7.setDate(d7.getDate() - 7);
-            fromDate = getLocalDateString(d7);
-        } else if (period === 'today') {
-            fromDate = getLocalDateString(new Date());
-        }
-
-        if (selectedTypes.includes('items_published') || selectedTypes.includes('items_drafts') || selectedTypes.includes('items_hidden')) {
-            const dotbItems = await DotbApiService.getItems(token, 'all', { from: fromDate, maxPages: 10 });
+        if (dotbItems.length > 0) {
             const allCal = await dbService.getCalendrier(orgId);
             const updatedComptesList = await dbService.getComptes(orgId);
             const todayStr = getLocalDateString(new Date());
@@ -1275,7 +1282,6 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     ? String(existingTitleMatch.sku).trim() 
                     : ((item.sku && String(item.sku).trim()) ? String(item.sku).trim() : (item.vinted_id ? `VINTED-${item.vinted_id}` : `SKU-${item.id ? item.id.substring(0, 8) : Math.floor(1000 + Math.random() * 9000)}`));
 
-                // Extraire la vraie date et la vraie heure depuis l'horodatage DotB
                 const itemRawDate = item.status_updated_at || item.created_at || item.order_date;
                 let realDateStr = todayStr;
                 let realHourStr = new Date().toTimeString().split(' ')[0].substring(0, 5);
@@ -1344,13 +1350,10 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
             }
         }
 
-        // 3. Synchronisation Historique des Commandes / Ventes (Depuis le 01/07/2026)
-        let fetchedOrdersCount = 0;
-        if (selectedTypes.includes('orders')) {
+        // 3. Traitement des Commandes / Ventes
+        let fetchedOrdersCount = orders.length;
+        if (orders.length > 0) {
             try {
-                const orders = await DotbApiService.getOrders(token, { from: fromDate || '2026-07-01', maxPages: 10 });
-                fetchedOrdersCount = orders.length;
-
                 const allCal = await dbService.getCalendrier(orgId);
                 const comptesList = await dbService.getComptes(orgId);
 
@@ -1378,7 +1381,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     }
                 }
             } catch (e) {
-                console.warn("[DotB Orders Sync Warning]", e.message);
+                console.warn("[DotB Orders Processing Warning]", e.message);
             }
         }
 
