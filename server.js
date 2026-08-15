@@ -22,6 +22,11 @@ function getLocalDateString(d = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
+function normalizeTitle(t) {
+    if (!t) return "";
+    return String(t).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 function calcScore(item, params) {
     const p = params.poidsScore || { vues: 0.1, favoris: 2, vente: 20 };
     // Likes et Messages désactivés temporairement
@@ -551,6 +556,27 @@ app.put('/api/calendrier/:id', async (req, res) => {
                 if (matchingIds.length > 0) {
                     await dbService.bulkUpdateCalendrierRows(matchingIds, { classification: 'Gagnant' });
                 }
+            }
+        } else if (field === 'sku' && value && String(value).trim() !== '') {
+            const cleanSku = String(value).trim();
+            updated.sku = cleanSku;
+
+            // Cascade automatique : Tous les articles ayant le même titre (insensible à la casse) reçoivent le MÊME SKU
+            const normTitle = normalizeTitle(current.produit);
+            if (normTitle) {
+                const matchingTitleRows = allCal.filter(l => l.id !== id && l.produit && normalizeTitle(l.produit) === normTitle);
+                if (matchingTitleRows.length > 0) {
+                    const rowIds = matchingTitleRows.map(l => l.id);
+                    await dbService.bulkUpdateCalendrierRows(rowIds, { sku: cleanSku });
+                }
+            }
+        } else if (field === 'produit' && value && String(value).trim() !== '') {
+            updated.produit = value;
+            const normTitle = normalizeTitle(value);
+            // Auto-attribution du même SKU si le titre normalisé est déjà connu
+            const matchWithSku = allCal.find(l => l.produit && normalizeTitle(l.produit) === normTitle && l.sku && String(l.sku).trim() !== '');
+            if (matchWithSku) {
+                updated.sku = String(matchWithSku.sku).trim();
             }
         } else {
             updated[field] = value;
@@ -1240,7 +1266,12 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
 
                 const ownerAccount = updatedComptesList.find(c => c.id === item.vinted_account_id || (c.numeroCompte && String(c.numeroCompte) === String(item.vinted_account_id)));
                 const compteId = ownerAccount ? ownerAccount.id : (updatedComptesList[0] ? updatedComptesList[0].id : 'c_default');
-                const itemSku = (item.sku && String(item.sku).trim()) ? String(item.sku).trim() : (item.vinted_id ? `VINTED-${item.vinted_id}` : `SKU-${item.id ? item.id.substring(0, 8) : Math.floor(1000 + Math.random() * 9000)}`);
+                const normItemTitle = normalizeTitle(item.title);
+                const existingTitleMatch = allCal.find(l => l.produit && normalizeTitle(l.produit) === normItemTitle && l.sku && String(l.sku).trim() !== '');
+
+                const itemSku = existingTitleMatch 
+                    ? String(existingTitleMatch.sku).trim() 
+                    : ((item.sku && String(item.sku).trim()) ? String(item.sku).trim() : (item.vinted_id ? `VINTED-${item.vinted_id}` : `SKU-${item.id ? item.id.substring(0, 8) : Math.floor(1000 + Math.random() * 9000)}`));
 
                 // Extraire la vraie date et la vraie heure depuis l'horodatage DotB
                 const itemRawDate = item.status_updated_at || item.created_at || item.order_date;
@@ -1258,8 +1289,8 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                 }
 
                 const matchLine = allCal.find(l => 
-                    (l.sku && item.sku && l.sku.toLowerCase() === item.sku.toLowerCase()) ||
-                    (l.produit && item.title && l.produit.toLowerCase().includes(item.title.toLowerCase()))
+                    (l.sku && itemSku && l.sku.toLowerCase() === itemSku.toLowerCase()) ||
+                    (l.produit && normItemTitle && normalizeTitle(l.produit) === normItemTitle)
                 );
 
                 const score = calcScore({ vues: 10, likes: 2, favoris: 2, messages: 0, vente: item.status === 'imported' ? 1 : 0 }, params);
