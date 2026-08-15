@@ -3756,10 +3756,11 @@ function ClassementView({ appState, onUpdateRow }) {
                         </button>
 
                         {csvImportResult && (
-                            <div style={{ display: 'flex', gap: '10px', fontSize: '12.5px', fontWeight: 600, alignItems: 'center' }}>
-                                <span className="badge badge-gagnant" style={{ padding: '6px 12px', fontSize: '12px' }}>📥 {csvImportResult.insertedCount} Stockées</span>
-                                <span className="badge badge-ecarte" style={{ padding: '6px 12px', fontSize: '12px' }}>🛑 {csvImportResult.duplicateCount} Doublons ignorés</span>
-                                <span className="badge badge-nouveau" style={{ padding: '6px 12px', fontSize: '12px' }}>✨ {csvImportResult.generatedSkusCount} SKUs générés</span>
+                            <div style={{ display: 'flex', gap: '8px', fontSize: '12px', fontWeight: 600, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span className="badge badge-gagnant" style={{ padding: '6px 12px' }}>📥 {csvImportResult.insertedCount} Créées</span>
+                                <span className="badge badge-retester" style={{ padding: '6px 12px', backgroundColor: '#3b82f6', color: '#fff' }}>🔄 {csvImportResult.updatedCount || 0} Mises à jour</span>
+                                <span className="badge badge-ecarte" style={{ padding: '6px 12px' }}>🛑 {csvImportResult.duplicateCount} Inchangées</span>
+                                <span className="badge badge-nouveau" style={{ padding: '6px 12px' }}>✨ {csvImportResult.generatedSkusCount} SKUs Générés</span>
                             </div>
                         )}
                     </div>

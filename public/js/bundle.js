@@ -5377,30 +5377,35 @@ function ClassementView({
   }), " Lancer l'importation & Stocker en Base")), csvImportResult && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      gap: '10px',
-      fontSize: '12.5px',
+      gap: '8px',
+      fontSize: '12px',
       fontWeight: 600,
-      alignItems: 'center'
+      alignItems: 'center',
+      flexWrap: 'wrap'
     }
   }, /*#__PURE__*/React.createElement("span", {
     className: "badge badge-gagnant",
     style: {
-      padding: '6px 12px',
-      fontSize: '12px'
+      padding: '6px 12px'
     }
-  }, "📥 ", csvImportResult.insertedCount, " Stockées"), /*#__PURE__*/React.createElement("span", {
+  }, "📥 ", csvImportResult.insertedCount, " Créées"), /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-retester",
+    style: {
+      padding: '6px 12px',
+      backgroundColor: '#3b82f6',
+      color: '#fff'
+    }
+  }, "🔄 ", csvImportResult.updatedCount || 0, " Mises à jour"), /*#__PURE__*/React.createElement("span", {
     className: "badge badge-ecarte",
     style: {
-      padding: '6px 12px',
-      fontSize: '12px'
+      padding: '6px 12px'
     }
-  }, "🛑 ", csvImportResult.duplicateCount, " Doublons ignorés"), /*#__PURE__*/React.createElement("span", {
+  }, "🛑 ", csvImportResult.duplicateCount, " Inchangées"), /*#__PURE__*/React.createElement("span", {
     className: "badge badge-nouveau",
     style: {
-      padding: '6px 12px',
-      fontSize: '12px'
+      padding: '6px 12px'
     }
-  }, "✨ ", csvImportResult.generatedSkusCount, " SKUs générés"))))), /*#__PURE__*/React.createElement("div", {
+  }, "✨ ", csvImportResult.generatedSkusCount, " SKUs Générés"))))), /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: '24px'

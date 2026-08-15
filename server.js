@@ -185,7 +185,7 @@ app.post('/api/import', async (req, res) => {
     }
 });
 
-// 2b. Import DotB Order CSV with Anti-Doublons & Automated Storage
+// 2b. Import DotB Order CSV with Anti-Doublons & Smart Update Storage
 app.post('/api/import-orders-csv', async (req, res) => {
     try {
         const { csvText, organisationId } = req.body;
@@ -196,17 +196,17 @@ app.post('/api/import-orders-csv', async (req, res) => {
         const orgId = organisationId || 'org_default';
         const existingLines = await dbService.getCalendrier(orgId);
 
-        // Build anti-duplicate sets
-        const existingSet = new Set();
+        // Build anti-duplicate & lookup map for existing orders
+        const existingMap = new Map();
         (existingLines || []).forEach(l => {
             if (l.transactionId && l.vintedId) {
-                existingSet.add(`${l.transactionId}_${l.vintedId}`.toLowerCase());
+                existingMap.set(`${l.transactionId}_${l.vintedId}`.toLowerCase(), l);
             }
             if (l.transactionId && l.produit) {
-                existingSet.add(`${l.transactionId}_${l.produit}`.toLowerCase().trim());
+                existingMap.set(`${l.transactionId}_${l.produit}`.toLowerCase().trim(), l);
             }
             if (l.sku && l.datePrevue && l.acheteur) {
-                existingSet.add(`${l.sku}_${l.datePrevue}_${l.acheteur}`.toLowerCase().trim());
+                existingMap.set(`${l.sku}_${l.datePrevue}_${l.acheteur}`.toLowerCase().trim(), l);
             }
         });
 
@@ -238,6 +238,7 @@ app.post('/api/import-orders-csv', async (req, res) => {
         const rawLines = csvText.trim().split(/\r?\n/);
         let parsedCount = 0;
         let insertedCount = 0;
+        let updatedCount = 0;
         let duplicateCount = 0;
         let generatedSkusCount = 0;
         let currentDateStr = new Date().toISOString().split('T')[0];
@@ -265,19 +266,11 @@ app.post('/api/import-orders-csv', async (req, res) => {
             let sku = parts[11] ? parts[11].trim() : '';
             const vintedId = parts[14] ? parts[14].trim() : '';
             const acheteur = parts[15] ? parts[15].trim() : '';
+            const nomDestinataire = parts[16] ? parts[16].trim() : '';
+            const ville = parts[17] ? parts[17].trim() : '';
             const pays = parts[18] ? parts[18].trim() : 'FR';
 
-            // Anti-doublon check
-            const key1 = transactionId && vintedId ? `${transactionId}_${vintedId}`.toLowerCase() : '';
-            const key2 = transactionId && titreArticle ? `${transactionId}_${titreArticle}`.toLowerCase().trim() : '';
-            const key3 = sku && currentDateStr && acheteur ? `${sku}_${currentDateStr}_${acheteur}`.toLowerCase().trim() : '';
-
-            if ((key1 && existingSet.has(key1)) || (key2 && existingSet.has(key2)) || (key3 && existingSet.has(key3))) {
-                duplicateCount++;
-                continue;
-            }
-
-            // SKU Generation if empty
+            // Auto-generate SKU if missing
             if (!sku && vintedId) {
                 const dp = currentDateStr.split('-');
                 const yy = dp[0] ? dp[0].substring(2) : '26';
@@ -285,6 +278,40 @@ app.post('/api/import-orders-csv', async (req, res) => {
                 const dd = dp[2] || '09';
                 sku = `sz${yy}${mm}${dd}${vintedId}`;
                 generatedSkusCount++;
+            }
+
+            // Anti-doublon & Update Check
+            const key1 = transactionId && vintedId ? `${transactionId}_${vintedId}`.toLowerCase() : '';
+            const key2 = transactionId && titreArticle ? `${transactionId}_${titreArticle}`.toLowerCase().trim() : '';
+            const key3 = sku && currentDateStr && acheteur ? `${sku}_${currentDateStr}_${acheteur}`.toLowerCase().trim() : '';
+
+            const existingRow = (key1 && existingMap.get(key1)) || (key2 && existingMap.get(key2)) || (key3 && existingMap.get(key3));
+
+            if (existingRow) {
+                // Check if new/updated info exists!
+                const updates = {};
+                if (statut && statut !== existingRow.statut) updates.statut = statut;
+                if (numeroSuivi && numeroSuivi !== existingRow.numeroSuivi) updates.numeroSuivi = numeroSuivi;
+                if (bordereauUrl && bordereauUrl !== existingRow.bordereauUrl) updates.bordereauUrl = bordereauUrl;
+                if (transporteur && transporteur !== existingRow.transporteur) updates.transporteur = transporteur;
+                if (sku && (!existingRow.sku || existingRow.sku !== sku)) updates.sku = sku;
+                if (photoUrl && photoUrl !== existingRow.photoUrl) updates.photoUrl = photoUrl;
+                if (acheteur && acheteur !== existingRow.acheteur) updates.acheteur = acheteur;
+                if (nomDestinataire && nomDestinataire !== existingRow.nomDestinataire) updates.nomDestinataire = nomDestinataire;
+                if (ville && ville !== existingRow.ville) updates.ville = ville;
+                if (pays && pays !== existingRow.pays) updates.pays = pays;
+                if (comptePseudo && (!existingRow.comptePseudo || existingRow.comptePseudo === 'DotB Cloud' || existingRow.comptePseudo === 'Non spécifié')) {
+                    updates.comptePseudo = comptePseudo;
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    updates.dateModification = new Date().toISOString();
+                    await dbService.updateCalendrierRow(existingRow.id, updates);
+                    updatedCount++;
+                } else {
+                    duplicateCount++;
+                }
+                continue;
             }
 
             const newRow = {
@@ -303,6 +330,8 @@ app.post('/api/import-orders-csv', async (req, res) => {
                 score: 15,
                 source: 'Import CSV DotB',
                 acheteur: acheteur || '',
+                nomDestinataire: nomDestinataire || '',
+                ville: ville || '',
                 transporteur: transporteur || '',
                 numeroSuivi: numeroSuivi || '',
                 bordereauUrl: bordereauUrl || '',
@@ -312,16 +341,16 @@ app.post('/api/import-orders-csv', async (req, res) => {
                 dateCreation: new Date().toISOString()
             };
 
-            await dbService.createCalendrierRow(newRow);
-            if (key1) existingSet.add(key1);
-            if (key2) existingSet.add(key2);
-            if (key3) existingSet.add(key3);
+            const created = await dbService.createCalendrierRow(newRow);
+            if (key1) existingMap.set(key1, created || newRow);
+            if (key2) existingMap.set(key2, created || newRow);
+            if (key3) existingMap.set(key3, created || newRow);
             insertedCount++;
         }
 
         await dbService.logAction(
             "Import CSV Commandes",
-            `Importation CSV réalisée : ${insertedCount} insérées, ${duplicateCount} doublons ignorés, ${generatedSkusCount} SKUs générés sur ${parsedCount} lignes lues.`,
+            `Importation CSV : ${insertedCount} créées, ${updatedCount} modifiées (mises à jour avec nouvelles infos), ${duplicateCount} identiques ignorées, ${generatedSkusCount} SKUs générés sur ${parsedCount} lignes.`,
             "Succès"
         );
 
@@ -329,9 +358,10 @@ app.post('/api/import-orders-csv', async (req, res) => {
             success: true,
             parsedCount,
             insertedCount,
+            updatedCount,
             duplicateCount,
             generatedSkusCount,
-            message: `✅ Importation réussie : ${insertedCount} nouvelles commandes stockées en base, ${duplicateCount} doublons ignorés, ${generatedSkusCount} SKUs auto-générés.`
+            message: `✅ Importation réussie : ${insertedCount} nouvelles commandes créées, ${updatedCount} commandes existantes mises à jour avec les nouvelles infos, ${duplicateCount} doublons ignorés.`
         });
     } catch (err) {
         console.error("Erreur Import CSV Commandes:", err);
@@ -339,6 +369,7 @@ app.post('/api/import-orders-csv', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 
 // ------------------- ORGANISATIONS -------------------
