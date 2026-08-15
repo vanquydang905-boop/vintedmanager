@@ -338,9 +338,16 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                 });
                 if (!matched) return false;
             }
-            if (!isAgent && filterAgent && (l.agent || '').trim().toLowerCase() !== filterAgent.trim().toLowerCase()) return false;
             if (filterStatut && l.statut !== filterStatut) return false;
-            if (filterClassif && l.classification !== filterClassif) return false;
+            if (filterClassif) {
+                const isGagnantFilter = filterClassif.includes('Gagnant');
+                const lineClassif = l.classification || (l.sku && winnerSkusSet.has(String(l.sku).trim().toLowerCase()) ? 'Gagnant' : '');
+                const isMatch = lineClassif.includes(filterClassif) ||
+                                (isGagnantFilter && l.sku && winnerSkusSet.has(String(l.sku).trim().toLowerCase())) ||
+                                (isGagnantFilter && (l.vente > 0 || l.transactionId || l.source === 'Import CSV DotB'));
+                if (!isMatch) return false;
+            }
+
             if (searchTerm.trim()) {
                 const q = searchTerm.trim().toLowerCase();
                 const cObj = comptesAll.find(c => 
@@ -462,12 +469,52 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
         }
     };
 
-    // KPI Métriques calculées uniquement sur les données pertinentes de l'Agent (baseLines)
+    // Fetch consolidated SKU summary to identify all Winning SKUs (Produits Gagnants)
+    const [apiSkuSummary, setApiSkuSummary] = useState([]);
+
+    useEffect(() => {
+        let isMounted = true;
+        fetch('/api/sku/summary')
+            .then(res => res.json())
+            .then(data => {
+                if (isMounted && Array.isArray(data)) {
+                    setApiSkuSummary(data);
+                }
+            })
+            .catch(err => console.warn("Err fetching SKU summary in Calendrier:", err));
+        return () => { isMounted = false; };
+    }, [calendrierAll]);
+
+    // Set of all SKUs classified as Gagnants across the organization & DotB Cloud
+    const winnerSkusSet = useMemo(() => {
+        const set = new Set();
+        (apiSkuSummary || []).forEach(s => {
+            if (s.sku && s.classification && s.classification.includes('Gagnant')) {
+                set.add(String(s.sku).trim().toLowerCase());
+            }
+        });
+        (calendrierAll || []).forEach(l => {
+            if (l.sku && (l.classification === 'Gagnant' || l.vente > 0 || l.transactionId || l.source === 'Import CSV DotB')) {
+                set.add(String(l.sku).trim().toLowerCase());
+            }
+        });
+        return set;
+    }, [apiSkuSummary, calendrierAll]);
+
+    // KPI Métriques calculées
     const totalVentes = useMemo(() => baseLines.reduce((sum, l) => sum + (l.vente || 0), 0), [baseLines]);
     const pubsFaite = useMemo(() => baseLines.filter(l => l.statut === 'Fait').length, [baseLines]);
     const totalPubs = baseLines.length;
     const avgScore = useMemo(() => totalPubs > 0 ? (baseLines.reduce((sum, l) => sum + (l.score || 0), 0) / totalPubs).toFixed(1) : "0.0", [baseLines, totalPubs]);
-    const winnersCount = useMemo(() => new Set(baseLines.filter(l => l.classification === 'Gagnant' && l.sku).map(l => l.sku)).size, [baseLines]);
+    
+    // Total Produits Gagnants dans toute l'organisation & DotB Cloud
+    const winnersCount = useMemo(() => {
+        if (apiSkuSummary && apiSkuSummary.length > 0) {
+            return apiSkuSummary.filter(s => (s.classification || '').includes('Gagnant')).length;
+        }
+        return winnerSkusSet.size;
+    }, [apiSkuSummary, winnerSkusSet]);
+
 
     // Nombre de ventes par SKU sur toute l'organisation
     const skuVentesMap = useMemo(() => {
@@ -1049,19 +1096,24 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                             })()}
                                         </td>
                                         <td>
-                                            {l.sku && String(l.sku).trim() !== '' ? (
-                                                <span className={`badge ${
-                                                    l.classification === 'Gagnant' ? 'badge-gagnant' :
-                                                    l.classification === 'Écarté' ? 'badge-ecarte' :
-                                                    l.classification === 'Nouveau produit' ? 'badge-nouveau' :
-                                                    'badge-retester'
-                                                }`}>
-                                                    {l.classification || 'Nouveau produit'}
-                                                </span>
-                                            ) : (
+                                            {l.sku && String(l.sku).trim() !== '' ? (() => {
+                                                const isWinner = winnerSkusSet.has(String(l.sku).trim().toLowerCase()) || l.vente > 0 || l.transactionId;
+                                                const classif = isWinner ? 'Gagnant' : (l.classification || 'Nouveau produit');
+                                                return (
+                                                    <span className={`badge ${
+                                                        classif === 'Gagnant' || classif.includes('Gagnant') ? 'badge-gagnant' :
+                                                        classif === 'Écarté' ? 'badge-ecarte' :
+                                                        classif === 'Nouveau produit' ? 'badge-nouveau' :
+                                                        'badge-retester'
+                                                    }`}>
+                                                        {classif === 'Gagnant' || classif.includes('Gagnant') ? '🏆 Gagnant' : classif}
+                                                    </span>
+                                                );
+                                            })() : (
                                                 <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>-</span>
                                             )}
                                         </td>
+
                                         <td>
                                             <button className={`btn btn-sm ${l.statut === 'Fait' ? 'btn-success' : 'btn-danger'}`}
                                                 onClick={() => onUpdateRow(l.id, { statut: l.statut === 'Fait' ? 'Non fait' : 'Fait' })}>
