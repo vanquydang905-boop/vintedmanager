@@ -886,10 +886,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                 <th style={{ fontWeight: 700 }}>Classif.</th>
                                 <th style={{ fontWeight: 700 }}>Statut</th>
                                 <th style={{ fontWeight: 700, color: 'var(--success)' }}>Vente</th>
-                                <th>Vues</th>
-                                {/* <th>Likes</th> */}
-                                <th>Favoris</th>
-                                {/* <th>Msgs</th> */}
                                 <th>Score</th>
                                 {(currentUser && currentUser.role !== 'agent') && <th>Actions</th>}
                             </tr>
@@ -1086,22 +1082,6 @@ function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddR
                                                 )}
                                             </div>
                                         </td>
-                                        <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.vues || 0}
-                                                onChange={(e) => onUpdateRow(l.id, { vues: parseInt(e.target.value) || 0 })} />
-                                        </td>
-                                        {/* <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.likes || 0}
-                                                onChange={(e) => onUpdateRow(l.id, { likes: parseInt(e.target.value) || 0 })} />
-                                        </td> */}
-                                        <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.favoris || 0}
-                                                onChange={(e) => onUpdateRow(l.id, { favoris: parseInt(e.target.value) || 0 })} />
-                                        </td>
-                                        {/* <td>
-                                            <input type="number" className="input-table" style={{ width: '60px' }} value={l.messages || 0}
-                                                onChange={(e) => onUpdateRow(l.id, { messages: parseInt(e.target.value) || 0 })} />
-                                        </td> */}
                                         <td><b>{(l.score || 0).toFixed(1)}</b></td>
                                         {(currentUser && currentUser.role !== 'agent') && (
                                             <td>

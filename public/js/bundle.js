@@ -1357,7 +1357,7 @@ function DashboardView({
       fontWeight: 700,
       color: 'var(--success)'
     }
-  }, "Vente"), /*#__PURE__*/React.createElement("th", null, "Vues"), /*#__PURE__*/React.createElement("th", null, "Favoris"), /*#__PURE__*/React.createElement("th", null, "Score"), currentUser && currentUser.role !== 'agent' && /*#__PURE__*/React.createElement("th", null, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, filteredLines.length > 0 ? filteredLines.map(l => /*#__PURE__*/React.createElement("tr", {
+  }, "Vente"), /*#__PURE__*/React.createElement("th", null, "Score"), currentUser && currentUser.role !== 'agent' && /*#__PURE__*/React.createElement("th", null, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, filteredLines.length > 0 ? filteredLines.map(l => /*#__PURE__*/React.createElement("tr", {
     key: l.id,
     style: {
       opacity: l.statut === 'Fait' ? 0.85 : 1,
@@ -1614,27 +1614,7 @@ function DashboardView({
       whiteSpace: 'nowrap'
     },
     title: `Ce SKU a été vendu ${skuVentesMap[l.sku]}x dans l'organisation`
-  }, skuVentesMap[l.sku], "x ce SKU"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    className: "input-table",
-    style: {
-      width: '60px'
-    },
-    value: l.vues || 0,
-    onChange: e => onUpdateRow(l.id, {
-      vues: parseInt(e.target.value) || 0
-    })
-  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    className: "input-table",
-    style: {
-      width: '60px'
-    },
-    value: l.favoris || 0,
-    onChange: e => onUpdateRow(l.id, {
-      favoris: parseInt(e.target.value) || 0
-    })
-  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, (l.score || 0).toFixed(1))), currentUser && currentUser.role !== 'agent' && /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+  }, skuVentesMap[l.sku], "x ce SKU"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, (l.score || 0).toFixed(1))), currentUser && currentUser.role !== 'agent' && /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-danger btn-sm",
     title: "Supprimer",
     onClick: () => onDeleteRow(l.id)

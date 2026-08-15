@@ -28,15 +28,11 @@ function normalizeTitle(t) {
 }
 
 function calcScore(item, params) {
-    const p = params.poidsScore || { vues: 0.1, favoris: 2, vente: 20 };
-    // Likes et Messages désactivés temporairement
-    // const favCount = (item.favoris || 0) + (item.likes || 0);
-    const favCount = (item.favoris || 0);
-    const weightFav = p.favoris || 2.0;
-    return (item.vues || 0) * (p.vues || 0) +
-        favCount * weightFav +
-        // (item.messages || 0) * (p.messages || 0) +
-        (item.vente || 0) * (p.vente || 0);
+    const isDone = item.statut === 'Fait' || item.statut === '✓ Fait' || item.statut === 'Publié' || item.done;
+    const isSold = item.vente === 1;
+    const pointsPub = isDone ? 5.0 : 0.0;
+    const pointsVente = isSold ? 20.0 : 0.0;
+    return pointsPub + pointsVente;
 }
 
 function getClassification(itemOrScore, allOrgLinesOrVente = [], paramsObj = {}) {
