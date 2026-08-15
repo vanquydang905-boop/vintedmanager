@@ -1279,16 +1279,18 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     ? String(existingTitleMatch.sku).trim() 
                     : ((item.sku && String(item.sku).trim()) ? String(item.sku).trim() : (item.vinted_id ? `VINTED-${item.vinted_id}` : `SKU-${item.id ? item.id.substring(0, 8) : Math.floor(1000 + Math.random() * 9000)}`));
 
+                const slotHours = ["08:15", "10:30", "12:00", "14:15", "16:30", "18:00", "20:15", "21:30"];
                 const itemRawDate = item.status_updated_at || item.created_at || item.order_date;
                 let realDateStr = todayStr;
-                let realHourStr = new Date().toTimeString().split(' ')[0].substring(0, 5);
+                let realHourStr = slotHours[(createdItemsCount + updatedItemsCount) % slotHours.length];
 
                 if (itemRawDate) {
                     try {
                         const dObj = new Date(itemRawDate);
                         if (!isNaN(dObj.getTime())) {
                             realDateStr = getLocalDateString(dObj);
-                            realHourStr = dObj.toTimeString().split(' ')[0].substring(0, 5);
+                            const parsedH = dObj.toTimeString().split(' ')[0].substring(0, 5);
+                            if (parsedH && parsedH !== '00:00') realHourStr = parsedH;
                         }
                     } catch (e) {}
                 }
@@ -1304,17 +1306,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                 const isSold = item.status === 'sold' || (matchLine && matchLine.vente === 1);
                 const isDone = item.status === 'imported' || (matchLine && (matchLine.statut === 'Fait' || matchLine.statut === 'Publié' || matchLine.done));
 
-                if (itemViews === 0) {
-                    if (matchLine && matchLine.vues > 0) itemViews = matchLine.vues;
-                    else itemViews = isSold ? Math.floor(135 + Math.random() * 80) : (isDone ? Math.floor(40 + Math.random() * 75) : Math.floor(15 + Math.random() * 30));
-                }
-
-                if (itemLikes === 0) {
-                    if (matchLine && matchLine.favoris > 0) itemLikes = matchLine.favoris;
-                    else itemLikes = isSold ? Math.floor(7 + Math.random() * 10) : (isDone ? Math.floor(3 + Math.random() * 6) : Math.floor(1 + Math.random() * 3));
-                }
-
-                const score = calcScore({ vues: itemViews, favoris: itemLikes, vente: isSold ? 1 : 0 }, params);
+                const score = calcScore({ statut: isDone ? 'Fait' : 'Non fait', vente: isSold ? 1 : 0 }, params);
                 const classif = getClassification(score, isSold ? 1 : 0, params);
 
                 if (matchLine) {
@@ -1327,10 +1319,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         date: matchLine.date || realDateStr,
                         heurePrevue: matchLine.heurePrevue || realHourStr,
                         heureStatut: realHourStr,
-                        statut: item.status === 'imported' ? 'Fait' : (matchLine.statut || 'Fait'),
-                        vues: itemViews,
-                        likes: itemLikes,
-                        favoris: itemLikes,
+                        statut: isDone ? 'Fait' : (matchLine.statut || 'Fait'),
                         score,
                         classification: classif
                     }));
@@ -1353,9 +1342,9 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         sku: itemSku,
                         produit: item.title,
                         lien: "",
-                        vues: itemViews,
-                        likes: itemLikes,
-                        favoris: itemLikes,
+                        vues: 0,
+                        likes: 0,
+                        favoris: 0,
                         messages: 0,
                         vente: isSold ? 1 : 0,
                         score,
