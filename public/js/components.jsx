@@ -3410,8 +3410,17 @@ function ClassementView({ appState, onUpdateRow }) {
     const [newClassifInput, setNewClassifInput] = useState('Nouveau produit');
     const [skuSearchTerm, setSkuSearchTerm] = useState('');
     const [skuFilterClassif, setSkuFilterClassif] = useState('');
+    const [skuFilterVentes, setSkuFilterVentes] = useState('all');
+    const [skuSortBy, setSkuSortBy] = useState('score');
 
-    // Répertoire de tous les SKUs enregistrés avec leur classification et statistiques
+    const comptesAll = appState.comptes || [];
+    const comptesMap = useMemo(() => {
+        const map = {};
+        comptesAll.forEach(c => { map[c.id] = c; });
+        return map;
+    }, [comptesAll]);
+
+    // Répertoire de tous les SKUs enregistrés avec leur classification, comptes, prix et statistiques
     const allSKUsMap = useMemo(() => {
         const map = {};
         calendrier.forEach(l => {
@@ -3427,6 +3436,8 @@ function ClassementView({ appState, onUpdateRow }) {
                     scoreCumule: 0,
                     ventes: 0,
                     pubs: 0,
+                    accountsSet: new Set(),
+                    priceSet: new Set(),
                     lineIds: []
                 };
             }
@@ -3438,27 +3449,60 @@ function ClassementView({ appState, onUpdateRow }) {
             map[skuClean].pubs += 1;
             map[skuClean].lineIds.push(l.id);
             if (l.classification) map[skuClean].classification = l.classification;
+
+            const comp = comptesMap[l.compteId];
+            if (comp && comp.pseudo) map[skuClean].accountsSet.add('@' + comp.pseudo.trim());
+            else if (l.comptePseudo) map[skuClean].accountsSet.add('@' + l.comptePseudo.trim());
+
+            if (l.prix) map[skuClean].priceSet.add(l.prix + '€');
         });
         return map;
-    }, [calendrier]);
+    }, [calendrier, comptesMap]);
 
-    const skuList = useMemo(() => Object.values(allSKUsMap), [allSKUsMap]);
+    const skuList = useMemo(() => {
+        return Object.values(allSKUsMap).map(s => {
+            const accs = Array.from(s.accountsSet);
+            const prices = Array.from(s.priceSet);
+            return {
+                ...s,
+                accountsStr: accs.length > 0 ? accs.join(', ') : 'Non spécifié',
+                pricesStr: prices.length > 0 ? prices.slice(0, 2).join(' - ') : '-'
+            };
+        });
+    }, [allSKUsMap]);
 
     const filteredSKUList = useMemo(() => {
-        let list = skuList;
+        let list = [...skuList];
+
         if (skuFilterClassif) {
             list = list.filter(s => s.classification === skuFilterClassif);
         }
+
+        if (skuFilterVentes === 'with_sales') {
+            list = list.filter(s => s.ventes > 0);
+        } else if (skuFilterVentes === 'no_sales') {
+            list = list.filter(s => s.ventes === 0);
+        } else if (skuFilterVentes === 'top_sales') {
+            list = list.filter(s => s.ventes >= 3);
+        }
+
         if (skuSearchTerm.trim()) {
             const q = skuSearchTerm.trim().toLowerCase();
             list = list.filter(s => 
                 s.sku.toLowerCase().includes(q) || 
                 (s.produit && s.produit.toLowerCase().includes(q)) ||
-                (s.classification && s.classification.toLowerCase().includes(q))
+                (s.classification && s.classification.toLowerCase().includes(q)) ||
+                (s.accountsStr && s.accountsStr.toLowerCase().includes(q))
             );
         }
+
+        if (skuSortBy === 'score') list.sort((a, b) => b.scoreCumule - a.scoreCumule);
+        else if (skuSortBy === 'ventes') list.sort((a, b) => b.ventes - a.ventes);
+        else if (skuSortBy === 'pubs') list.sort((a, b) => b.pubs - a.pubs);
+        else if (skuSortBy === 'sku') list.sort((a, b) => a.sku.localeCompare(b.sku));
+
         return list;
-    }, [skuList, skuSearchTerm, skuFilterClassif]);
+    }, [skuList, skuSearchTerm, skuFilterClassif, skuFilterVentes, skuSortBy]);
 
     const topSKUs = useMemo(() => {
         return [...skuList].sort((a, b) => b.scoreCumule - a.scoreCumule).slice(0, 10);
@@ -3673,7 +3717,7 @@ function ClassementView({ appState, onUpdateRow }) {
                             className="input"
                             value={skuFilterClassif}
                             onChange={(e) => setSkuFilterClassif(e.target.value)}
-                            style={{ height: '34px', fontSize: '12px', width: '190px', borderRadius: '6px', border: skuFilterClassif ? '1.5px solid var(--primary)' : '1px solid var(--border)' }}
+                            style={{ height: '34px', fontSize: '12px', width: '170px', borderRadius: '6px', border: skuFilterClassif ? '1.5px solid var(--primary)' : '1px solid var(--border)' }}
                         >
                             <option value="">Toutes les classifications</option>
                             <option value="Gagnant">🏆 Produit Gagnant</option>
@@ -3681,25 +3725,49 @@ function ClassementView({ appState, onUpdateRow }) {
                             <option value="À retester">🔄 À retester</option>
                             <option value="Écarté">🚫 Écarté</option>
                         </select>
+                        <select
+                            className="input"
+                            value={skuFilterVentes}
+                            onChange={(e) => setSkuFilterVentes(e.target.value)}
+                            style={{ height: '34px', fontSize: '12px', width: '160px', borderRadius: '6px', border: skuFilterVentes !== 'all' ? '1.5px solid var(--primary)' : '1px solid var(--border)' }}
+                        >
+                            <option value="all">Toutes les ventes</option>
+                            <option value="with_sales">💰 Avec Ventes (&gt;0)</option>
+                            <option value="top_sales">🔥 Best-Sellers (&ge;3)</option>
+                            <option value="no_sales">⚪ Sans Vente (0)</option>
+                        </select>
+                        <select
+                            className="input"
+                            value={skuSortBy}
+                            onChange={(e) => setSkuSortBy(e.target.value)}
+                            style={{ height: '34px', fontSize: '12px', width: '150px', borderRadius: '6px' }}
+                        >
+                            <option value="score">Trier par Score</option>
+                            <option value="ventes">Trier par Ventes</option>
+                            <option value="pubs">Trier par Pubs</option>
+                            <option value="sku">Trier par Code SKU</option>
+                        </select>
                         <input
                             type="text"
                             className="input"
                             value={skuSearchTerm}
                             onChange={(e) => setSkuSearchTerm(e.target.value)}
-                            placeholder="🔍 Filtrer les SKUs..."
-                            style={{ width: '200px', height: '34px', fontSize: '12px' }}
+                            placeholder="🔍 Filtrer par SKU, Titre ou @compte..."
+                            style={{ width: '220px', height: '34px', fontSize: '12px' }}
                         />
                     </div>
                 </div>
 
-                <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <div className="table-container" style={{ maxHeight: '380px', overflowY: 'auto' }}>
                     <table>
                         <thead>
                             <tr>
                                 <th>Code SKU</th>
+                                <th>Publications (DotB)</th>
+                                <th>Ventes (DotB)</th>
+                                <th>Compte(s) Vinted Vendeur</th>
+                                <th>Prix Constaté</th>
                                 <th>Classification</th>
-                                <th>Publications</th>
-                                <th>Ventes</th>
                                 <th>Score Cumulé</th>
                             </tr>
                         </thead>
@@ -3708,6 +3776,10 @@ function ClassementView({ appState, onUpdateRow }) {
                                 filteredSKUList.map(s => (
                                     <tr key={s.sku}>
                                         <td><b style={{ color: 'var(--primary)' }} title={s.produit || s.sku}>{s.sku}</b></td>
+                                        <td><b>{s.pubs}</b> pub{s.pubs > 1 ? 's' : ''}</td>
+                                        <td><b style={{ color: s.ventes > 0 ? '#059669' : 'inherit' }}>{s.ventes}</b> vente{s.ventes > 1 ? 's' : ''}</td>
+                                        <td><span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>{s.accountsStr}</span></td>
+                                        <td><span style={{ fontSize: '12px', fontWeight: 600, color: '#0d9488' }}>{s.pricesStr}</span></td>
                                         <td>
                                             <span className={`badge ${
                                                 s.classification === 'Gagnant' ? 'badge-gagnant' :
@@ -3718,14 +3790,12 @@ function ClassementView({ appState, onUpdateRow }) {
                                                 {s.classification}
                                             </span>
                                         </td>
-                                        <td>{s.pubs} pub{s.pubs > 1 ? 's' : ''}</td>
-                                        <td><b>{s.ventes}</b> vente{s.ventes > 1 ? 's' : ''}</td>
                                         <td><b>{s.scoreCumule.toFixed(1)} pts</b></td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
                                         Aucun SKU trouvé pour ce filtre.
                                     </td>
                                 </tr>

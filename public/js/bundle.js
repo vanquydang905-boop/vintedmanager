@@ -4937,8 +4937,18 @@ function ClassementView({
   const [newClassifInput, setNewClassifInput] = useState('Nouveau produit');
   const [skuSearchTerm, setSkuSearchTerm] = useState('');
   const [skuFilterClassif, setSkuFilterClassif] = useState('');
+  const [skuFilterVentes, setSkuFilterVentes] = useState('all');
+  const [skuSortBy, setSkuSortBy] = useState('score');
+  const comptesAll = appState.comptes || [];
+  const comptesMap = useMemo(() => {
+    const map = {};
+    comptesAll.forEach(c => {
+      map[c.id] = c;
+    });
+    return map;
+  }, [comptesAll]);
 
-  // Répertoire de tous les SKUs enregistrés avec leur classification et statistiques
+  // Répertoire de tous les SKUs enregistrés avec leur classification, comptes, prix et statistiques
   const allSKUsMap = useMemo(() => {
     const map = {};
     calendrier.forEach(l => {
@@ -4953,6 +4963,8 @@ function ClassementView({
           scoreCumule: 0,
           ventes: 0,
           pubs: 0,
+          accountsSet: new Set(),
+          priceSet: new Set(),
           lineIds: []
         };
       }
@@ -4964,21 +4976,42 @@ function ClassementView({
       map[skuClean].pubs += 1;
       map[skuClean].lineIds.push(l.id);
       if (l.classification) map[skuClean].classification = l.classification;
+      const comp = comptesMap[l.compteId];
+      if (comp && comp.pseudo) map[skuClean].accountsSet.add('@' + comp.pseudo.trim());else if (l.comptePseudo) map[skuClean].accountsSet.add('@' + l.comptePseudo.trim());
+      if (l.prix) map[skuClean].priceSet.add(l.prix + '€');
     });
     return map;
-  }, [calendrier]);
-  const skuList = useMemo(() => Object.values(allSKUsMap), [allSKUsMap]);
+  }, [calendrier, comptesMap]);
+  const skuList = useMemo(() => {
+    return Object.values(allSKUsMap).map(s => {
+      const accs = Array.from(s.accountsSet);
+      const prices = Array.from(s.priceSet);
+      return {
+        ...s,
+        accountsStr: accs.length > 0 ? accs.join(', ') : 'Non spécifié',
+        pricesStr: prices.length > 0 ? prices.slice(0, 2).join(' - ') : '-'
+      };
+    });
+  }, [allSKUsMap]);
   const filteredSKUList = useMemo(() => {
-    let list = skuList;
+    let list = [...skuList];
     if (skuFilterClassif) {
       list = list.filter(s => s.classification === skuFilterClassif);
     }
+    if (skuFilterVentes === 'with_sales') {
+      list = list.filter(s => s.ventes > 0);
+    } else if (skuFilterVentes === 'no_sales') {
+      list = list.filter(s => s.ventes === 0);
+    } else if (skuFilterVentes === 'top_sales') {
+      list = list.filter(s => s.ventes >= 3);
+    }
     if (skuSearchTerm.trim()) {
       const q = skuSearchTerm.trim().toLowerCase();
-      list = list.filter(s => s.sku.toLowerCase().includes(q) || s.produit && s.produit.toLowerCase().includes(q) || s.classification && s.classification.toLowerCase().includes(q));
+      list = list.filter(s => s.sku.toLowerCase().includes(q) || s.produit && s.produit.toLowerCase().includes(q) || s.classification && s.classification.toLowerCase().includes(q) || s.accountsStr && s.accountsStr.toLowerCase().includes(q));
     }
+    if (skuSortBy === 'score') list.sort((a, b) => b.scoreCumule - a.scoreCumule);else if (skuSortBy === 'ventes') list.sort((a, b) => b.ventes - a.ventes);else if (skuSortBy === 'pubs') list.sort((a, b) => b.pubs - a.pubs);else if (skuSortBy === 'sku') list.sort((a, b) => a.sku.localeCompare(b.sku));
     return list;
-  }, [skuList, skuSearchTerm, skuFilterClassif]);
+  }, [skuList, skuSearchTerm, skuFilterClassif, skuFilterVentes, skuSortBy]);
   const topSKUs = useMemo(() => {
     return [...skuList].sort((a, b) => b.scoreCumule - a.scoreCumule).slice(0, 10);
   }, [skuList]);
@@ -5308,7 +5341,7 @@ function ClassementView({
     style: {
       height: '34px',
       fontSize: '12px',
-      width: '190px',
+      width: '170px',
       borderRadius: '6px',
       border: skuFilterClassif ? '1.5px solid var(--primary)' : '1px solid var(--border)'
     }
@@ -5322,34 +5355,87 @@ function ClassementView({
     value: "À retester"
   }, "🔄 À retester"), /*#__PURE__*/React.createElement("option", {
     value: "Écarté"
-  }, "🚫 Écarté")), /*#__PURE__*/React.createElement("input", {
+  }, "🚫 Écarté")), /*#__PURE__*/React.createElement("select", {
+    className: "input",
+    value: skuFilterVentes,
+    onChange: e => setSkuFilterVentes(e.target.value),
+    style: {
+      height: '34px',
+      fontSize: '12px',
+      width: '160px',
+      borderRadius: '6px',
+      border: skuFilterVentes !== 'all' ? '1.5px solid var(--primary)' : '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Toutes les ventes"), /*#__PURE__*/React.createElement("option", {
+    value: "with_sales"
+  }, "💰 Avec Ventes (>0)"), /*#__PURE__*/React.createElement("option", {
+    value: "top_sales"
+  }, "🔥 Best-Sellers (≥3)"), /*#__PURE__*/React.createElement("option", {
+    value: "no_sales"
+  }, "⚪ Sans Vente (0)")), /*#__PURE__*/React.createElement("select", {
+    className: "input",
+    value: skuSortBy,
+    onChange: e => setSkuSortBy(e.target.value),
+    style: {
+      height: '34px',
+      fontSize: '12px',
+      width: '150px',
+      borderRadius: '6px'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "score"
+  }, "Trier par Score"), /*#__PURE__*/React.createElement("option", {
+    value: "ventes"
+  }, "Trier par Ventes"), /*#__PURE__*/React.createElement("option", {
+    value: "pubs"
+  }, "Trier par Pubs"), /*#__PURE__*/React.createElement("option", {
+    value: "sku"
+  }, "Trier par Code SKU")), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "input",
     value: skuSearchTerm,
     onChange: e => setSkuSearchTerm(e.target.value),
-    placeholder: "🔍 Filtrer les SKUs...",
+    placeholder: "🔍 Filtrer par SKU, Titre ou @compte...",
     style: {
-      width: '200px',
+      width: '220px',
       height: '34px',
       fontSize: '12px'
     }
   }))), /*#__PURE__*/React.createElement("div", {
     className: "table-container",
     style: {
-      maxHeight: '300px',
+      maxHeight: '380px',
       overflowY: 'auto'
     }
-  }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Code SKU"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Publications"), /*#__PURE__*/React.createElement("th", null, "Ventes"), /*#__PURE__*/React.createElement("th", null, "Score Cumulé"))), /*#__PURE__*/React.createElement("tbody", null, filteredSKUList.length > 0 ? filteredSKUList.map(s => /*#__PURE__*/React.createElement("tr", {
+  }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Code SKU"), /*#__PURE__*/React.createElement("th", null, "Publications (DotB)"), /*#__PURE__*/React.createElement("th", null, "Ventes (DotB)"), /*#__PURE__*/React.createElement("th", null, "Compte(s) Vinted Vendeur"), /*#__PURE__*/React.createElement("th", null, "Prix Constaté"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Score Cumulé"))), /*#__PURE__*/React.createElement("tbody", null, filteredSKUList.length > 0 ? filteredSKUList.map(s => /*#__PURE__*/React.createElement("tr", {
     key: s.sku
   }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
     style: {
       color: 'var(--primary)'
     },
     title: s.produit || s.sku
-  }, s.sku)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+  }, s.sku)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.pubs), " pub", s.pubs > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: s.ventes > 0 ? '#059669' : 'inherit'
+    }
+  }, s.ventes), " vente", s.ventes > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 600,
+      color: 'var(--text-muted)'
+    }
+  }, s.accountsStr)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 600,
+      color: '#0d9488'
+    }
+  }, s.pricesStr)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
     className: `badge ${s.classification === 'Gagnant' ? 'badge-gagnant' : s.classification === 'Écarté' ? 'badge-ecarte' : s.classification === 'Nouveau produit' ? 'badge-nouveau' : 'badge-retester'}`
-  }, s.classification)), /*#__PURE__*/React.createElement("td", null, s.pubs, " pub", s.pubs > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.ventes), " vente", s.ventes > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.scoreCumule.toFixed(1), " pts")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: "5",
+  }, s.classification)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.scoreCumule.toFixed(1), " pts")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: "7",
     style: {
       textAlign: 'center',
       padding: '20px',
