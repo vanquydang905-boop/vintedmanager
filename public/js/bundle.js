@@ -1644,6 +1644,7 @@ function ComptesView({
   const [statut, setStatut] = useState('Actif');
   const [dateStatutCompte, setDateStatutCompte] = useState('');
   const [organisationId, setOrganisationId] = useState(userOrgId);
+  const [dotbApiKey, setDotbApiKey] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedCompteIds, setSelectedCompteIds] = useState([]);
 
@@ -1757,6 +1758,7 @@ function ComptesView({
     setStatut(c.statut || 'Actif');
     setDateStatutCompte(c.dateStatutCompte || '');
     setOrganisationId(isAdmin ? c.organisationId || 'org_default' : userOrgId);
+    setDotbApiKey(c.dotbApiKey || '');
     setNotes(c.notes || '');
     // Scroll to form smoothly after state update
     setTimeout(() => {
@@ -1783,6 +1785,7 @@ function ComptesView({
     setStatut('Actif');
     setDateStatutCompte('');
     setOrganisationId(userOrgId);
+    setDotbApiKey('');
     setNotes('');
   };
   const handleSubmit = e => {
@@ -1799,6 +1802,7 @@ function ComptesView({
       statut,
       dateStatutCompte,
       organisationId: isAdmin ? organisationId : userOrgId,
+      dotbApiKey,
       notes
     });
     handleReset();
@@ -2121,12 +2125,22 @@ function ComptesView({
     value: o.id
   }, o.nom)))), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", null, "🔑 Clé / Token API DotB (Optionnel)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: dotbApiKey || '',
+    onChange: e => setDotbApiKey(e.target.value),
+    placeholder: "ex: dotb_token_live_..."
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group",
+    style: {
+      marginBottom: '16px'
+    }
   }, /*#__PURE__*/React.createElement("label", null, "Notes & Observations (Adspower, Ventes, etc.)"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: notes,
     onChange: e => setNotes(e.target.value),
     placeholder: "ex: connecté à Adspower le 05/08/26, 1 article en vente"
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '10px'

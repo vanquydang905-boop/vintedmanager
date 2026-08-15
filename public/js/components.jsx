@@ -1117,6 +1117,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const [statut, setStatut] = useState('Actif');
     const [dateStatutCompte, setDateStatutCompte] = useState('');
     const [organisationId, setOrganisationId] = useState(userOrgId);
+    const [dotbApiKey, setDotbApiKey] = useState('');
     const [notes, setNotes] = useState('');
     const [selectedCompteIds, setSelectedCompteIds] = useState([]);
     
@@ -1252,6 +1253,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
         setStatut(c.statut || 'Actif');
         setDateStatutCompte(c.dateStatutCompte || '');
         setOrganisationId(isAdmin ? (c.organisationId || 'org_default') : userOrgId);
+        setDotbApiKey(c.dotbApiKey || '');
         setNotes(c.notes || '');
         // Scroll to form smoothly after state update
         setTimeout(() => {
@@ -1276,6 +1278,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
         setStatut('Actif');
         setDateStatutCompte('');
         setOrganisationId(userOrgId);
+        setDotbApiKey('');
         setNotes('');
     };
 
@@ -1293,6 +1296,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             statut,
             dateStatutCompte,
             organisationId: isAdmin ? organisationId : userOrgId,
+            dotbApiKey,
             notes
         });
         handleReset();
@@ -1509,9 +1513,14 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                             </div>
 
                             <div className="form-group">
-                                <label>Notes & Observations (Adspower, Ventes, etc.)</label>
-                                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ex: connecté à Adspower le 05/08/26, 1 article en vente" />
+                                <label>🔑 Clé / Token API DotB (Optionnel)</label>
+                                <input type="text" value={dotbApiKey || ''} onChange={(e) => setDotbApiKey(e.target.value)} placeholder="ex: dotb_token_live_..." />
                             </div>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: '16px' }}>
+                            <label>Notes & Observations (Adspower, Ventes, etc.)</label>
+                            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ex: connecté à Adspower le 05/08/26, 1 article en vente" />
                         </div>
 
                         <div style={{ display: 'flex', gap: '10px' }}>
