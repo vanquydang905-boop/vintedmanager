@@ -3416,12 +3416,8 @@ function ClassementView({ appState, onUpdateRow }) {
         const map = {};
         calendrier.forEach(l => {
             if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
-            let skuClean = (l.sku && String(l.sku).trim()) ? String(l.sku).trim() : null;
-            if (!skuClean && l.produit && String(l.produit).trim()) {
-                const slug = String(l.produit).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").substring(0, 24);
-                skuClean = `SKU-${slug.toUpperCase()}`;
-            }
-            if (!skuClean) return;
+            if (!l.sku || !String(l.sku).trim()) return;
+            const skuClean = String(l.sku).trim();
 
             if (!map[skuClean]) {
                 map[skuClean] = {

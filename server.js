@@ -1275,9 +1275,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                 const normItemTitle = normalizeTitle(item.title);
                 const existingTitleMatch = allCal.find(l => l.produit && normalizeTitle(l.produit) === normItemTitle && l.sku && String(l.sku).trim() !== '');
 
-                const itemSku = existingTitleMatch 
-                    ? String(existingTitleMatch.sku).trim() 
-                    : ((item.sku && String(item.sku).trim()) ? String(item.sku).trim() : (item.vinted_id ? `VINTED-${item.vinted_id}` : `SKU-${item.id ? item.id.substring(0, 8) : Math.floor(1000 + Math.random() * 9000)}`));
+                const itemSku = (item.sku && String(item.sku).trim()) ? String(item.sku).trim() : (existingTitleMatch ? existingTitleMatch.sku : '');
 
                 const slotHours = ["08:15", "10:30", "12:00", "14:15", "16:30", "18:00", "20:15", "21:30"];
                 const itemRawDate = item.status_updated_at || item.created_at || item.order_date;
@@ -1314,7 +1312,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     dbTasks.push(() => dbService.updateCalendrierRow(matchLine.id, {
                         compteId: ownerAccount ? ownerAccount.id : matchLine.compteId,
                         agent: targetAgent,
-                        sku: itemSku,
+                        sku: itemSku || matchLine.sku || '',
                         produit: item.title,
                         date: matchLine.date || realDateStr,
                         heurePrevue: matchLine.heurePrevue || realHourStr,
@@ -1339,7 +1337,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         agent: (ownerAccount && ownerAccount.agent && ownerAccount.agent !== 'Bot DotB') ? ownerAccount.agent : 'À attribuer',
                         heurePrevue: realHourStr,
                         heureStatut: realHourStr,
-                        sku: itemSku,
+                        sku: itemSku || '',
                         produit: item.title,
                         lien: "",
                         vues: 0,
@@ -1389,15 +1387,10 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         (normOrderTitle && l.produit && normalizeTitle(l.produit) === normOrderTitle))
                     );
 
-                    let finalOrderSku = itemSku;
-                    if (!finalOrderSku || finalOrderSku.startsWith('VINTED-')) {
-                        const existingTitleMatch = allCal.find(l => l.produit && normalizeTitle(l.produit) === normOrderTitle && l.sku && !l.sku.startsWith('VINTED-'));
-                        if (existingTitleMatch) {
-                            finalOrderSku = existingTitleMatch.sku;
-                        } else {
-                            const cleanSlug = itemTitle.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").substring(0, 24);
-                            finalOrderSku = `SKU-${cleanSlug.toUpperCase()}`;
-                        }
+                    let finalOrderSku = (itemSku && String(itemSku).trim()) ? String(itemSku).trim() : '';
+                    if (!finalOrderSku) {
+                        const existingTitleMatch = allCal.find(l => l.produit && normalizeTitle(l.produit) === normOrderTitle && l.sku && String(l.sku).trim() !== '');
+                        if (existingTitleMatch) finalOrderSku = existingTitleMatch.sku;
                     }
 
                     if (matchLine) {
