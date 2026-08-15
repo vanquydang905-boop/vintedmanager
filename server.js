@@ -124,6 +124,87 @@ app.get('/api/db', async (req, res) => {
     }
 });
 
+// 1b. SKU Consolidated Summary API (Real Sales & Publications from DotB + DB)
+app.get('/api/sku/summary', async (req, res) => {
+    try {
+        const orgId = req.query.organisationId || 'org_default';
+        const fs = require('fs');
+        const path = require('path');
+        const skuMap = {};
+
+        // A. Load fast_check_sku_results.json (Real DotB Cloud metrics)
+        const fastCheckPath = path.join(__dirname, "fast_check_sku_results.json");
+        if (fs.existsSync(fastCheckPath)) {
+            try {
+                const fcData = JSON.parse(fs.readFileSync(fastCheckPath, "utf8"));
+                fcData.forEach(item => {
+                    if (!item.sku) return;
+                    const k = item.sku.trim();
+                    skuMap[k] = {
+                        sku: k,
+                        produit: item.title || "Produit",
+                        pubs: item.pubs || 1,
+                        ventes: item.ventes || 0,
+                        accounts: new Set(item.accounts || []),
+                        accountsStr: item.accountsStr || "Non spécifié",
+                        priceStr: item.priceStr || "-",
+                        classification: item.classification || "Nouveau produit",
+                        scoreCumule: item.score || 0
+                    };
+                });
+            } catch(e) { console.warn("Err loading fast_check_sku_results:", e.message); }
+        }
+
+        // B. Merge DB Calendrier rows
+        const calendrier = await dbService.getCalendrier(orgId);
+        (calendrier || []).forEach(l => {
+            if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
+            if (!l.sku || !String(l.sku).trim()) return;
+            const k = String(l.sku).trim();
+
+            if (!skuMap[k]) {
+                skuMap[k] = {
+                    sku: k,
+                    produit: l.produit || "Produit sans titre",
+                    pubs: 1,
+                    ventes: 0,
+                    accounts: new Set(),
+                    accountsStr: l.comptePseudo ? "@" + l.comptePseudo : "Non spécifié",
+                    priceStr: l.prix ? l.prix + "€" : "-",
+                    classification: l.classification || "Nouveau produit",
+                    scoreCumule: l.score || 15
+                };
+            }
+
+            if (l.comptePseudo) skuMap[k].accounts.add(l.comptePseudo.replace("@", ""));
+        });
+
+        const list = Object.values(skuMap).map(s => {
+            const accs = Array.from(s.accounts);
+            const accountsStr = accs.length > 0 ? accs.map(a => "@" + a).join(", ") : (s.accountsStr || "Non spécifié");
+            const isMultiAccount = accs.length > 1 || (s.accountsStr && s.accountsStr.includes(","));
+            
+            let classif = s.classification;
+            if (s.ventes >= 3 || (s.ventes >= 1 && isMultiAccount)) classif = "🏆 Gagnant";
+            else if (s.ventes >= 1) classif = "🏆 Gagnant";
+            else if (s.pubs > 2) classif = "🔄 À retester";
+
+            return {
+                ...s,
+                accountsStr,
+                isMultiAccount,
+                classification: classif
+            };
+        });
+
+        list.sort((a, b) => b.ventes - a.ventes || b.scoreCumule - a.scoreCumule);
+        res.json(list);
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // ------------------- CORBEILLE API -------------------
 app.get('/api/corbeille', async (req, res) => {
     try {

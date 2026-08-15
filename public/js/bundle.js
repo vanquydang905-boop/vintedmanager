@@ -5029,7 +5029,34 @@ function ClassementView({
     });
     return map;
   }, [calendrier, comptesMap]);
+
+  // API SKU Summary State (Real DotB Cloud Sales & Publications Metrics)
+  const [apiSkuSummary, setApiSkuSummary] = useState([]);
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/sku/summary').then(res => res.json()).then(data => {
+      if (isMounted && Array.isArray(data)) {
+        setApiSkuSummary(data);
+      }
+    }).catch(err => console.warn("Err fetching SKU summary:", err));
+    return () => {
+      isMounted = false;
+    };
+  }, [calendrier]);
   const skuList = useMemo(() => {
+    if (apiSkuSummary && apiSkuSummary.length > 0) {
+      return apiSkuSummary.map(s => ({
+        sku: s.sku,
+        produit: s.produit,
+        classification: s.classification,
+        scoreCumule: s.scoreCumule || s.score || 0,
+        ventes: s.ventes || 0,
+        pubs: s.pubs || 1,
+        accountsStr: s.accountsStr || 'Non spécifié',
+        pricesStr: s.priceStr || s.pricesStr || '-',
+        isMultiAccount: s.isMultiAccount
+      }));
+    }
     return Object.values(allSKUsMap).map(s => {
       const accs = Array.from(s.accountsSet);
       const prices = Array.from(s.priceSet);
@@ -5039,7 +5066,7 @@ function ClassementView({
         pricesStr: prices.length > 0 ? prices.slice(0, 2).join(' - ') : '-'
       };
     });
-  }, [allSKUsMap]);
+  }, [apiSkuSummary, allSKUsMap]);
   const filteredSKUList = useMemo(() => {
     let list = [...skuList];
     if (skuFilterClassif) {
