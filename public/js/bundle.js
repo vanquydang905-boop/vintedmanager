@@ -5025,13 +5025,13 @@ function ClassementView({
         };
       }
       statsMap[key].pubsTotales += 1;
-      if (l.statut === 'Publié' || l.statut === '✓ Fait' || l.done) {
+      if (l.statut === 'Fait' || l.statut === 'Publié' || l.statut === '✓ Fait' || l.done) {
         statsMap[key].pubsFaites += 1;
       }
       statsMap[key].ventes += l.vente || 0;
       statsMap[key].scoreTotal += l.score || 0;
     });
-    return Object.values(statsMap).map(a => ({
+    return Object.values(statsMap).filter(a => a.name !== 'Bot DotB' && a.name !== 'À attribuer').map(a => ({
       ...a,
       taux: a.pubsTotales > 0 ? Math.round(a.pubsFaites / a.pubsTotales * 100) : 0
     })).sort((a, b) => {

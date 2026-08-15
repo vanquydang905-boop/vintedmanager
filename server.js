@@ -1203,7 +1203,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                     numeroCompte: String(acc.vinted_id || ''),
                     pseudo: loginClean,
                     statut: 'Actif',
-                    agent: 'Bot DotB',
+                    agent: 'À attribuer',
                     dateCreation: getLocalDateString(new Date())
                 });
                 syncedComptesCount++;
@@ -1277,7 +1277,7 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
                         date: todayStr,
                         jour: jourCap,
                         compteId,
-                        agent: ownerAccount ? ownerAccount.agent : 'Bot DotB',
+                        agent: (ownerAccount && ownerAccount.agent && ownerAccount.agent !== 'Bot DotB') ? ownerAccount.agent : 'À attribuer',
                         heurePrevue: currentHour,
                         heureStatut: currentHour,
                         sku: itemSku,
