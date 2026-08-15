@@ -70,19 +70,53 @@ class DotbApiService {
     }
 
     /**
-     * Récupère les articles gérés sur DotB
+     * Récupère tous les articles gérés sur DotB avec pagination par curseur
      */
-    static async getItems(token, status = 'all') {
-        const data = await this.request(`/items?status=${status}&limit=100`, token);
-        return data.data || [];
+    static async getItems(token, status = 'all', options = {}) {
+        let allItems = [];
+        let cursor = null;
+        let page = 1;
+        const maxPages = options.maxPages || 10;
+
+        do {
+            let endpoint = `/items?status=${status}&limit=100`;
+            if (options.from) endpoint += `&from=${options.from}`;
+            if (cursor) endpoint += `&cursor=${encodeURIComponent(cursor)}`;
+
+            const res = await this.request(endpoint, token);
+            const items = res.data || [];
+            allItems = allItems.concat(items);
+
+            cursor = res.has_more ? res.next_cursor : null;
+            page++;
+        } while (cursor && page <= maxPages);
+
+        return allItems;
     }
 
     /**
-     * Récupère les commandes / ventes gérées sur DotB
+     * Récupère toutes les commandes / ventes gérées sur DotB avec pagination par curseur
      */
-    static async getOrders(token) {
-        const data = await this.request('/orders?limit=100&include=account,items', token);
-        return data.data || [];
+    static async getOrders(token, options = {}) {
+        let allOrders = [];
+        let cursor = null;
+        let page = 1;
+        const maxPages = options.maxPages || 10;
+
+        do {
+            let endpoint = `/orders?limit=100&include=account,items`;
+            if (options.from) endpoint += `&from=${options.from}`;
+            if (cursor) endpoint += `&cursor=${encodeURIComponent(cursor)}`;
+
+            const res = await this.request(endpoint, token);
+            const orders = res.data || [];
+            allOrders = allOrders.concat(orders);
+
+            cursor = res.has_more ? res.next_cursor : null;
+            page++;
+        } while (cursor && page <= maxPages);
+
+        return allOrders;
     }
 }
 

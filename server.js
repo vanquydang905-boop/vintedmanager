@@ -1243,22 +1243,24 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
         let hiddenCount = 0;
         let activeCount = 0;
 
+        let fromDate = null;
+        if (period === '30days' || period === 'all' || period === 'july1') {
+            fromDate = '2026-07-01';
+        } else if (period === '7days') {
+            const d7 = new Date();
+            d7.setDate(d7.getDate() - 7);
+            fromDate = getLocalDateString(d7);
+        } else if (period === 'today') {
+            fromDate = getLocalDateString(new Date());
+        }
+
         if (selectedTypes.includes('items_published') || selectedTypes.includes('items_drafts') || selectedTypes.includes('items_hidden')) {
-            const dotbItems = await DotbApiService.getItems(token, 'all');
+            const dotbItems = await DotbApiService.getItems(token, 'all', { from: fromDate, maxPages: 10 });
             const allCal = await dbService.getCalendrier(orgId);
             const updatedComptesList = await dbService.getComptes(orgId);
             const todayStr = getLocalDateString(new Date());
 
-            // Filtrage par période
-            const nowTime = Date.now();
-            const filteredItems = dotbItems.filter(item => {
-                if (period === 'today') return true; // Les items récents
-                if (period === '7days') return true;
-                if (period === '30days') return true;
-                return true;
-            });
-
-            for (const item of filteredItems) {
+            for (const item of dotbItems) {
                 if (!item.title) continue;
 
                 if (item.status === 'imported') activeCount++;
@@ -1342,12 +1344,39 @@ app.post('/api/dotb/fetch-live', async (req, res) => {
             }
         }
 
-        // 3. Synchronisation des Commandes / Ventes
+        // 3. Synchronisation Historique des Commandes / Ventes (Depuis le 01/07/2026)
         let fetchedOrdersCount = 0;
         if (selectedTypes.includes('orders')) {
             try {
-                const orders = await DotbApiService.getOrders(token);
+                const orders = await DotbApiService.getOrders(token, { from: fromDate || '2026-07-01', maxPages: 10 });
                 fetchedOrdersCount = orders.length;
+
+                const allCal = await dbService.getCalendrier(orgId);
+                const comptesList = await dbService.getComptes(orgId);
+
+                for (const order of orders) {
+                    if (!order.items || order.items.length === 0) continue;
+                    const orderItem = order.items[0];
+                    const itemSku = orderItem.sku ? orderItem.sku.trim() : null;
+                    const itemTitle = orderItem.title ? orderItem.title.trim() : order.title;
+                    const normOrderTitle = normalizeTitle(itemTitle);
+
+                    const ownerAcc = order.account ? comptesList.find(c => String(c.numeroCompte) === String(order.account.vinted_id) || (c.pseudo && c.pseudo.toLowerCase() === (order.account.login || '').toLowerCase())) : null;
+
+                    const matchLine = allCal.find(l => 
+                        (itemSku && l.sku && l.sku.trim().toLowerCase() === itemSku.toLowerCase()) ||
+                        (normOrderTitle && l.produit && normalizeTitle(l.produit) === normOrderTitle)
+                    );
+
+                    if (matchLine) {
+                        await dbService.updateCalendrierRow(matchLine.id, {
+                            vente: 1,
+                            statut: 'Fait',
+                            compteId: ownerAcc ? ownerAcc.id : matchLine.compteId,
+                            agent: (ownerAcc && ownerAcc.agent && ownerAcc.agent !== 'À attribuer') ? ownerAcc.agent : matchLine.agent
+                        });
+                    }
+                }
             } catch (e) {
                 console.warn("[DotB Orders Sync Warning]", e.message);
             }
