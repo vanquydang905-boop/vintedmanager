@@ -418,7 +418,20 @@ app.post('/api/import-orders-csv', async (req, res) => {
         }
 
         const orgId = organisationId || 'org_default';
-        const existingLines = await dbService.getCalendrier(orgId);
+        const [existingLines, accounts] = await Promise.all([
+            dbService.getCalendrier(orgId),
+            dbService.getComptes(orgId)
+        ]);
+
+        // Map Compte -> Agent Assigné
+        const accountAgentMap = {};
+        (accounts || []).forEach(acc => {
+            if (acc.pseudo) {
+                const k = acc.pseudo.replace('@', '').trim().toLowerCase();
+                const ag = acc.agent || acc.agentAssigne;
+                if (ag) accountAgentMap[k] = ag;
+            }
+        });
 
         // Build anti-duplicate & lookup map for existing orders
         const existingMap = new Map();
@@ -494,6 +507,10 @@ app.post('/api/import-orders-csv', async (req, res) => {
             const ville = parts[17] ? parts[17].trim() : '';
             const pays = parts[18] ? parts[18].trim() : 'FR';
 
+            // Automatic Agent Attribution from Account
+            const cleanAccKey = comptePseudo.replace('@', '').trim().toLowerCase();
+            const assignedAgent = accountAgentMap[cleanAccKey] || 'Florencio';
+
             // Auto-generate SKU if missing
             if (!sku && vintedId) {
                 const dp = currentDateStr.split('-');
@@ -527,6 +544,12 @@ app.post('/api/import-orders-csv', async (req, res) => {
                 if (comptePseudo && (!existingRow.comptePseudo || existingRow.comptePseudo === 'DotB Cloud' || existingRow.comptePseudo === 'Non spécifié')) {
                     updates.comptePseudo = comptePseudo;
                 }
+                if (assignedAgent && (!existingRow.agent || existingRow.agent === 'À attribuer' || existingRow.agent === 'Non spécifié')) {
+                    updates.agent = assignedAgent;
+                }
+                if (dateCol && !existingRow.dateCommande) {
+                    updates.dateCommande = dateCol;
+                }
 
                 if (Object.keys(updates).length > 0) {
                     updates.dateModification = new Date().toISOString();
@@ -543,8 +566,11 @@ app.post('/api/import-orders-csv', async (req, res) => {
                 organisationId: orgId,
                 transactionId: transactionId,
                 datePrevue: currentDateStr,
+                dateCommande: dateCol || currentDateStr,
+                datePublication: currentDateStr,
                 heurePrevue: dateCol && dateCol.includes(' ') ? dateCol.split(' ')[1].substring(0, 5) : '12:00',
                 comptePseudo: comptePseudo || 'DotB Cloud',
+                agent: assignedAgent,
                 produit: titreArticle || 'Produit sans titre',
                 sku: sku || '',
                 vintedId: vintedId || '',
@@ -564,6 +590,7 @@ app.post('/api/import-orders-csv', async (req, res) => {
                 classification: '🏆 Gagnant',
                 dateCreation: new Date().toISOString()
             };
+
 
             const created = await dbService.createCalendrierRow(newRow);
             if (key1) existingMap.set(key1, created || newRow);
@@ -593,6 +620,58 @@ app.post('/api/import-orders-csv', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// 2c. Auto Sync Agent Attributions & Date Structuring for Calendar Rows & Orders
+app.post('/api/calendrier/sync-attributions', async (req, res) => {
+    try {
+        const orgId = req.body.organisationId || 'org_default';
+        const [cal, comptes] = await Promise.all([
+            dbService.getCalendrier(orgId),
+            dbService.getComptes(orgId)
+        ]);
+
+        const accountAgentMap = {};
+        (comptes || []).forEach(c => {
+            if (c.pseudo) {
+                const k = c.pseudo.replace('@', '').trim().toLowerCase();
+                const ag = c.agent || c.agentAssigne;
+                if (ag) accountAgentMap[k] = ag;
+            }
+        });
+
+        let updatedCount = 0;
+        for (const l of (cal || [])) {
+            const accKey = (l.comptePseudo || l.compteId || "").replace("@", "").trim().toLowerCase();
+            const mappedAgent = accountAgentMap[accKey];
+            const updates = {};
+
+            if (mappedAgent && (!l.agent || l.agent === "À attribuer" || l.agent === "Non spécifié")) {
+                updates.agent = mappedAgent;
+            }
+            if (l.date && !l.datePublication) {
+                updates.datePublication = l.date;
+            }
+            if (l.datePrevue && !l.dateCommande && (l.transactionId || l.source === 'Import CSV DotB')) {
+                updates.dateCommande = l.datePrevue;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await dbService.updateCalendrierRow(l.id, updates);
+                updatedCount++;
+            }
+        }
+
+        res.json({
+            success: true,
+            updatedCount,
+            message: `✨ ${updatedCount} ligne(s) synchronisées avec l'attribution exacte des agents et la structuration des dates !`
+        });
+    } catch (err) {
+        console.error("Erreur Sync Attributions:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 
 
