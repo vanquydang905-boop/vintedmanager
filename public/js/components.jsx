@@ -3584,10 +3584,41 @@ function ClassementView({ appState, onUpdateRow }) {
         return map;
     }, [comptesAll]);
 
-    // Répertoire de tous les SKUs enregistrés avec leur classification, comptes, prix et statistiques
+    // Filtre Temporel pour les Classements (Aujourd'hui, 2j, 3j, 7j, 14j, 30j, Tout)
+    const [rankingDateFilter, setRankingDateFilter] = useState('all');
+
+    const referenceDate = useMemo(() => {
+        let maxMs = Date.now();
+        (calendrier || []).forEach(l => {
+            if (l.date) {
+                const d = new Date(l.date.replace(' ', 'T'));
+                if (!isNaN(d.getTime()) && d.getTime() > maxMs) {
+                    maxMs = d.getTime();
+                }
+            }
+        });
+        return new Date(maxMs);
+    }, [calendrier]);
+
+    const filteredCalendrierForRanking = useMemo(() => {
+        if (rankingDateFilter === 'all') return calendrier;
+        const daysLimit = parseInt(rankingDateFilter, 10);
+        return (calendrier || []).filter(l => {
+            if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return false;
+            const dateVal = l.date || l.datePrevue || l.created_at;
+            if (!dateVal) return false;
+            const d = new Date(String(dateVal).replace(' ', 'T'));
+            if (isNaN(d.getTime())) return false;
+            const diffMs = referenceDate.getTime() - d.getTime();
+            const diffDays = diffMs / (1000 * 3600 * 24);
+            return diffDays >= -0.5 && diffDays < daysLimit;
+        });
+    }, [calendrier, rankingDateFilter, referenceDate]);
+
+    // Répertoire des SKUs filtré par période
     const allSKUsMap = useMemo(() => {
         const map = {};
-        calendrier.forEach(l => {
+        filteredCalendrierForRanking.forEach(l => {
             if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
             if (!l.sku || !String(l.sku).trim()) return;
             const skuClean = String(l.sku).trim();
@@ -3621,7 +3652,8 @@ function ClassementView({ appState, onUpdateRow }) {
             if (l.prix) map[skuClean].priceSet.add(l.prix + '€');
         });
         return map;
-    }, [calendrier, comptesMap]);
+    }, [filteredCalendrierForRanking, comptesMap]);
+
 
     // API SKU Summary State (Real DotB Cloud Sales & Publications Metrics)
     const [apiSkuSummary, setApiSkuSummary] = useState([]);
@@ -3722,8 +3754,9 @@ function ClassementView({ appState, onUpdateRow }) {
         })).sort((a, b) => b.scoreMoyen - a.scoreMoyen);
     }, [calendrier]);
 
-    // Classement et performance des agents par score et publications
+    // Classement et performance des agents filtré par la période sélectionnée
     const agentRanking = useMemo(() => {
+
         const statsMap = {};
         (appState.utilisateurs || []).forEach(u => {
             const name = (u.nom || u.agentAssigne || '').trim();
@@ -3739,7 +3772,7 @@ function ClassementView({ appState, onUpdateRow }) {
             }
         });
 
-        calendrier.forEach(l => {
+        filteredCalendrierForRanking.forEach(l => {
             if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
             const agentName = (l.agent || '').trim();
             if (!agentName) return;
@@ -3770,7 +3803,8 @@ function ClassementView({ appState, onUpdateRow }) {
             if (b.pubsFaites !== a.pubsFaites) return b.pubsFaites - a.pubsFaites;
             return b.ventes - a.ventes;
         });
-    }, [calendrier, appState.utilisateurs]);
+    }, [filteredCalendrierForRanking, appState.utilisateurs]);
+
 
     const handleRegisterSKU = async (e) => {
         e.preventDefault();
@@ -3802,6 +3836,62 @@ function ClassementView({ appState, onUpdateRow }) {
         <section className="view">
             <h2 className="page-title" style={{ marginBottom: '20px' }}>Classements & Gestion des SKUs</h2>
 
+            {/* BARRE DE FILTRE TEMPOREL / PERIODE DE CLASSEMENT */}
+            <div className="card" style={{ marginBottom: '24px', padding: '18px 24px', borderRadius: '14px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff', border: '1px solid #334155', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ backgroundColor: '#2563eb', width: '42px', height: '42px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '18px', boxShadow: '0 4px 12px rgba(37,99,235,0.4)' }}>
+                            <i className="fa-solid fa-calendar-range"></i>
+                        </div>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '15.5px', color: '#ffffff', fontWeight: 700 }}>
+                                Période d'Analyse du Classement & Performances
+                            </h4>
+                            <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
+                                Filtrer la performance des agents et les SKUs par horizon temporel ({rankingDateFilter === 'all' ? 'Toutes les données' : `Derniers ${rankingDateFilter} jour(s)`})
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* PILLS DE FILTRE TEMPOREL (1j, 2j, 3j, 1 semaine, 2 semaines, 30j, Tout) */}
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {[
+                            { id: 'all', label: '🌐 Tout', title: 'Historique complet' },
+                            { id: '1', label: '📅 Aujourd\'hui (1j)', title: 'Dernières 24 heures' },
+                            { id: '2', label: '⏱️ 2 Jours', title: 'Derniers 2 jours' },
+                            { id: '3', label: '⏱️ 3 Jours', title: 'Derniers 3 jours' },
+                            { id: '7', label: '🗓️ 1 Semaine (7j)', title: 'Derniers 7 jours' },
+                            { id: '14', label: '🗓️ 2 Semaines (14j)', title: 'Derniers 14 jours' },
+                            { id: '30', label: '📊 Ce Mois (30j)', title: 'Derniers 30 jours' }
+                        ].map(btn => {
+                            const isActive = rankingDateFilter === btn.id;
+                            return (
+                                <button
+                                    key={btn.id}
+                                    type="button"
+                                    onClick={() => setRankingDateFilter(btn.id)}
+                                    title={btn.title}
+                                    style={{
+                                        padding: '8px 15px',
+                                        borderRadius: '20px',
+                                        fontSize: '12.5px',
+                                        fontWeight: isActive ? 700 : 500,
+                                        border: isActive ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.18)',
+                                        backgroundColor: isActive ? '#2563eb' : 'rgba(255,255,255,0.08)',
+                                        color: isActive ? '#ffffff' : '#cbd5e1',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: isActive ? '0 0 14px rgba(56, 189, 248, 0.4)' : 'none'
+                                    }}
+                                >
+                                    {btn.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
             {/* CLASSEMENT DES AGENTS */}
             <div className="card" style={{ marginBottom: '24px' }}>
                 <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3811,6 +3901,7 @@ function ClassementView({ appState, onUpdateRow }) {
                 <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '16px' }}>
                     Suivi en temps réel du volume de publications réalisées, des ventes enregistrées et du score de performance par agent.
                 </p>
+
                 <div className="table-container">
                     <table>
                         <thead>
