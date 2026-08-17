@@ -5114,8 +5114,10 @@ function ClassementView({
     return map;
   }, [comptesAll]);
 
-  // Filtre Temporel pour les Classements (Aujourd'hui, 2j, 3j, 7j, 14j, 30j, Tout)
+  // Filtre Temporel pour les Classements (Aujourd'hui, 2j, 3j, 7j, 14j, 30j, Custom, Tout)
   const [rankingDateFilter, setRankingDateFilter] = useState('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const referenceDate = useMemo(() => {
     let maxMs = Date.now();
     (calendrier || []).forEach(l => {
@@ -5130,6 +5132,18 @@ function ClassementView({
   }, [calendrier]);
   const filteredCalendrierForRanking = useMemo(() => {
     if (rankingDateFilter === 'all') return calendrier;
+    if (rankingDateFilter === 'custom') {
+      if (!customStartDate && !customEndDate) return calendrier;
+      return (calendrier || []).filter(l => {
+        if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return false;
+        const dateVal = l.date || l.datePrevue || l.created_at;
+        if (!dateVal) return false;
+        const dStr = String(dateVal).split(' ')[0].split('T')[0];
+        if (customStartDate && dStr < customStartDate) return false;
+        if (customEndDate && dStr > customEndDate) return false;
+        return true;
+      });
+    }
     const daysLimit = parseInt(rankingDateFilter, 10);
     return (calendrier || []).filter(l => {
       if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return false;
@@ -5141,7 +5155,7 @@ function ClassementView({
       const diffDays = diffMs / (1000 * 3600 * 24);
       return diffDays >= -0.5 && diffDays < daysLimit;
     });
-  }, [calendrier, rankingDateFilter, referenceDate]);
+  }, [calendrier, rankingDateFilter, referenceDate, customStartDate, customEndDate]);
 
   // Répertoire des SKUs filtré par période
   const allSKUsMap = useMemo(() => {
@@ -5395,7 +5409,7 @@ function ClassementView({
       fontSize: '12.5px',
       color: '#94a3b8'
     }
-  }, "Filtrer la performance des agents et les SKUs par horizon temporel (", rankingDateFilter === 'all' ? 'Toutes les données' : `Derniers ${rankingDateFilter} jour(s)`, ")"))), /*#__PURE__*/React.createElement("div", {
+  }, rankingDateFilter === 'all' ? 'Toutes les données historiques' : rankingDateFilter === 'custom' ? `Période personnalisée du ${customStartDate || 'début'} au ${customEndDate || 'fin'}` : `Derniers ${rankingDateFilter} jour(s)`))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '6px',
@@ -5430,6 +5444,10 @@ function ClassementView({
     id: '30',
     label: '📊 Ce Mois (30j)',
     title: 'Derniers 30 jours'
+  }, {
+    id: 'custom',
+    label: '📆 Personnalisé',
+    title: 'Définir une plage de dates exacte'
   }].map(btn => {
     const isActive = rankingDateFilter === btn.id;
     return /*#__PURE__*/React.createElement("button", {
@@ -5450,7 +5468,92 @@ function ClassementView({
         boxShadow: isActive ? '0 0 14px rgba(56, 189, 248, 0.4)' : 'none'
       }
     }, btn.label);
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))), rankingDateFilter === 'custom' && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '16px',
+      paddingTop: '16px',
+      borderTop: '1px solid rgba(255,255,255,0.12)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '16px',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '13px',
+      color: '#cbd5e1',
+      fontWeight: 600
+    }
+  }, "Du :"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: customStartDate,
+    onChange: e => setCustomStartDate(e.target.value),
+    className: "input",
+    style: {
+      backgroundColor: '#1e293b',
+      color: '#ffffff',
+      border: '1px solid #475569',
+      borderRadius: '8px',
+      padding: '6px 12px',
+      fontSize: '13px',
+      width: 'auto',
+      colorScheme: 'dark'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '13px',
+      color: '#cbd5e1',
+      fontWeight: 600
+    }
+  }, "Au :"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: customEndDate,
+    onChange: e => setCustomEndDate(e.target.value),
+    className: "input",
+    style: {
+      backgroundColor: '#1e293b',
+      color: '#ffffff',
+      border: '1px solid #475569',
+      borderRadius: '8px',
+      padding: '6px 12px',
+      fontSize: '13px',
+      width: 'auto',
+      colorScheme: 'dark'
+    }
+  })), (customStartDate || customEndDate) && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setCustomStartDate('');
+      setCustomEndDate('');
+    },
+    style: {
+      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+      color: '#fca5a5',
+      border: '1px solid rgba(239, 68, 68, 0.4)',
+      borderRadius: '8px',
+      padding: '6px 14px',
+      fontSize: '12px',
+      cursor: 'pointer',
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-rotate-left",
+    style: {
+      marginRight: '6px'
+    }
+  }), " Réinitialiser les dates"))), /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: '24px'
