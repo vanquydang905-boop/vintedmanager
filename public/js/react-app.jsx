@@ -19,10 +19,37 @@ function App() {
     const [toast, setToast] = useState({ visible: false, message: '', isError: false });
     const [loginError, setLoginError] = useState('');
 
+    const [isSyncingDotB, setIsSyncingDotB] = useState(false);
+
     const handleSwitchTZ = (tz) => {
         setTimeZone(tz);
         localStorage.setItem('vinted_timezone', tz);
     };
+
+    const handleFetchLiveDotB = async () => {
+        setIsSyncingDotB(true);
+        showToast("⚡ Synchronisation et actualisation en cours avec DotB Cloud...");
+        try {
+            const res = await fetch('/api/dotb/fetch-live', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ organisationId: currentOrgId, period: 'all' })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`✅ Données actualisées en direct depuis DotB Cloud ! (${data.totalAccounts || 0} comptes, ${data.totalOrders || 0} commandes)`);
+                await loadData();
+            } else {
+                showToast(`❌ Erreur: ${data.error || 'Échec de l\'actualisation DotB'}`, true);
+            }
+        } catch (err) {
+            console.error("Erreur Sync DotB:", err);
+            showToast("❌ Erreur réseau lors de l'actualisation DotB", true);
+        } finally {
+            setIsSyncingDotB(false);
+        }
+    };
+
 
     const [appState, setAppState] = useState({
         organisations: [],
@@ -550,6 +577,23 @@ function App() {
 
                     {currentUser && currentUser.role === 'admin' && (
                         <>
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={handleFetchLiveDotB}
+                                disabled={isSyncingDotB}
+                                style={{ backgroundColor: '#2563eb', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600, boxShadow: '0 2px 8px rgba(37,99,235,0.3)' }}
+                                title="Actualiser en direct tous les comptes, articles en ligne et commandes depuis DotB Cloud"
+                            >
+                                {isSyncingDotB ? (
+                                    <>
+                                        <i className="fa-solid fa-spinner fa-spin"></i> Sync DotB...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fa-solid fa-arrows-rotate"></i> Actualiser DotB
+                                    </>
+                                )}
+                            </button>
                             <button className="btn btn-secondary btn-sm" onClick={handleExportJSON} title="Exporter la base de données en JSON">
                                 <i className="fa-solid fa-download"></i> Exporter JSON
                             </button>
@@ -559,6 +603,7 @@ function App() {
                             </label>
                         </>
                     )}
+
                 </div>
 
                 {activeView === 'dashboard' && (
