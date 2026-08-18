@@ -3771,9 +3771,11 @@ function ClassementView({ appState, onUpdateRow }) {
         })).sort((a, b) => b.scoreMoyen - a.scoreMoyen);
     }, [calendrier]);
 
-    // Classement et performance des agents filtré par la période sélectionnée
-    const agentRanking = useMemo(() => {
+    // State du Filtre par Classification d'Agent (Même logique de présentation que les SKUs)
+    const [agentFilterClassif, setAgentFilterClassif] = useState('all');
 
+    // Classement et performance des agents filtré par la période sélectionnée avec Classification
+    const agentRanking = useMemo(() => {
         const statsMap = {};
         (appState.utilisateurs || []).forEach(u => {
             const name = (u.nom || u.agentAssigne || '').trim();
@@ -3812,15 +3814,51 @@ function ClassementView({ appState, onUpdateRow }) {
             statsMap[key].scoreTotal += (l.score || 0);
         });
 
-        return Object.values(statsMap).filter(a => a.name !== 'Bot DotB' && a.name !== 'À attribuer').map(a => ({
-            ...a,
-            taux: a.pubsTotales > 0 ? Math.round((a.pubsFaites / a.pubsTotales) * 100) : 0
-        })).sort((a, b) => {
+        return Object.values(statsMap).filter(a => a.name !== 'Bot DotB' && a.name !== 'À attribuer').map(a => {
+            const taux = a.pubsTotales > 0 ? Math.round((a.pubsFaites / a.pubsTotales) * 100) : 0;
+            
+            // Logique de classification des Agents (même niveau de présentation que les SKUs)
+            let classification = '🌟 Nouvel Agent';
+            if (a.scoreTotal >= 1000 || a.ventes >= 10 || (taux >= 80 && a.pubsTotales >= 20)) {
+                classification = '🏆 Agent Top';
+            } else if (a.scoreTotal >= 200 || a.ventes >= 2 || (taux >= 50 && a.pubsFaites >= 5)) {
+                classification = '⚡ En Progression';
+            } else if (a.pubsTotales > 0) {
+                classification = '🌟 Nouvel Agent';
+            } else {
+                classification = '🛑 Inactif';
+            }
+
+            return {
+                ...a,
+                taux,
+                classification
+            };
+        }).sort((a, b) => {
             if (b.scoreTotal !== a.scoreTotal) return b.scoreTotal - a.scoreTotal;
             if (b.pubsFaites !== a.pubsFaites) return b.pubsFaites - a.pubsFaites;
             return b.ventes - a.ventes;
         });
     }, [filteredCalendrierForRanking, appState.utilisateurs]);
+
+    // Agent Ranking filtré par la classification sélectionnée
+    const filteredAgentRanking = useMemo(() => {
+        if (!agentFilterClassif || agentFilterClassif === 'all') return agentRanking;
+        return agentRanking.filter(a => a.classification === agentFilterClassif);
+    }, [agentRanking, agentFilterClassif]);
+
+    // Comptage dynamique des catégories d'agents
+    const agentClassifCounts = useMemo(() => {
+        const counts = { total: agentRanking.length, top: 0, progression: 0, nouveau: 0, inactif: 0 };
+        agentRanking.forEach(a => {
+            if (a.classification === '🏆 Agent Top') counts.top++;
+            else if (a.classification === '⚡ En Progression') counts.progression++;
+            else if (a.classification === '🌟 Nouvel Agent') counts.nouveau++;
+            else if (a.classification === '🛑 Inactif') counts.inactif++;
+        });
+        return counts;
+    }, [agentRanking]);
+
 
 
     const handleRegisterSKU = async (e) => {
@@ -3948,15 +3986,70 @@ function ClassementView({ appState, onUpdateRow }) {
             </div>
 
 
-            {/* CLASSEMENT DES AGENTS */}
+            {/* CLASSEMENT & CLASSIFICATION DES AGENTS */}
             <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <i className="fa-solid fa-trophy" style={{ color: '#f59e0b' }}></i>
-                    Classement & Performance des Agents
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                    <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <i className="fa-solid fa-trophy" style={{ color: '#f59e0b' }}></i>
+                        Classement & Classification des Agents
+                    </h3>
+
+                    {/* BADGES RÉSUMÉ CLASSIFICATION DES AGENTS */}
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span className="badge badge-gagnant" style={{ padding: '6px 12px', fontSize: '12px' }}>🏆 {agentClassifCounts.top} Top Agent{agentClassifCounts.top > 1 ? 's' : ''}</span>
+                        <span className="badge badge-retester" style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#3b82f6', color: '#fff' }}>⚡ {agentClassifCounts.progression} En Progression</span>
+                        <span className="badge badge-nouveau" style={{ padding: '6px 12px', fontSize: '12px' }}>🌟 {agentClassifCounts.nouveau} Nouveau{agentClassifCounts.nouveau > 1 ? 'x' : ''}</span>
+                        <span className="badge badge-ecarte" style={{ padding: '6px 12px', fontSize: '12px' }}>🛑 {agentClassifCounts.inactif} Inactif{agentClassifCounts.inactif > 1 ? 's' : ''}</span>
+                    </div>
+                </div>
+
                 <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '16px' }}>
-                    Suivi en temps réel du volume de publications réalisées, des ventes enregistrées et du score de performance par agent.
+                    Suivi en temps réel et classification des agents selon leur volume de publications, leur taux de réussite et leur score de ventes.
                 </p>
+
+                {/* FILTRES PAR CLASSIFICATION D'AGENT (MÊME LOGIQUE DE PRÉSENTATION QUE LES SKUS) */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <button
+                        type="button"
+                        className={`btn ${agentFilterClassif === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setAgentFilterClassif('all')}
+                        style={{ height: '34px', fontSize: '12.5px', padding: '0 14px' }}
+                    >
+                        Tous ({agentClassifCounts.total})
+                    </button>
+                    <button
+                        type="button"
+                        className={`btn ${agentFilterClassif === '🏆 Agent Top' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setAgentFilterClassif('🏆 Agent Top')}
+                        style={{ height: '34px', fontSize: '12.5px', padding: '0 14px', backgroundColor: agentFilterClassif === '🏆 Agent Top' ? '#10b981' : '#fff', borderColor: '#10b981', color: agentFilterClassif === '🏆 Agent Top' ? '#fff' : '#047857' }}
+                    >
+                        🏆 Agent Top ({agentClassifCounts.top})
+                    </button>
+                    <button
+                        type="button"
+                        className={`btn ${agentFilterClassif === '⚡ En Progression' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setAgentFilterClassif('⚡ En Progression')}
+                        style={{ height: '34px', fontSize: '12.5px', padding: '0 14px', backgroundColor: agentFilterClassif === '⚡ En Progression' ? '#3b82f6' : '#fff', borderColor: '#3b82f6', color: agentFilterClassif === '⚡ En Progression' ? '#fff' : '#1d4ed8' }}
+                    >
+                        ⚡ En Progression ({agentClassifCounts.progression})
+                    </button>
+                    <button
+                        type="button"
+                        className={`btn ${agentFilterClassif === '🌟 Nouvel Agent' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setAgentFilterClassif('🌟 Nouvel Agent')}
+                        style={{ height: '34px', fontSize: '12.5px', padding: '0 14px', backgroundColor: agentFilterClassif === '🌟 Nouvel Agent' ? '#f59e0b' : '#fff', borderColor: '#f59e0b', color: agentFilterClassif === '🌟 Nouvel Agent' ? '#fff' : '#b45309' }}
+                    >
+                        🌟 Nouvel Agent ({agentClassifCounts.nouveau})
+                    </button>
+                    <button
+                        type="button"
+                        className={`btn ${agentFilterClassif === '🛑 Inactif' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setAgentFilterClassif('🛑 Inactif')}
+                        style={{ height: '34px', fontSize: '12.5px', padding: '0 14px', backgroundColor: agentFilterClassif === '🛑 Inactif' ? '#ef4444' : '#fff', borderColor: '#ef4444', color: agentFilterClassif === '🛑 Inactif' ? '#fff' : '#b91c1c' }}
+                    >
+                        🛑 Inactif ({agentClassifCounts.inactif})
+                    </button>
+                </div>
 
                 <div className="table-container">
                     <table>
@@ -3964,6 +4057,7 @@ function ClassementView({ appState, onUpdateRow }) {
                             <tr>
                                 <th style={{ width: '60px' }}>Rang</th>
                                 <th>Agent</th>
+                                <th>Classification</th>
                                 <th>Publications</th>
                                 <th>Taux Réussite</th>
                                 <th>Ventes Total</th>
@@ -3971,8 +4065,8 @@ function ClassementView({ appState, onUpdateRow }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {agentRanking.length > 0 ? (
-                                agentRanking.map((a, idx) => (
+                            {filteredAgentRanking.length > 0 ? (
+                                filteredAgentRanking.map((a, idx) => (
                                     <tr key={a.name}>
                                         <td>
                                             {idx === 0 ? <span style={{ fontSize: '18px' }} title="1er Place">🥇</span> :
@@ -3983,6 +4077,17 @@ function ClassementView({ appState, onUpdateRow }) {
                                         <td>
                                             <b style={{ color: 'var(--text-primary)' }}>{a.name}</b>
                                             <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>({a.role})</span>
+                                        </td>
+                                        <td>
+                                            {a.classification === '🏆 Agent Top' ? (
+                                                <span className="badge badge-gagnant">🏆 Agent Top</span>
+                                            ) : a.classification === '⚡ En Progression' ? (
+                                                <span className="badge badge-retester" style={{ backgroundColor: '#3b82f6', color: '#fff' }}>⚡ En Progression</span>
+                                            ) : a.classification === '🌟 Nouvel Agent' ? (
+                                                <span className="badge badge-nouveau">🌟 Nouvel Agent</span>
+                                            ) : (
+                                                <span className="badge badge-ecarte">🛑 Inactif</span>
+                                            )}
                                         </td>
                                         <td>
                                             <b>{a.pubsFaites}</b> / {a.pubsTotales} pub{a.pubsTotales > 1 ? 's' : ''}
@@ -4001,8 +4106,8 @@ function ClassementView({ appState, onUpdateRow }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
-                                        Aucun agent ou activité enregistrée.
+                                    <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
+                                        Aucun agent correspondant à ce filtre de classification.
                                     </td>
                                 </tr>
                             )}
@@ -4010,6 +4115,7 @@ function ClassementView({ appState, onUpdateRow }) {
                     </table>
                 </div>
             </div>
+
 
             {/* IMPORTATION DES COMMANDES CSV (ANTI-DOUBLONS) */}
             <div className="card" style={{ marginBottom: '24px', border: '1px solid #cbd5e1', background: 'linear-gradient(to right, #ffffff, #f8fafc)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>

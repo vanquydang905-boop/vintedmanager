@@ -5274,7 +5274,10 @@ function ClassementView({
     })).sort((a, b) => b.scoreMoyen - a.scoreMoyen);
   }, [calendrier]);
 
-  // Classement et performance des agents filtré par la période sélectionnée
+  // State du Filtre par Classification d'Agent (Même logique de présentation que les SKUs)
+  const [agentFilterClassif, setAgentFilterClassif] = useState('all');
+
+  // Classement et performance des agents filtré par la période sélectionnée avec Classification
   const agentRanking = useMemo(() => {
     const statsMap = {};
     (appState.utilisateurs || []).forEach(u => {
@@ -5312,15 +5315,52 @@ function ClassementView({
       statsMap[key].ventes += l.vente || 0;
       statsMap[key].scoreTotal += l.score || 0;
     });
-    return Object.values(statsMap).filter(a => a.name !== 'Bot DotB' && a.name !== 'À attribuer').map(a => ({
-      ...a,
-      taux: a.pubsTotales > 0 ? Math.round(a.pubsFaites / a.pubsTotales * 100) : 0
-    })).sort((a, b) => {
+    return Object.values(statsMap).filter(a => a.name !== 'Bot DotB' && a.name !== 'À attribuer').map(a => {
+      const taux = a.pubsTotales > 0 ? Math.round(a.pubsFaites / a.pubsTotales * 100) : 0;
+
+      // Logique de classification des Agents (même niveau de présentation que les SKUs)
+      let classification = '🌟 Nouvel Agent';
+      if (a.scoreTotal >= 1000 || a.ventes >= 10 || taux >= 80 && a.pubsTotales >= 20) {
+        classification = '🏆 Agent Top';
+      } else if (a.scoreTotal >= 200 || a.ventes >= 2 || taux >= 50 && a.pubsFaites >= 5) {
+        classification = '⚡ En Progression';
+      } else if (a.pubsTotales > 0) {
+        classification = '🌟 Nouvel Agent';
+      } else {
+        classification = '🛑 Inactif';
+      }
+      return {
+        ...a,
+        taux,
+        classification
+      };
+    }).sort((a, b) => {
       if (b.scoreTotal !== a.scoreTotal) return b.scoreTotal - a.scoreTotal;
       if (b.pubsFaites !== a.pubsFaites) return b.pubsFaites - a.pubsFaites;
       return b.ventes - a.ventes;
     });
   }, [filteredCalendrierForRanking, appState.utilisateurs]);
+
+  // Agent Ranking filtré par la classification sélectionnée
+  const filteredAgentRanking = useMemo(() => {
+    if (!agentFilterClassif || agentFilterClassif === 'all') return agentRanking;
+    return agentRanking.filter(a => a.classification === agentFilterClassif);
+  }, [agentRanking, agentFilterClassif]);
+
+  // Comptage dynamique des catégories d'agents
+  const agentClassifCounts = useMemo(() => {
+    const counts = {
+      total: agentRanking.length,
+      top: 0,
+      progression: 0,
+      nouveau: 0,
+      inactif: 0
+    };
+    agentRanking.forEach(a => {
+      if (a.classification === '🏆 Agent Top') counts.top++;else if (a.classification === '⚡ En Progression') counts.progression++;else if (a.classification === '🌟 Nouvel Agent') counts.nouveau++;else if (a.classification === '🛑 Inactif') counts.inactif++;
+    });
+    return counts;
+  }, [agentRanking]);
   const handleRegisterSKU = async e => {
     e.preventDefault();
     if (!newSkuInput.trim()) return;
@@ -5558,31 +5598,142 @@ function ClassementView({
     style: {
       marginBottom: '24px'
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '12px',
+      marginBottom: '12px'
+    }
   }, /*#__PURE__*/React.createElement("h3", {
     className: "card-title",
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: '8px',
+      margin: 0
     }
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-trophy",
     style: {
       color: '#f59e0b'
     }
-  }), "Classement & Performance des Agents"), /*#__PURE__*/React.createElement("p", {
+  }), "Classement & Classification des Agents"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px',
+      flexWrap: 'wrap',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-gagnant",
+    style: {
+      padding: '6px 12px',
+      fontSize: '12px'
+    }
+  }, "🏆 ", agentClassifCounts.top, " Top Agent", agentClassifCounts.top > 1 ? 's' : ''), /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-retester",
+    style: {
+      padding: '6px 12px',
+      fontSize: '12px',
+      backgroundColor: '#3b82f6',
+      color: '#fff'
+    }
+  }, "⚡ ", agentClassifCounts.progression, " En Progression"), /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-nouveau",
+    style: {
+      padding: '6px 12px',
+      fontSize: '12px'
+    }
+  }, "🌟 ", agentClassifCounts.nouveau, " Nouveau", agentClassifCounts.nouveau > 1 ? 'x' : ''), /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-ecarte",
+    style: {
+      padding: '6px 12px',
+      fontSize: '12px'
+    }
+  }, "🛑 ", agentClassifCounts.inactif, " Inactif", agentClassifCounts.inactif > 1 ? 's' : ''))), /*#__PURE__*/React.createElement("p", {
     style: {
       color: 'var(--text-muted)',
       fontSize: '13.5px',
       marginBottom: '16px'
     }
-  }, "Suivi en temps réel du volume de publications réalisées, des ventes enregistrées et du score de performance par agent."), /*#__PURE__*/React.createElement("div", {
+  }, "Suivi en temps réel et classification des agents selon leur volume de publications, leur taux de réussite et leur score de ventes."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px',
+      flexWrap: 'wrap',
+      marginBottom: '16px',
+      backgroundColor: '#f8fafc',
+      padding: '10px 14px',
+      borderRadius: '10px',
+      border: '1px solid #e2e8f0'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `btn ${agentFilterClassif === 'all' ? 'btn-primary' : 'btn-secondary'}`,
+    onClick: () => setAgentFilterClassif('all'),
+    style: {
+      height: '34px',
+      fontSize: '12.5px',
+      padding: '0 14px'
+    }
+  }, "Tous (", agentClassifCounts.total, ")"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `btn ${agentFilterClassif === '🏆 Agent Top' ? 'btn-primary' : 'btn-secondary'}`,
+    onClick: () => setAgentFilterClassif('🏆 Agent Top'),
+    style: {
+      height: '34px',
+      fontSize: '12.5px',
+      padding: '0 14px',
+      backgroundColor: agentFilterClassif === '🏆 Agent Top' ? '#10b981' : '#fff',
+      borderColor: '#10b981',
+      color: agentFilterClassif === '🏆 Agent Top' ? '#fff' : '#047857'
+    }
+  }, "🏆 Agent Top (", agentClassifCounts.top, ")"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `btn ${agentFilterClassif === '⚡ En Progression' ? 'btn-primary' : 'btn-secondary'}`,
+    onClick: () => setAgentFilterClassif('⚡ En Progression'),
+    style: {
+      height: '34px',
+      fontSize: '12.5px',
+      padding: '0 14px',
+      backgroundColor: agentFilterClassif === '⚡ En Progression' ? '#3b82f6' : '#fff',
+      borderColor: '#3b82f6',
+      color: agentFilterClassif === '⚡ En Progression' ? '#fff' : '#1d4ed8'
+    }
+  }, "⚡ En Progression (", agentClassifCounts.progression, ")"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `btn ${agentFilterClassif === '🌟 Nouvel Agent' ? 'btn-primary' : 'btn-secondary'}`,
+    onClick: () => setAgentFilterClassif('🌟 Nouvel Agent'),
+    style: {
+      height: '34px',
+      fontSize: '12.5px',
+      padding: '0 14px',
+      backgroundColor: agentFilterClassif === '🌟 Nouvel Agent' ? '#f59e0b' : '#fff',
+      borderColor: '#f59e0b',
+      color: agentFilterClassif === '🌟 Nouvel Agent' ? '#fff' : '#b45309'
+    }
+  }, "🌟 Nouvel Agent (", agentClassifCounts.nouveau, ")"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `btn ${agentFilterClassif === '🛑 Inactif' ? 'btn-primary' : 'btn-secondary'}`,
+    onClick: () => setAgentFilterClassif('🛑 Inactif'),
+    style: {
+      height: '34px',
+      fontSize: '12.5px',
+      padding: '0 14px',
+      backgroundColor: agentFilterClassif === '🛑 Inactif' ? '#ef4444' : '#fff',
+      borderColor: '#ef4444',
+      color: agentFilterClassif === '🛑 Inactif' ? '#fff' : '#b91c1c'
+    }
+  }, "🛑 Inactif (", agentClassifCounts.inactif, ")")), /*#__PURE__*/React.createElement("div", {
     className: "table-container"
   }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: {
       width: '60px'
     }
-  }, "Rang"), /*#__PURE__*/React.createElement("th", null, "Agent"), /*#__PURE__*/React.createElement("th", null, "Publications"), /*#__PURE__*/React.createElement("th", null, "Taux Réussite"), /*#__PURE__*/React.createElement("th", null, "Ventes Total"), /*#__PURE__*/React.createElement("th", null, "Score Cumulé"))), /*#__PURE__*/React.createElement("tbody", null, agentRanking.length > 0 ? agentRanking.map((a, idx) => /*#__PURE__*/React.createElement("tr", {
+  }, "Rang"), /*#__PURE__*/React.createElement("th", null, "Agent"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Publications"), /*#__PURE__*/React.createElement("th", null, "Taux Réussite"), /*#__PURE__*/React.createElement("th", null, "Ventes Total"), /*#__PURE__*/React.createElement("th", null, "Score Cumulé"))), /*#__PURE__*/React.createElement("tbody", null, filteredAgentRanking.length > 0 ? filteredAgentRanking.map((a, idx) => /*#__PURE__*/React.createElement("tr", {
     key: a.name
   }, /*#__PURE__*/React.createElement("td", null, idx === 0 ? /*#__PURE__*/React.createElement("span", {
     style: {
@@ -5609,7 +5760,19 @@ function ClassementView({
       color: 'var(--text-muted)',
       marginLeft: '6px'
     }
-  }, "(", a.role, ")")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, a.pubsFaites), " / ", a.pubsTotales, " pub", a.pubsTotales > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+  }, "(", a.role, ")")), /*#__PURE__*/React.createElement("td", null, a.classification === '🏆 Agent Top' ? /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-gagnant"
+  }, "🏆 Agent Top") : a.classification === '⚡ En Progression' ? /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-retester",
+    style: {
+      backgroundColor: '#3b82f6',
+      color: '#fff'
+    }
+  }, "⚡ En Progression") : a.classification === '🌟 Nouvel Agent' ? /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-nouveau"
+  }, "🌟 Nouvel Agent") : /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-ecarte"
+  }, "🛑 Inactif")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, a.pubsFaites), " / ", a.pubsTotales, " pub", a.pubsTotales > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -5638,13 +5801,13 @@ function ClassementView({
   }, a.taux, "%"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, a.ventes), " vente", a.ventes > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
     className: "badge badge-gagnant"
   }, a.scoreTotal.toFixed(1), " pts")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: "6",
+    colSpan: "7",
     style: {
       textAlign: 'center',
       color: 'var(--text-muted)',
       padding: '16px'
     }
-  }, "Aucun agent ou activité enregistrée.")))))), /*#__PURE__*/React.createElement("div", {
+  }, "Aucun agent correspondant à ce filtre de classification.")))))), /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: '24px',
