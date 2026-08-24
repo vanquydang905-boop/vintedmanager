@@ -1786,7 +1786,7 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 <th>Email</th>
                                 <th>Mot de passe</th>
                                 <th>Notes & Observations</th>
-                                {isCadre && <th>Actions</th>}
+                                {isCadre && <th style={{ width: '90px', minWidth: '90px', textAlign: 'center' }}>Actions</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -1897,26 +1897,45 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                                  )}
                                              </div>
                                          </td>
-                                         <td style={{ fontSize: '12px', maxWidth: '200px' }}>
-                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                                                 <span>{c.notes || '-'}</span>
+                                         <td style={{ fontSize: '12px', width: '220px', minWidth: '180px', maxWidth: '240px' }}>
+                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                 {c.notes ? (
+                                                     <span 
+                                                         title={c.notes} 
+                                                         style={{ 
+                                                             color: '#334155', 
+                                                             fontWeight: 500, 
+                                                             display: '-webkit-box', 
+                                                             WebkitLineClamp: 2, 
+                                                             WebkitBoxOrient: 'vertical', 
+                                                             overflow: 'hidden', 
+                                                             textOverflow: 'ellipsis',
+                                                             lineHeight: '1.35',
+                                                             wordBreak: 'break-word'
+                                                         }}
+                                                     >
+                                                         {c.notes}
+                                                     </span>
+                                                 ) : (
+                                                     <span style={{ color: '#94a3b8' }}>-</span>
+                                                 )}
                                                  <button
                                                      type="button"
                                                      onClick={() => handleCopyText(`N°${c.numeroCompte || ''} | Pseudo: ${c.pseudo || ''} | Tél: ${c.telephone || ''} | Email: ${c.email || ''} | MP: ${c.motDePasse || ''}`, 'all', c.id)}
                                                      title="Copier TOUS les identifiants"
-                                                     style={{ border: '1px solid #cbd5e1', background: '#f8fafc', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', color: copiedField === `${c.id}_all` ? '#10b981' : '#64748b', fontSize: '10px', fontWeight: 600, flexShrink: 0 }}
+                                                     style={{ alignSelf: 'flex-start', border: '1px solid #cbd5e1', background: copiedField === `${c.id}_all` ? '#dcfce7' : '#f8fafc', borderRadius: '4px', cursor: 'pointer', padding: '2px 8px', color: copiedField === `${c.id}_all` ? '#166534' : '#475569', fontSize: '10.5px', fontWeight: 600, marginTop: '2px', whiteSpace: 'nowrap' }}
                                                  >
                                                      {copiedField === `${c.id}_all` ? '✓ Copié !' : '📋 Tout copier'}
                                                  </button>
                                              </div>
                                          </td>
                                         {isCadre && (
-                                            <td>
-                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                    <button className="btn btn-primary btn-sm" onClick={() => handleEdit(c)} title="Éditer">
+                                            <td style={{ width: '90px', minWidth: '90px', textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                                                    <button className="btn btn-primary btn-sm" onClick={() => handleEdit(c)} title="Éditer le compte" style={{ width: '30px', height: '30px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                                                         <i className="fa-solid fa-pen"></i>
                                                     </button>
-                                                    <button className="btn btn-danger btn-sm" onClick={() => onDeleteCompte(c.id)} title="Supprimer">
+                                                    <button className="btn btn-danger btn-sm" onClick={() => onDeleteCompte(c.id)} title="Supprimer le compte" style={{ width: '30px', height: '30px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                                                         <i className="fa-solid fa-trash"></i>
                                                     </button>
                                                 </div>
@@ -1926,12 +1945,13 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="11" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="13" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                                         Aucun compte Vinted enregistré.
                                     </td>
                                 </tr>
                             )}
                         </tbody>
+
                     </table>
                 </div>
             </div>

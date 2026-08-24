@@ -2561,7 +2561,13 @@ function ComptesView({
       height: '16px',
       cursor: 'pointer'
     }
-  })), /*#__PURE__*/React.createElement("th", null, "Statut & Date"), /*#__PURE__*/React.createElement("th", null, "N° Proxy"), /*#__PURE__*/React.createElement("th", null, "Pseudo"), /*#__PURE__*/React.createElement("th", null, "Géré par"), /*#__PURE__*/React.createElement("th", null, "Agent"), /*#__PURE__*/React.createElement("th", null, "Couleur Fond"), /*#__PURE__*/React.createElement("th", null, "Taille"), /*#__PURE__*/React.createElement("th", null, "Téléphone"), /*#__PURE__*/React.createElement("th", null, "Email"), /*#__PURE__*/React.createElement("th", null, "Mot de passe"), /*#__PURE__*/React.createElement("th", null, "Notes & Observations"), isCadre && /*#__PURE__*/React.createElement("th", null, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, visibleComptes.length > 0 ? visibleComptes.map(c => /*#__PURE__*/React.createElement("tr", {
+  })), /*#__PURE__*/React.createElement("th", null, "Statut & Date"), /*#__PURE__*/React.createElement("th", null, "N° Proxy"), /*#__PURE__*/React.createElement("th", null, "Pseudo"), /*#__PURE__*/React.createElement("th", null, "Géré par"), /*#__PURE__*/React.createElement("th", null, "Agent"), /*#__PURE__*/React.createElement("th", null, "Couleur Fond"), /*#__PURE__*/React.createElement("th", null, "Taille"), /*#__PURE__*/React.createElement("th", null, "Téléphone"), /*#__PURE__*/React.createElement("th", null, "Email"), /*#__PURE__*/React.createElement("th", null, "Mot de passe"), /*#__PURE__*/React.createElement("th", null, "Notes & Observations"), isCadre && /*#__PURE__*/React.createElement("th", {
+    style: {
+      width: '90px',
+      minWidth: '90px',
+      textAlign: 'center'
+    }
+  }, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, visibleComptes.length > 0 ? visibleComptes.map(c => /*#__PURE__*/React.createElement("tr", {
     key: c.id,
     style: {
       backgroundColor: selectedCompteIds.includes(c.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent'
@@ -2759,50 +2765,93 @@ function ComptesView({
   })))), /*#__PURE__*/React.createElement("td", {
     style: {
       fontSize: '12px',
-      maxWidth: '200px'
+      width: '220px',
+      minWidth: '180px',
+      maxWidth: '240px'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: 'column',
       gap: '6px'
     }
-  }, /*#__PURE__*/React.createElement("span", null, c.notes || '-'), /*#__PURE__*/React.createElement("button", {
+  }, c.notes ? /*#__PURE__*/React.createElement("span", {
+    title: c.notes,
+    style: {
+      color: '#334155',
+      fontWeight: 500,
+      display: '-webkit-box',
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: 'vertical',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      lineHeight: '1.35',
+      wordBreak: 'break-word'
+    }
+  }, c.notes) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#94a3b8'
+    }
+  }, "-"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => handleCopyText(`N°${c.numeroCompte || ''} | Pseudo: ${c.pseudo || ''} | Tél: ${c.telephone || ''} | Email: ${c.email || ''} | MP: ${c.motDePasse || ''}`, 'all', c.id),
     title: "Copier TOUS les identifiants",
     style: {
+      alignSelf: 'flex-start',
       border: '1px solid #cbd5e1',
-      background: '#f8fafc',
+      background: copiedField === `${c.id}_all` ? '#dcfce7' : '#f8fafc',
       borderRadius: '4px',
       cursor: 'pointer',
-      padding: '2px 6px',
-      color: copiedField === `${c.id}_all` ? '#10b981' : '#64748b',
-      fontSize: '10px',
+      padding: '2px 8px',
+      color: copiedField === `${c.id}_all` ? '#166534' : '#475569',
+      fontSize: '10.5px',
       fontWeight: 600,
-      flexShrink: 0
+      marginTop: '2px',
+      whiteSpace: 'nowrap'
     }
-  }, copiedField === `${c.id}_all` ? '✓ Copié !' : '📋 Tout copier'))), isCadre && /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+  }, copiedField === `${c.id}_all` ? '✓ Copié !' : '📋 Tout copier'))), isCadre && /*#__PURE__*/React.createElement("td", {
+    style: {
+      width: '90px',
+      minWidth: '90px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '6px',
-      flexWrap: 'wrap'
+      justifyContent: 'center',
+      alignItems: 'center'
     }
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary btn-sm",
     onClick: () => handleEdit(c),
-    title: "Éditer"
+    title: "Éditer le compte",
+    style: {
+      width: '30px',
+      height: '30px',
+      padding: 0,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-pen"
   })), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-danger btn-sm",
     onClick: () => onDeleteCompte(c.id),
-    title: "Supprimer"
+    title: "Supprimer le compte",
+    style: {
+      width: '30px',
+      height: '30px',
+      padding: 0,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-trash"
   })))))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: "11",
+    colSpan: "13",
     style: {
       textAlign: 'center',
       padding: '24px',
