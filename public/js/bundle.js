@@ -5644,14 +5644,34 @@ function ClassementView({
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
-      margin: 0
+      margin: 0,
+      flexWrap: 'wrap'
     }
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-trophy",
     style: {
       color: '#f59e0b'
     }
-  }), "Classement & Classification des Agents"), /*#__PURE__*/React.createElement("div", {
+  }), "Classement & Classification des Agents", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11px',
+      fontWeight: 600,
+      padding: '3px 9px',
+      borderRadius: '12px',
+      backgroundColor: '#eff6ff',
+      color: '#1d4ed8',
+      border: '1px solid #bfdbfe',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px'
+    },
+    title: "Données et métriques issues directement de l'API DotB Cloud"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-cloud",
+    style: {
+      color: '#2563eb'
+    }
+  }), " Source : DotB Cloud")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '6px',
@@ -5996,14 +6016,34 @@ function ClassementView({
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: '8px',
+      flexWrap: 'wrap'
     }
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-boxes-packing",
     style: {
       color: 'var(--primary)'
     }
-  }), "Enregistrement & Répertoire des SKU avec Classification"), /*#__PURE__*/React.createElement("p", {
+  }), "Enregistrement & Répertoire des SKU avec Classification", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11px',
+      fontWeight: 600,
+      padding: '3px 9px',
+      borderRadius: '12px',
+      backgroundColor: '#eff6ff',
+      color: '#1d4ed8',
+      border: '1px solid #bfdbfe',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px'
+    },
+    title: "Métriques et ventes consolidées depuis l'API et les exports DotB Cloud"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-cloud",
+    style: {
+      color: '#2563eb'
+    }
+  }), " Source : DotB Cloud")), /*#__PURE__*/React.createElement("p", {
     style: {
       color: 'var(--text-muted)',
       fontSize: '13.5px',

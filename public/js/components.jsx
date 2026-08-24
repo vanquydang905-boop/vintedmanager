@@ -4028,10 +4028,14 @@ function ClassementView({ appState, onUpdateRow }) {
             {/* CLASSEMENT & CLASSIFICATION DES AGENTS */}
             <div className="card" style={{ marginBottom: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
-                    <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, flexWrap: 'wrap' }}>
                         <i className="fa-solid fa-trophy" style={{ color: '#f59e0b' }}></i>
                         Classement & Classification des Agents
+                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 9px', borderRadius: '12px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', display: 'inline-flex', alignItems: 'center', gap: '5px' }} title="Données et métriques issues directement de l'API DotB Cloud">
+                            <i className="fa-solid fa-cloud" style={{ color: '#2563eb' }}></i> Source : DotB Cloud
+                        </span>
                     </h3>
+
 
                     {/* BADGES RÉSUMÉ CLASSIFICATION DES AGENTS */}
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -4213,10 +4217,14 @@ function ClassementView({ appState, onUpdateRow }) {
             {/* SECTION DÉDIÉE SKU AVEC CLASSIFICATION */}
             <div className="card" style={{ marginBottom: '24px' }}>
 
-                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <i className="fa-solid fa-boxes-packing" style={{ color: 'var(--primary)' }}></i>
                     Enregistrement & Répertoire des SKU avec Classification
+                    <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 9px', borderRadius: '12px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', display: 'inline-flex', alignItems: 'center', gap: '5px' }} title="Métriques et ventes consolidées depuis l'API et les exports DotB Cloud">
+                        <i className="fa-solid fa-cloud" style={{ color: '#2563eb' }}></i> Source : DotB Cloud
+                    </span>
                 </h3>
+
                 <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '16px' }}>
                     Enregistrez vos SKU et définissez directement leur classification (Nouveau produit, Gagnant, À retester, Écarté).
                 </p>
