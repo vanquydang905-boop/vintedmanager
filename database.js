@@ -586,6 +586,8 @@ const dbService = {
                             motDePasse: extra.motDePasse || dbRow.motdepasse || '',
                             gereParInitiales: extra.gereParInitiales || dbRow.gereparinitiales || '',
                             dateStatutCompte: extra.dateStatutCompte || dbRow.datestatutcompte || '',
+                            couleurFond: extra.couleurFond || extra.couleur_fond || dbRow.couleur_fond || dbRow.couleurfond || '',
+                            taille: extra.taille || extra.taille_vetement || dbRow.taille || '',
                             notes: extra.userNotes !== undefined ? extra.userNotes : (dbRow.notes || '')
                         };
                     }).forEach(dbRow => {
@@ -607,6 +609,8 @@ const dbService = {
             organisationId: 'org_default',
             statut: 'Actif',
             dateCreation: getLocalDateString(),
+            couleurFond: '',
+            taille: '',
             notes: '',
             ...compte
         };
@@ -626,6 +630,8 @@ const dbService = {
                     motDePasse: payload.motDePasse || '',
                     gereParInitiales: payload.gereParInitiales || '',
                     dateStatutCompte: payload.dateStatutCompte || '',
+                    couleurFond: payload.couleurFond || payload.couleur_fond || '',
+                    taille: payload.taille || payload.taille_vetement || '',
                     userNotes: payload.notes || '',
                     adsPowerUserId: payload.adspowerProfileId || payload.adsPowerUserId || ''
                 };
@@ -671,6 +677,8 @@ const dbService = {
                     motDePasse: updatedCompte.motDePasse || '',
                     gereParInitiales: updatedCompte.gereParInitiales || '',
                     dateStatutCompte: updatedCompte.dateStatutCompte || '',
+                    couleurFond: updatedCompte.couleurFond || updatedCompte.couleur_fond || '',
+                    taille: updatedCompte.taille || updatedCompte.taille_vetement || '',
                     userNotes: updatedCompte.notes || '',
                     adsPowerUserId: updatedCompte.adspowerProfileId || updatedCompte.adsPowerUserId || ''
                 };
@@ -682,6 +690,7 @@ const dbService = {
                     statut: updatedCompte.statut || 'Actif',
                     notes: JSON.stringify(extraMeta)
                 };
+
 
                 await supabase.from('comptes').update(dbFields).eq('id', id).select();
             } catch (err) {}

@@ -1735,6 +1735,8 @@ function ComptesView({
   const [dateStatutCompte, setDateStatutCompte] = useState('');
   const [organisationId, setOrganisationId] = useState(userOrgId);
   const [dotbApiKey, setDotbApiKey] = useState('');
+  const [couleurFond, setCouleurFond] = useState('');
+  const [taille, setTaille] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedCompteIds, setSelectedCompteIds] = useState([]);
 
@@ -1849,6 +1851,8 @@ function ComptesView({
     setDateStatutCompte(c.dateStatutCompte || '');
     setOrganisationId(isAdmin ? c.organisationId || 'org_default' : userOrgId);
     setDotbApiKey(c.dotbApiKey || '');
+    setCouleurFond(c.couleurFond || c.couleur_fond || '');
+    setTaille(c.taille || c.taille_vetement || '');
     setNotes(c.notes || '');
     // Scroll to form smoothly after state update
     setTimeout(() => {
@@ -1876,6 +1880,8 @@ function ComptesView({
     setDateStatutCompte('');
     setOrganisationId(userOrgId);
     setDotbApiKey('');
+    setCouleurFond('');
+    setTaille('');
     setNotes('');
   };
   const handleSubmit = e => {
@@ -1893,6 +1899,8 @@ function ComptesView({
       dateStatutCompte,
       organisationId: isAdmin ? organisationId : userOrgId,
       dotbApiKey,
+      couleurFond: couleurFond.trim(),
+      taille: taille.trim(),
       notes
     });
     handleReset();
@@ -2200,11 +2208,69 @@ function ComptesView({
     onChange: e => setDateStatutCompte(e.target.value),
     placeholder: "ex: 28/07/2026"
   }))), /*#__PURE__*/React.createElement("div", {
-    className: "grid-2",
+    className: "grid-3",
     style: {
-      marginBottom: '16px'
+      marginBottom: '12px'
     }
   }, /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-palette",
+    style: {
+      color: '#ec4899'
+    }
+  }), " Code Couleur de Fond"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: couleurFond,
+    onChange: e => setCouleurFond(e.target.value),
+    placeholder: "ex: #ffffff, Fond Bois, Beige, #f1f5f9",
+    style: {
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "color",
+    value: couleurFond && couleurFond.startsWith('#') && couleurFond.length === 7 ? couleurFond : '#ffffff',
+    onChange: e => setCouleurFond(e.target.value),
+    style: {
+      width: '38px',
+      height: '38px',
+      padding: '2px',
+      border: '1px solid #cbd5e1',
+      borderRadius: '6px',
+      cursor: 'pointer'
+    },
+    title: "Choisir une couleur"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-ruler",
+    style: {
+      color: '#8b5cf6'
+    }
+  }), " Taille des Articles (Input Text)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: taille,
+    onChange: e => setTaille(e.target.value),
+    placeholder: "ex: S, M, L, 38-40, XS-S"
+  })), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", null, "Organisation"), /*#__PURE__*/React.createElement("select", {
     value: isAdmin ? organisationId : userOrgId,
@@ -2213,7 +2279,12 @@ function ComptesView({
   }, organisations.map(o => /*#__PURE__*/React.createElement("option", {
     key: o.id,
     value: o.id
-  }, o.nom)))), /*#__PURE__*/React.createElement("div", {
+  }, o.nom))))), /*#__PURE__*/React.createElement("div", {
+    className: "grid-1",
+    style: {
+      marginBottom: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", null, "Notes & Observations (Adspower, Ventes, etc.)"), /*#__PURE__*/React.createElement("input", {
     type: "text",
@@ -2490,7 +2561,7 @@ function ComptesView({
       height: '16px',
       cursor: 'pointer'
     }
-  })), /*#__PURE__*/React.createElement("th", null, "Statut & Date"), /*#__PURE__*/React.createElement("th", null, "N° Proxy"), /*#__PURE__*/React.createElement("th", null, "Pseudo"), /*#__PURE__*/React.createElement("th", null, "Géré par"), /*#__PURE__*/React.createElement("th", null, "Agent"), /*#__PURE__*/React.createElement("th", null, "Téléphone"), /*#__PURE__*/React.createElement("th", null, "Email"), /*#__PURE__*/React.createElement("th", null, "Mot de passe"), /*#__PURE__*/React.createElement("th", null, "Notes & Observations"), isCadre && /*#__PURE__*/React.createElement("th", null, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, visibleComptes.length > 0 ? visibleComptes.map(c => /*#__PURE__*/React.createElement("tr", {
+  })), /*#__PURE__*/React.createElement("th", null, "Statut & Date"), /*#__PURE__*/React.createElement("th", null, "N° Proxy"), /*#__PURE__*/React.createElement("th", null, "Pseudo"), /*#__PURE__*/React.createElement("th", null, "Géré par"), /*#__PURE__*/React.createElement("th", null, "Agent"), /*#__PURE__*/React.createElement("th", null, "Couleur Fond"), /*#__PURE__*/React.createElement("th", null, "Taille"), /*#__PURE__*/React.createElement("th", null, "Téléphone"), /*#__PURE__*/React.createElement("th", null, "Email"), /*#__PURE__*/React.createElement("th", null, "Mot de passe"), /*#__PURE__*/React.createElement("th", null, "Notes & Observations"), isCadre && /*#__PURE__*/React.createElement("th", null, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, visibleComptes.length > 0 ? visibleComptes.map(c => /*#__PURE__*/React.createElement("tr", {
     key: c.id,
     style: {
       backgroundColor: selectedCompteIds.includes(c.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent'
@@ -2577,7 +2648,41 @@ function ComptesView({
       backgroundColor: '#64748b',
       color: '#fff'
     }
-  }, "À attribuer")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+  }, "À attribuer")), /*#__PURE__*/React.createElement("td", null, c.couleurFond ? /*#__PURE__*/React.createElement("span", {
+    className: "badge",
+    style: {
+      backgroundColor: c.couleurFond.startsWith('#') && c.couleurFond.length === 7 ? c.couleurFond : '#f8fafc',
+      color: c.couleurFond.startsWith('#') && c.couleurFond.length === 7 ? '#1e293b' : '#334155',
+      border: '1px solid #cbd5e1',
+      padding: '3px 9px',
+      fontSize: '11.5px',
+      borderRadius: '12px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px',
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: '10px',
+      height: '10px',
+      borderRadius: '50%',
+      backgroundColor: c.couleurFond.startsWith('#') && c.couleurFond.length === 7 ? c.couleurFond : '#cbd5e1',
+      border: '1px solid rgba(0,0,0,0.25)',
+      display: 'inline-block'
+    }
+  }), c.couleurFond) : '-'), /*#__PURE__*/React.createElement("td", null, c.taille ? /*#__PURE__*/React.createElement("span", {
+    className: "badge",
+    style: {
+      backgroundColor: '#f3e8ff',
+      color: '#6b21a8',
+      border: '1px solid #d8b4fe',
+      padding: '3px 9px',
+      fontSize: '11.5px',
+      fontWeight: 700,
+      borderRadius: '12px'
+    }
+  }, "📏 ", c.taille) : '-'), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'inline-flex',
       alignItems: 'center',

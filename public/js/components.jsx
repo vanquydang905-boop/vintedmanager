@@ -1202,8 +1202,11 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
     const [dateStatutCompte, setDateStatutCompte] = useState('');
     const [organisationId, setOrganisationId] = useState(userOrgId);
     const [dotbApiKey, setDotbApiKey] = useState('');
+    const [couleurFond, setCouleurFond] = useState('');
+    const [taille, setTaille] = useState('');
     const [notes, setNotes] = useState('');
     const [selectedCompteIds, setSelectedCompteIds] = useState([]);
+
     
     // Quick Text Import Modal State
     const [showTextModal, setShowTextModal] = useState(false);
@@ -1338,6 +1341,8 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
         setDateStatutCompte(c.dateStatutCompte || '');
         setOrganisationId(isAdmin ? (c.organisationId || 'org_default') : userOrgId);
         setDotbApiKey(c.dotbApiKey || '');
+        setCouleurFond(c.couleurFond || c.couleur_fond || '');
+        setTaille(c.taille || c.taille_vetement || '');
         setNotes(c.notes || '');
         // Scroll to form smoothly after state update
         setTimeout(() => {
@@ -1363,6 +1368,8 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
         setDateStatutCompte('');
         setOrganisationId(userOrgId);
         setDotbApiKey('');
+        setCouleurFond('');
+        setTaille('');
         setNotes('');
     };
 
@@ -1381,10 +1388,13 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
             dateStatutCompte,
             organisationId: isAdmin ? organisationId : userOrgId,
             dotbApiKey,
+            couleurFond: couleurFond.trim(),
+            taille: taille.trim(),
             notes
         });
         handleReset();
     };
+
 
     // Helper text parser for bulk pasted accounts text
     const handleParseAndImportText = async () => {
@@ -1586,7 +1596,41 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                             </div>
                         </div>
 
-                        <div className="grid-2" style={{ marginBottom: '16px' }}>
+                        <div className="grid-3" style={{ marginBottom: '12px' }}>
+                            <div className="form-group">
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <i className="fa-solid fa-palette" style={{ color: '#ec4899' }}></i> Code Couleur de Fond
+                                </label>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <input
+                                        type="text"
+                                        value={couleurFond}
+                                        onChange={(e) => setCouleurFond(e.target.value)}
+                                        placeholder="ex: #ffffff, Fond Bois, Beige, #f1f5f9"
+                                        style={{ flex: 1 }}
+                                    />
+                                    <input
+                                        type="color"
+                                        value={couleurFond && couleurFond.startsWith('#') && couleurFond.length === 7 ? couleurFond : '#ffffff'}
+                                        onChange={(e) => setCouleurFond(e.target.value)}
+                                        style={{ width: '38px', height: '38px', padding: '2px', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
+                                        title="Choisir une couleur"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <i className="fa-solid fa-ruler" style={{ color: '#8b5cf6' }}></i> Taille des Articles (Input Text)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={taille}
+                                    onChange={(e) => setTaille(e.target.value)}
+                                    placeholder="ex: S, M, L, 38-40, XS-S"
+                                />
+                            </div>
+
                             <div className="form-group">
                                 <label>Organisation</label>
                                 <select value={isAdmin ? organisationId : userOrgId} onChange={(e) => setOrganisationId(e.target.value)} disabled={!isAdmin}>
@@ -1595,12 +1639,15 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                     ))}
                                 </select>
                             </div>
+                        </div>
 
+                        <div className="grid-1" style={{ marginBottom: '16px' }}>
                             <div className="form-group">
                                 <label>Notes & Observations (Adspower, Ventes, etc.)</label>
                                 <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ex: connecté à Adspower le 05/08/26, 1 article en vente" />
                             </div>
                         </div>
+
 
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <button type="submit" className="btn btn-primary">
@@ -1733,6 +1780,8 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                 <th>Pseudo</th>
                                 <th>Géré par</th>
                                 <th>Agent</th>
+                                <th>Couleur Fond</th>
+                                <th>Taille</th>
                                 <th>Téléphone</th>
                                 <th>Email</th>
                                 <th>Mot de passe</th>
@@ -1787,6 +1836,22 @@ function ComptesView({ currentUser, appState, onSaveCompte, onDeleteCompte, onBu
                                          </td>
                                         <td>{c.gereParInitiales ? <span className="badge" style={{ backgroundColor: '#475569', color: '#fff' }}>{c.gereParInitiales}</span> : '-'}</td>
                                         <td>{c.agent && c.agent !== 'À attribuer' ? <span className="badge badge-agent">{c.agent}</span> : <span className="badge" style={{ backgroundColor: '#64748b', color: '#fff' }}>À attribuer</span>}</td>
+                                        <td>
+                                            {c.couleurFond ? (
+                                                <span className="badge" style={{ backgroundColor: (c.couleurFond.startsWith('#') && c.couleurFond.length === 7) ? c.couleurFond : '#f8fafc', color: (c.couleurFond.startsWith('#') && c.couleurFond.length === 7) ? '#1e293b' : '#334155', border: '1px solid #cbd5e1', padding: '3px 9px', fontSize: '11.5px', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                                                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: (c.couleurFond.startsWith('#') && c.couleurFond.length === 7) ? c.couleurFond : '#cbd5e1', border: '1px solid rgba(0,0,0,0.25)', display: 'inline-block' }}></span>
+                                                    {c.couleurFond}
+                                                </span>
+                                            ) : '-'}
+                                        </td>
+                                        <td>
+                                            {c.taille ? (
+                                                <span className="badge" style={{ backgroundColor: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', padding: '3px 9px', fontSize: '11.5px', fontWeight: 700, borderRadius: '12px' }}>
+                                                    📏 {c.taille}
+                                                </span>
+                                            ) : '-'}
+                                        </td>
+
                                         <td>
                                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                                  <span>{c.telephone || '-'}</span>
