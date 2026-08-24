@@ -5361,9 +5361,35 @@ function ClassementView({
     });
     return counts;
   }, [agentRanking]);
+
+  // Vérification en temps réel du champ de saisie des SKUs
+  const skuVerificationStatus = useMemo(() => {
+    if (!newSkuInput || !newSkuInput.trim()) return null;
+    const clean = newSkuInput.trim();
+    const existing = allSKUsMap[clean] || (skuList || []).find(s => s.sku && s.sku.trim().toLowerCase() === clean.toLowerCase());
+    const isStandardFormat = /^s[zx]\d+$/i.test(clean);
+    if (existing) {
+      return {
+        exists: true,
+        sku: existing.sku,
+        produit: existing.produit || 'Produit sans titre',
+        classification: existing.classification || 'Nouveau produit',
+        ventes: existing.ventes || 0,
+        pubs: existing.pubs || 1
+      };
+    }
+    return {
+      exists: false,
+      sku: clean,
+      isStandardFormat
+    };
+  }, [newSkuInput, allSKUsMap, skuList]);
   const handleRegisterSKU = async e => {
     e.preventDefault();
-    if (!newSkuInput.trim()) return;
+    if (!newSkuInput.trim()) {
+      if (window.showToast) window.showToast("⚠️ Veuillez saisir un code SKU valide.");
+      return;
+    }
     const skuClean = newSkuInput.trim();
     const userOrgId = appState.currentUser && appState.currentUser.organisationId || 'org_default';
     try {
@@ -5380,13 +5406,14 @@ function ClassementView({
       });
       const data = await res.json();
       if (data.success) {
-        if (window.showToast) window.showToast(data.message || `✅ SKU "${skuClean}" enregistré comme "${newClassifInput}" !`);
+        if (window.showToast) window.showToast(data.message || `✅ SKU "${skuClean}" vérifié et enregistré comme "${newClassifInput}" !`);
         if (window.loadAppState) await window.loadAppState();
       } else {
         if (window.showToast) window.showToast(`❌ Erreur : ${data.error || 'Échec de l\'enregistrement'}`);
       }
     } catch (err) {
       console.error("Erreur enregistrement SKU:", err);
+      if (window.showToast) window.showToast("❌ Erreur réseau lors de l'enregistrement du SKU");
     }
     setNewSkuInput('');
   };
@@ -5982,40 +6009,68 @@ function ClassementView({
     onSubmit: handleRegisterSKU,
     style: {
       display: 'flex',
+      flexDirection: 'column',
       gap: '12px',
-      flexWrap: 'wrap',
-      alignItems: 'flex-end',
       marginBottom: '20px',
       backgroundColor: '#f8fafc',
-      padding: '16px',
-      borderRadius: '10px',
-      border: '1px solid #e2e8f0'
+      padding: '18px',
+      borderRadius: '12px',
+      border: '1px solid #cbd5e1'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      flex: 2,
-      minWidth: '180px'
+      display: 'flex',
+      gap: '12px',
+      flexWrap: 'wrap',
+      alignItems: 'flex-end'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 3,
+      minWidth: '220px'
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
       fontSize: '12.5px',
       fontWeight: 600,
       color: 'var(--text-main)',
-      marginBottom: '4px',
-      display: 'block'
+      marginBottom: '6px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
     }
-  }, "Code SKU"), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-barcode",
+    style: {
+      color: '#2563eb'
+    }
+  }), " Code SKU à Vérifier & Enregistrer"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'relative'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "input",
     value: newSkuInput,
     onChange: e => setNewSkuInput(e.target.value),
-    placeholder: "ex: sz26001, SKU-JEAN-02",
+    placeholder: "ex: sz2602188195162729, SKU-JEAN-02",
     required: true,
     style: {
-      height: '40px',
-      fontSize: '13px'
+      height: '42px',
+      fontSize: '13px',
+      paddingRight: '36px',
+      borderColor: skuVerificationStatus ? skuVerificationStatus.exists ? '#f59e0b' : '#10b981' : '#cbd5e1',
+      backgroundColor: skuVerificationStatus ? skuVerificationStatus.exists ? '#fffbeb' : '#f0fdf4' : '#fff'
     }
-  })), /*#__PURE__*/React.createElement("div", {
+  }), skuVerificationStatus && /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: 'absolute',
+      right: '12px',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      fontSize: '15px'
+    }
+  }, skuVerificationStatus.exists ? '⚠️' : '✅'))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 2,
       minWidth: '180px'
@@ -6025,15 +6080,15 @@ function ClassementView({
       fontSize: '12.5px',
       fontWeight: 600,
       color: 'var(--text-main)',
-      marginBottom: '4px',
+      marginBottom: '6px',
       display: 'block'
     }
-  }, "Classification"), /*#__PURE__*/React.createElement("select", {
+  }, "Classification Définie"), /*#__PURE__*/React.createElement("select", {
     className: "input",
     value: newClassifInput,
     onChange: e => setNewClassifInput(e.target.value),
     style: {
-      height: '40px',
+      height: '42px',
       fontSize: '13px'
     }
   }, /*#__PURE__*/React.createElement("option", {
@@ -6048,16 +6103,50 @@ function ClassementView({
     type: "submit",
     className: "btn btn-primary",
     style: {
-      height: '40px',
-      padding: '0 20px',
-      fontSize: '13px'
+      height: '42px',
+      padding: '0 22px',
+      fontSize: '13px',
+      fontWeight: 600,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px'
     }
   }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-plus",
+    className: "fa-solid fa-shield-check"
+  }), " ", skuVerificationStatus && skuVerificationStatus.exists ? 'Mettre à jour SKU' : 'Vérifier & Enregistrer')), skuVerificationStatus && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginRight: '6px'
+      fontSize: '12.5px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '10px 14px',
+      borderRadius: '8px',
+      backgroundColor: skuVerificationStatus.exists ? '#fffbebf0' : '#f0fdf4f0',
+      border: skuVerificationStatus.exists ? '1px solid #fcd34d' : '1px solid #86efac',
+      color: skuVerificationStatus.exists ? '#92400e' : '#166534',
+      fontWeight: 500,
+      boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
     }
-  }), " Enregistrer SKU")), /*#__PURE__*/React.createElement("div", {
+  }, skuVerificationStatus.exists ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-triangle-exclamation",
+    style: {
+      color: '#d97706',
+      fontSize: '15px'
+    }
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "SKU Déjà Enregistré :"), " Produit \"", skuVerificationStatus.produit, "\" — Classification actuelle : ", /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-gagnant",
+    style: {
+      padding: '2px 8px',
+      fontSize: '11px',
+      marginLeft: '4px'
+    }
+  }, skuVerificationStatus.classification), " (", skuVerificationStatus.ventes, " vente(s), ", skuVerificationStatus.pubs, " publication(s)).")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-circle-check",
+    style: {
+      color: '#16a34a',
+      fontSize: '15px'
+    }
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "SKU Valide & Conforme :"), " Ce code est prêt à être enregistré et classé sous ", /*#__PURE__*/React.createElement("b", null, "\"", newClassifInput, "\""), ".")))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'space-between',
