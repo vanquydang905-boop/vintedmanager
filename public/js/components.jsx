@@ -3484,7 +3484,9 @@ function ClassementView({ appState, onUpdateRow }) {
     const calendrier = appState.calendrier || [];
     const [newSkuInput, setNewSkuInput] = useState('');
     const [newClassifInput, setNewClassifInput] = useState('Nouveau produit');
+    const [newPhotoInput, setNewPhotoInput] = useState('');
     const [skuSearchTerm, setSkuSearchTerm] = useState('');
+
     const [skuFilterClassif, setSkuFilterClassif] = useState('');
     const [skuFilterVentes, setSkuFilterVentes] = useState('all');
     const [skuSortBy, setSkuSortBy] = useState('score');
@@ -3875,7 +3877,8 @@ function ClassementView({ appState, onUpdateRow }) {
                 produit: existing.produit || 'Produit sans titre',
                 classification: existing.classification || 'Nouveau produit',
                 ventes: existing.ventes || 0,
-                pubs: existing.pubs || 1
+                pubs: existing.pubs || 1,
+                photoUrl: existing.photoUrl || existing.photo || ''
             };
         }
 
@@ -3899,12 +3902,19 @@ function ClassementView({ appState, onUpdateRow }) {
             const res = await fetch('/api/sku/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sku: skuClean, classification: newClassifInput, organisationId: userOrgId })
+                body: JSON.stringify({
+                    sku: skuClean,
+                    classification: newClassifInput,
+                    photoUrl: newPhotoInput.trim(),
+                    organisationId: userOrgId
+                })
             });
             const data = await res.json();
             if (data.success) {
-                if (window.showToast) window.showToast(data.message || `✅ SKU "${skuClean}" vérifié et enregistré comme "${newClassifInput}" !`);
+                if (window.showToast) window.showToast(data.message || `✅ SKU "${skuClean}" enregistré comme "${newClassifInput}" avec sa photo !`);
                 if (window.loadAppState) await window.loadAppState();
+                setNewSkuInput('');
+                setNewPhotoInput('');
             } else {
                 if (window.showToast) window.showToast(`❌ Erreur : ${data.error || 'Échec de l\'enregistrement'}`);
             }
@@ -3912,9 +3922,8 @@ function ClassementView({ appState, onUpdateRow }) {
             console.error("Erreur enregistrement SKU:", err);
             if (window.showToast) window.showToast("❌ Erreur réseau lors de l'enregistrement du SKU");
         }
-
-        setNewSkuInput('');
     };
+
 
 
     return (

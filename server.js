@@ -1564,24 +1564,28 @@ app.post('/api/calendrier/publish-winner', async (req, res) => {
 // Enregistrement / qualification directe d'un SKU avec sa classification (ex: Gagnant)
 app.post('/api/sku/register', async (req, res) => {
     try {
-        const { sku, classification, organisationId } = req.body;
+        const { sku, classification, organisationId, photoUrl, photo } = req.body;
         if (!sku || !String(sku).trim()) {
             return res.status(400).json({ error: "Code SKU requis" });
         }
         const orgId = organisationId || 'org_default';
         const cleanSku = String(sku).trim();
         const targetClassif = classification || 'Gagnant';
+        const cleanPhotoUrl = (photoUrl || photo || '').trim();
 
         const allCal = await dbService.getCalendrier(orgId);
         const matchingLines = allCal.filter(l => l.sku && String(l.sku).trim().toLowerCase() === cleanSku.toLowerCase());
 
         if (matchingLines.length > 0) {
             const ids = matchingLines.map(l => l.id);
-            await dbService.bulkUpdateCalendrierRows(ids, { classification: targetClassif });
-            await dbService.logAction("Classification SKU", `SKU ${cleanSku} qualifié comme ${targetClassif} sur ${ids.length} lignes`, "Succès", orgId);
-            return res.json({ success: true, message: `✅ SKU "${cleanSku}" qualifié en "${targetClassif}" sur ${ids.length} ligne(s) !`, count: ids.length });
+            const updates = { classification: targetClassif };
+            if (cleanPhotoUrl) updates.photoUrl = cleanPhotoUrl;
+
+            await dbService.bulkUpdateCalendrierRows(ids, updates);
+            await dbService.logAction("Classification SKU", `SKU ${cleanSku} qualifié comme ${targetClassif} avec photo sur ${ids.length} lignes`, "Succès", orgId);
+            return res.json({ success: true, message: `✅ SKU "${cleanSku}" qualifié en "${targetClassif}" avec sa photo sur ${ids.length} ligne(s) !`, count: ids.length });
         } else {
-            // Création d'une ligne d'enregistrement initiale dans la base pour persister le SKU qualifié
+            // Création d'une ligne d'enregistrement initiale dans la base pour persister le SKU qualifié et sa photo
             const id = "sku_reg_" + Date.now() + Math.random().toString(36).substr(2, 5);
             const comptes = await dbService.getComptes(orgId);
             const firstCompte = comptes[0] || { id: 'c_default', agent: 'Admin' };
@@ -1597,6 +1601,7 @@ app.post('/api/sku/register', async (req, res) => {
                 heurePrevue: "12:00",
                 sku: cleanSku,
                 produit: "Article " + cleanSku,
+                photoUrl: cleanPhotoUrl || "",
                 lien: "",
                 vues: 0,
                 likes: 0,
@@ -1607,13 +1612,14 @@ app.post('/api/sku/register', async (req, res) => {
                 classification: targetClassif,
                 statut: "Non fait"
             });
-            await dbService.logAction("Enregistrement SKU", `SKU ${cleanSku} enregistré avec statut ${targetClassif}`, "Succès", orgId);
-            return res.json({ success: true, message: `✅ SKU "${cleanSku}" enregistré avec succès comme "${targetClassif}" !`, count: 1 });
+            await dbService.logAction("Enregistrement SKU", `SKU ${cleanSku} enregistré avec photo sous statut ${targetClassif}`, "Succès", orgId);
+            return res.json({ success: true, message: `✅ SKU "${cleanSku}" enregistré avec succès avec sa photo comme "${targetClassif}" !`, count: 1 });
         }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 // ------------------- INCIDENTS -------------------
 app.get('/api/incidents', async (req, res) => {
