@@ -17,3 +17,15 @@ const bundleRes = babel.transformSync(combinedJSX, {
 
 fs.writeFileSync('public/js/bundle.js', `(function() {\n${bundleRes.code}\n})();`);
 console.log('✅ Generated public/js/bundle.js (' + bundleRes.code.length + ' bytes)');
+
+// Mirror public directory to build directory for Vercel Output Directory detection compatibility
+try {
+    if (!fs.existsSync('build')) {
+        fs.mkdirSync('build', { recursive: true });
+    }
+    fs.cpSync('public', 'build', { recursive: true });
+    console.log('✅ Synchronized public -> build directory for Vercel deployment');
+} catch (e) {
+    console.warn('⚠️ Warning mirroring build dir:', e.message);
+}
+
