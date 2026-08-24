@@ -5314,7 +5314,7 @@ function ClassementView({
           ventes: 0,
           pubs: 0,
           isOnline: false,
-          onlinePubs: 0,
+          onlineAccountsSet: new Set(),
           accountsSet: new Set(),
           priceSet: new Set(),
           lineIds: []
@@ -5329,11 +5329,13 @@ function ClassementView({
       map[skuClean].lineIds.push(l.id);
       if (l.classification) map[skuClean].classification = l.classification;
 
-      // Détection si le SKU est toujours actif et en ligne
+      // Détection si le SKU est toujours actif et en ligne sur des comptes distincts
       const isDoneOrOnline = l.statut === 'Fait' || l.statut === 'Publié' || l.statut === '✓ Fait' || l.done || l.isOnline || l.enLigne;
       if (isDoneOrOnline) {
         map[skuClean].isOnline = true;
-        map[skuClean].onlinePubs += 1;
+        const comp = comptesMap[l.compteId];
+        const pseudoClean = comp && comp.pseudo ? comp.pseudo.trim() : l.comptePseudo ? l.comptePseudo.trim() : '';
+        if (pseudoClean) map[skuClean].onlineAccountsSet.add(pseudoClean.toLowerCase());
       }
       const comp = comptesMap[l.compteId];
       if (comp && comp.pseudo) map[skuClean].accountsSet.add('@' + comp.pseudo.trim());else if (l.comptePseudo) map[skuClean].accountsSet.add('@' + l.comptePseudo.trim());
@@ -5360,7 +5362,10 @@ function ClassementView({
       return apiSkuSummary.map(s => {
         const localInfo = allSKUsMap[s.sku] || {};
         const isOnline = Boolean(s.isOnline || s.status === 'PUBLISHED' || s.status === 'ACTIVE' || localInfo.isOnline || s.pubs > 0);
-        const onlinePubs = localInfo.onlinePubs || (isOnline ? Math.max(1, s.pubs || 1) : 0);
+
+        // Nombre de publications/comptes actifs 100% cohérent avec les publications réelles
+        const activeAccountsCount = s.accountBreakdown && s.accountBreakdown.length > 0 ? s.accountBreakdown.length : localInfo.onlineAccountsSet ? localInfo.onlineAccountsSet.size : 0;
+        const onlinePubs = isOnline ? Math.max(1, Math.min(s.pubs || 1, activeAccountsCount || s.pubs || 1)) : 0;
         return {
           sku: s.sku,
           produit: s.produit,
@@ -5381,8 +5386,10 @@ function ClassementView({
     return Object.values(allSKUsMap).map(s => {
       const accs = Array.from(s.accountsSet);
       const prices = Array.from(s.priceSet);
+      const onlineCount = s.isOnline ? Math.max(1, s.onlineAccountsSet.size || 1) : 0;
       return {
         ...s,
+        onlinePubs: onlineCount,
         accountsStr: accs.length > 0 ? accs.join(', ') : 'Non spécifié',
         pricesStr: prices.length > 0 ? prices.slice(0, 2).join(' - ') : '-'
       };
@@ -6814,7 +6821,32 @@ function ClassementView({
         padding: '2px 8px',
         borderRadius: '6px'
       }
-    }, s.sku), s.isMultiAccount && /*#__PURE__*/React.createElement("span", {
+    }, s.sku), s.isOnline ? /*#__PURE__*/React.createElement("span", {
+      className: "badge",
+      style: {
+        backgroundColor: '#10b981',
+        color: '#ffffff',
+        padding: '3px 9px',
+        fontSize: '11.5px',
+        borderRadius: '12px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        fontWeight: 600
+      }
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-globe"
+    }), " En Ligne (", s.onlinePubs || s.pubs || 1, ")") : /*#__PURE__*/React.createElement("span", {
+      className: "badge",
+      style: {
+        backgroundColor: '#f1f5f9',
+        color: '#64748b',
+        border: '1px solid #cbd5e1',
+        padding: '3px 9px',
+        fontSize: '11.5px',
+        borderRadius: '12px'
+      }
+    }, "Hors Ligne"), s.isMultiAccount && /*#__PURE__*/React.createElement("span", {
       className: "badge",
       style: {
         backgroundColor: '#8b5cf6',
