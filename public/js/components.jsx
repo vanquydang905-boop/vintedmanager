@@ -3488,8 +3488,10 @@ function ClassementView({ appState, onUpdateRow }) {
     const [skuSearchTerm, setSkuSearchTerm] = useState('');
 
     const [skuFilterClassif, setSkuFilterClassif] = useState('');
+    const [skuFilterOnline, setSkuFilterOnline] = useState('all');
     const [skuFilterVentes, setSkuFilterVentes] = useState('all');
     const [skuSortBy, setSkuSortBy] = useState('score');
+
 
     // CSV & Google Sheet Bulk SKU Import State
     const [bulkSheetUrlInput, setBulkSheetUrlInput] = useState('https://docs.google.com/spreadsheets/d/1_8zZWfVVCU96VLLIlyulK2gchbrNkBVOyMb6WTr0X6w/edit?gid=0#gid=0');
@@ -3669,7 +3671,7 @@ function ClassementView({ appState, onUpdateRow }) {
     }, [calendrier, rankingDateFilter, referenceDate, customStartDate, customEndDate]);
 
 
-    // Répertoire des SKUs filtré par période
+    // Répertoire des SKUs filtré par période avec détection des SKUs en ligne
     const allSKUsMap = useMemo(() => {
         const map = {};
         filteredCalendrierForRanking.forEach(l => {
@@ -3685,6 +3687,8 @@ function ClassementView({ appState, onUpdateRow }) {
                     scoreCumule: 0,
                     ventes: 0,
                     pubs: 0,
+                    isOnline: false,
+                    onlinePubs: 0,
                     accountsSet: new Set(),
                     priceSet: new Set(),
                     lineIds: []
@@ -3698,6 +3702,13 @@ function ClassementView({ appState, onUpdateRow }) {
             map[skuClean].pubs += 1;
             map[skuClean].lineIds.push(l.id);
             if (l.classification) map[skuClean].classification = l.classification;
+
+            // Détection si le SKU est toujours actif et en ligne
+            const isDoneOrOnline = l.statut === 'Fait' || l.statut === 'Publié' || l.statut === '✓ Fait' || l.done || l.isOnline || l.enLigne;
+            if (isDoneOrOnline) {
+                map[skuClean].isOnline = true;
+                map[skuClean].onlinePubs += 1;
+            }
 
             const comp = comptesMap[l.compteId];
             if (comp && comp.pseudo) map[skuClean].accountsSet.add('@' + comp.pseudo.trim());
@@ -3727,19 +3738,27 @@ function ClassementView({ appState, onUpdateRow }) {
 
     const skuList = useMemo(() => {
         if (apiSkuSummary && apiSkuSummary.length > 0) {
-            return apiSkuSummary.map(s => ({
-                sku: s.sku,
-                produit: s.produit,
-                classification: s.classification,
-                scoreCumule: s.scoreCumule || s.score || 0,
-                ventes: s.ventes || 0,
-                pubs: s.pubs || 1,
-                accountsStr: s.accountsStr || 'Non spécifié',
-                pricesStr: s.priceStr || s.pricesStr || '-',
-                isMultiAccount: s.isMultiAccount,
-                accountBreakdown: s.accountBreakdown || [],
-                salesTimeline: s.salesTimeline || []
-            }));
+            return apiSkuSummary.map(s => {
+                const localInfo = allSKUsMap[s.sku] || {};
+                const isOnline = Boolean(s.isOnline || s.status === 'PUBLISHED' || s.status === 'ACTIVE' || localInfo.isOnline || (s.pubs > 0));
+                const onlinePubs = localInfo.onlinePubs || (isOnline ? Math.max(1, s.pubs || 1) : 0);
+
+                return {
+                    sku: s.sku,
+                    produit: s.produit,
+                    classification: s.classification,
+                    scoreCumule: s.scoreCumule || s.score || 0,
+                    ventes: s.ventes || 0,
+                    pubs: s.pubs || 1,
+                    isOnline,
+                    onlinePubs,
+                    accountsStr: s.accountsStr || 'Non spécifié',
+                    pricesStr: s.priceStr || s.pricesStr || '-',
+                    isMultiAccount: s.isMultiAccount,
+                    accountBreakdown: s.accountBreakdown || [],
+                    salesTimeline: s.salesTimeline || []
+                };
+            });
         }
 
 
@@ -3754,12 +3773,22 @@ function ClassementView({ appState, onUpdateRow }) {
         });
     }, [apiSkuSummary, allSKUsMap]);
 
+    const onlineSkuCount = useMemo(() => {
+        return skuList.filter(s => s.isOnline).length;
+    }, [skuList]);
+
 
     const filteredSKUList = useMemo(() => {
         let list = [...skuList];
 
         if (skuFilterClassif) {
             list = list.filter(s => s.classification === skuFilterClassif);
+        }
+
+        if (skuFilterOnline === 'online') {
+            list = list.filter(s => s.isOnline);
+        } else if (skuFilterOnline === 'offline') {
+            list = list.filter(s => !s.isOnline);
         }
 
         if (skuFilterVentes === 'with_sales') {
@@ -3786,7 +3815,8 @@ function ClassementView({ appState, onUpdateRow }) {
         else if (skuSortBy === 'sku') list.sort((a, b) => a.sku.localeCompare(b.sku));
 
         return list;
-    }, [skuList, skuSearchTerm, skuFilterClassif, skuFilterVentes, skuSortBy]);
+    }, [skuList, skuSearchTerm, skuFilterClassif, skuFilterOnline, skuFilterVentes, skuSortBy]);
+
 
     const topSKUs = useMemo(() => {
         return [...skuList].sort((a, b) => b.scoreCumule - a.scoreCumule).slice(0, 10);
@@ -4394,7 +4424,9 @@ function ClassementView({ appState, onUpdateRow }) {
                         </button>
                     </div>
 
+
                     <div style={{ fontSize: '12px', color: '#475569', backgroundColor: '#ffffff', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+
                         <span><b>Note sur les permissions Google Sheet :</b> Si le fichier est en accès restreint, assurez-vous de régler le partage sur <i>"Tous les utilisateurs disposant du lien"</i> ou collez directement la liste des SKUs ci-dessous :</span>
                         <textarea
                             className="input"
@@ -4407,12 +4439,26 @@ function ClassementView({ appState, onUpdateRow }) {
                     </div>
                 </form>
 
-
-
                 {/* TABLEAU DES SKUS ET CLASSIFICATIONS */}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Catalogue des SKUs Qualifiés ({filteredSKUList.length})</h4>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Catalogue des SKUs Qualifiés ({filteredSKUList.length})
+                        <span style={{ fontSize: '11.5px', fontWeight: 600, padding: '2px 8px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>
+                            🌐 {onlineSkuCount} En Ligne
+                        </span>
+                    </h4>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select
+                            className="input"
+                            value={skuFilterOnline}
+                            onChange={(e) => setSkuFilterOnline(e.target.value)}
+                            style={{ height: '34px', fontSize: '12px', width: '160px', borderRadius: '6px', border: skuFilterOnline !== 'all' ? '1.5px solid #10b981' : '1px solid var(--border)' }}
+                        >
+                            <option value="all">Tous les statuts</option>
+                            <option value="online">🌐 En Ligne uniquement</option>
+                            <option value="offline">⚪ Hors Ligne / Non publiés</option>
+                        </select>
                         <select
                             className="input"
                             value={skuFilterClassif}
@@ -4463,6 +4509,7 @@ function ClassementView({ appState, onUpdateRow }) {
                         <thead>
                             <tr>
                                 <th>Code SKU</th>
+                                <th>Statut En Ligne</th>
                                 <th>Publications (DotB)</th>
                                 <th>Ventes (DotB)</th>
                                 <th>Compte(s) Vinted Vendeur</th>
@@ -4476,6 +4523,17 @@ function ClassementView({ appState, onUpdateRow }) {
                                 filteredSKUList.map(s => (
                                     <tr key={s.sku} style={{ cursor: 'pointer' }} onClick={() => setSelectedSkuDetail(s)} title="Cliquez pour ouvrir les détails & l'option de propagation">
                                         <td><b style={{ color: 'var(--primary)' }} title={s.produit || s.sku}>{s.sku}</b></td>
+                                        <td>
+                                            {s.isOnline ? (
+                                                <span className="badge" style={{ backgroundColor: '#10b981', color: '#ffffff', padding: '4px 10px', fontSize: '11.5px', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                                                    <i className="fa-solid fa-globe"></i> En Ligne ({s.onlinePubs || 1})
+                                                </span>
+                                            ) : (
+                                                <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1', padding: '4px 8px', fontSize: '11.5px', borderRadius: '12px' }}>
+                                                    Hors Ligne
+                                                </span>
+                                            )}
+                                        </td>
                                         <td><b>{s.pubs}</b> pub{s.pubs > 1 ? 's' : ''}</td>
                                         <td><b style={{ color: s.ventes > 0 ? '#059669' : 'inherit' }}>{s.ventes}</b> vente{s.ventes > 1 ? 's' : ''}</td>
                                         <td><span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>{s.accountsStr}</span></td>
@@ -4495,7 +4553,7 @@ function ClassementView({ appState, onUpdateRow }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
                                         Aucun SKU trouvé pour ce filtre.
                                     </td>
                                 </tr>
@@ -4506,6 +4564,7 @@ function ClassementView({ appState, onUpdateRow }) {
             </div>
 
             <div className="grid-2">
+
                 <div className="card">
                     <h3 className="card-title">🏆 Top 10 SKU par Score Cumulé</h3>
                     <div className="table-container">

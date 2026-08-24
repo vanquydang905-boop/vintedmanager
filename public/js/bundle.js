@@ -5017,6 +5017,7 @@ function ClassementView({
   const [newPhotoInput, setNewPhotoInput] = useState('');
   const [skuSearchTerm, setSkuSearchTerm] = useState('');
   const [skuFilterClassif, setSkuFilterClassif] = useState('');
+  const [skuFilterOnline, setSkuFilterOnline] = useState('all');
   const [skuFilterVentes, setSkuFilterVentes] = useState('all');
   const [skuSortBy, setSkuSortBy] = useState('score');
 
@@ -5192,7 +5193,7 @@ function ClassementView({
     });
   }, [calendrier, rankingDateFilter, referenceDate, customStartDate, customEndDate]);
 
-  // Répertoire des SKUs filtré par période
+  // Répertoire des SKUs filtré par période avec détection des SKUs en ligne
   const allSKUsMap = useMemo(() => {
     const map = {};
     filteredCalendrierForRanking.forEach(l => {
@@ -5207,6 +5208,8 @@ function ClassementView({
           scoreCumule: 0,
           ventes: 0,
           pubs: 0,
+          isOnline: false,
+          onlinePubs: 0,
           accountsSet: new Set(),
           priceSet: new Set(),
           lineIds: []
@@ -5220,6 +5223,13 @@ function ClassementView({
       map[skuClean].pubs += 1;
       map[skuClean].lineIds.push(l.id);
       if (l.classification) map[skuClean].classification = l.classification;
+
+      // Détection si le SKU est toujours actif et en ligne
+      const isDoneOrOnline = l.statut === 'Fait' || l.statut === 'Publié' || l.statut === '✓ Fait' || l.done || l.isOnline || l.enLigne;
+      if (isDoneOrOnline) {
+        map[skuClean].isOnline = true;
+        map[skuClean].onlinePubs += 1;
+      }
       const comp = comptesMap[l.compteId];
       if (comp && comp.pseudo) map[skuClean].accountsSet.add('@' + comp.pseudo.trim());else if (l.comptePseudo) map[skuClean].accountsSet.add('@' + l.comptePseudo.trim());
       if (l.prix) map[skuClean].priceSet.add(l.prix + '€');
@@ -5242,19 +5252,26 @@ function ClassementView({
   }, [calendrier]);
   const skuList = useMemo(() => {
     if (apiSkuSummary && apiSkuSummary.length > 0) {
-      return apiSkuSummary.map(s => ({
-        sku: s.sku,
-        produit: s.produit,
-        classification: s.classification,
-        scoreCumule: s.scoreCumule || s.score || 0,
-        ventes: s.ventes || 0,
-        pubs: s.pubs || 1,
-        accountsStr: s.accountsStr || 'Non spécifié',
-        pricesStr: s.priceStr || s.pricesStr || '-',
-        isMultiAccount: s.isMultiAccount,
-        accountBreakdown: s.accountBreakdown || [],
-        salesTimeline: s.salesTimeline || []
-      }));
+      return apiSkuSummary.map(s => {
+        const localInfo = allSKUsMap[s.sku] || {};
+        const isOnline = Boolean(s.isOnline || s.status === 'PUBLISHED' || s.status === 'ACTIVE' || localInfo.isOnline || s.pubs > 0);
+        const onlinePubs = localInfo.onlinePubs || (isOnline ? Math.max(1, s.pubs || 1) : 0);
+        return {
+          sku: s.sku,
+          produit: s.produit,
+          classification: s.classification,
+          scoreCumule: s.scoreCumule || s.score || 0,
+          ventes: s.ventes || 0,
+          pubs: s.pubs || 1,
+          isOnline,
+          onlinePubs,
+          accountsStr: s.accountsStr || 'Non spécifié',
+          pricesStr: s.priceStr || s.pricesStr || '-',
+          isMultiAccount: s.isMultiAccount,
+          accountBreakdown: s.accountBreakdown || [],
+          salesTimeline: s.salesTimeline || []
+        };
+      });
     }
     return Object.values(allSKUsMap).map(s => {
       const accs = Array.from(s.accountsSet);
@@ -5266,10 +5283,18 @@ function ClassementView({
       };
     });
   }, [apiSkuSummary, allSKUsMap]);
+  const onlineSkuCount = useMemo(() => {
+    return skuList.filter(s => s.isOnline).length;
+  }, [skuList]);
   const filteredSKUList = useMemo(() => {
     let list = [...skuList];
     if (skuFilterClassif) {
       list = list.filter(s => s.classification === skuFilterClassif);
+    }
+    if (skuFilterOnline === 'online') {
+      list = list.filter(s => s.isOnline);
+    } else if (skuFilterOnline === 'offline') {
+      list = list.filter(s => !s.isOnline);
     }
     if (skuFilterVentes === 'with_sales') {
       list = list.filter(s => s.ventes > 0);
@@ -5284,7 +5309,7 @@ function ClassementView({
     }
     if (skuSortBy === 'score') list.sort((a, b) => b.scoreCumule - a.scoreCumule);else if (skuSortBy === 'ventes') list.sort((a, b) => b.ventes - a.ventes);else if (skuSortBy === 'pubs') list.sort((a, b) => b.pubs - a.pubs);else if (skuSortBy === 'sku') list.sort((a, b) => a.sku.localeCompare(b.sku));
     return list;
-  }, [skuList, skuSearchTerm, skuFilterClassif, skuFilterVentes, skuSortBy]);
+  }, [skuList, skuSearchTerm, skuFilterClassif, skuFilterOnline, skuFilterVentes, skuSortBy]);
   const topSKUs = useMemo(() => {
     return [...skuList].sort((a, b) => b.scoreCumule - a.scoreCumule).slice(0, 10);
   }, [skuList]);
@@ -6363,9 +6388,22 @@ function ClassementView({
     style: {
       margin: 0,
       fontSize: '14px',
-      fontWeight: 700
+      fontWeight: 700,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
     }
-  }, "Catalogue des SKUs Qualifiés (", filteredSKUList.length, ")"), /*#__PURE__*/React.createElement("div", {
+  }, "Catalogue des SKUs Qualifiés (", filteredSKUList.length, ")", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11.5px',
+      fontWeight: 600,
+      padding: '2px 8px',
+      borderRadius: '10px',
+      backgroundColor: '#dcfce7',
+      color: '#166534',
+      border: '1px solid #86efac'
+    }
+  }, "🌐 ", onlineSkuCount, " En Ligne")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '10px',
@@ -6373,6 +6411,23 @@ function ClassementView({
       flexWrap: 'wrap'
     }
   }, /*#__PURE__*/React.createElement("select", {
+    className: "input",
+    value: skuFilterOnline,
+    onChange: e => setSkuFilterOnline(e.target.value),
+    style: {
+      height: '34px',
+      fontSize: '12px',
+      width: '160px',
+      borderRadius: '6px',
+      border: skuFilterOnline !== 'all' ? '1.5px solid #10b981' : '1px solid var(--border)'
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Tous les statuts"), /*#__PURE__*/React.createElement("option", {
+    value: "online"
+  }, "🌐 En Ligne uniquement"), /*#__PURE__*/React.createElement("option", {
+    value: "offline"
+  }, "⚪ Hors Ligne / Non publiés")), /*#__PURE__*/React.createElement("select", {
     className: "input",
     value: skuFilterClassif,
     onChange: e => setSkuFilterClassif(e.target.value),
@@ -6447,7 +6502,7 @@ function ClassementView({
       maxHeight: '380px',
       overflowY: 'auto'
     }
-  }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Code SKU"), /*#__PURE__*/React.createElement("th", null, "Publications (DotB)"), /*#__PURE__*/React.createElement("th", null, "Ventes (DotB)"), /*#__PURE__*/React.createElement("th", null, "Compte(s) Vinted Vendeur"), /*#__PURE__*/React.createElement("th", null, "Prix Constaté"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Score Cumulé"))), /*#__PURE__*/React.createElement("tbody", null, filteredSKUList.length > 0 ? filteredSKUList.map(s => /*#__PURE__*/React.createElement("tr", {
+  }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Code SKU"), /*#__PURE__*/React.createElement("th", null, "Statut En Ligne"), /*#__PURE__*/React.createElement("th", null, "Publications (DotB)"), /*#__PURE__*/React.createElement("th", null, "Ventes (DotB)"), /*#__PURE__*/React.createElement("th", null, "Compte(s) Vinted Vendeur"), /*#__PURE__*/React.createElement("th", null, "Prix Constaté"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Score Cumulé"))), /*#__PURE__*/React.createElement("tbody", null, filteredSKUList.length > 0 ? filteredSKUList.map(s => /*#__PURE__*/React.createElement("tr", {
     key: s.sku,
     style: {
       cursor: 'pointer'
@@ -6459,7 +6514,32 @@ function ClassementView({
       color: 'var(--primary)'
     },
     title: s.produit || s.sku
-  }, s.sku)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.pubs), " pub", s.pubs > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
+  }, s.sku)), /*#__PURE__*/React.createElement("td", null, s.isOnline ? /*#__PURE__*/React.createElement("span", {
+    className: "badge",
+    style: {
+      backgroundColor: '#10b981',
+      color: '#ffffff',
+      padding: '4px 10px',
+      fontSize: '11.5px',
+      borderRadius: '12px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px',
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-globe"
+  }), " En Ligne (", s.onlinePubs || 1, ")") : /*#__PURE__*/React.createElement("span", {
+    className: "badge",
+    style: {
+      backgroundColor: '#f1f5f9',
+      color: '#64748b',
+      border: '1px solid #cbd5e1',
+      padding: '4px 8px',
+      fontSize: '11.5px',
+      borderRadius: '12px'
+    }
+  }, "Hors Ligne")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.pubs), " pub", s.pubs > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
     style: {
       color: s.ventes > 0 ? '#059669' : 'inherit'
     }
@@ -6478,7 +6558,7 @@ function ClassementView({
   }, s.pricesStr)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
     className: `badge ${s.classification === 'Gagnant' ? 'badge-gagnant' : s.classification === 'Écarté' ? 'badge-ecarte' : s.classification === 'Nouveau produit' ? 'badge-nouveau' : 'badge-retester'}`
   }, s.classification)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, s.scoreCumule.toFixed(1), " pts")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: "7",
+    colSpan: "8",
     style: {
       textAlign: 'center',
       padding: '20px',
