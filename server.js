@@ -1620,6 +1620,100 @@ app.post('/api/sku/register', async (req, res) => {
     }
 });
 
+// Qualification en masse de SKUs (ex: depuis un Google Sheet ou une liste) comme "À retester"
+app.post('/api/sku/bulk-register', async (req, res) => {
+    try {
+        const { skus, classification, organisationId, sheetUrl } = req.body;
+        const orgId = organisationId || 'org_default';
+        const targetClassif = classification || 'À retester';
+
+        let skuListToProcess = [];
+
+        if (Array.isArray(skus)) {
+            skuListToProcess = skus.map(s => String(s).trim()).filter(Boolean);
+        } else if (typeof skus === 'string' && skus.trim()) {
+            skuListToProcess = skus.split(/[\n,;\t]+/).map(s => String(s).trim()).filter(Boolean);
+        }
+
+        // Si une URL Google Sheet est transmise, tenter d'extraire le CSV
+        if (sheetUrl && String(sheetUrl).includes('docs.google.com/spreadsheets')) {
+            try {
+                const match = String(sheetUrl).match(/\/d\/([a-zA-Z0-9-_]+)/);
+                if (match && match[1]) {
+                    const sheetId = match[1];
+                    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+                    const resp = await fetch(csvUrl);
+                    if (resp.ok) {
+                        const csvText = await resp.text();
+                        const extractedSkus = csvText.split(/[\r\n,;\t]+/)
+                            .map(s => String(s).replace(/"/g, '').trim())
+                            .filter(s => s.length >= 3 && !s.includes('http') && !s.includes('<html') && !s.toLowerCase().includes('sku'));
+                        skuListToProcess = [...new Set([...skuListToProcess, ...extractedSkus])];
+                    }
+                }
+            } catch (sheetErr) {
+                console.warn("[Bulk SKU Sheet Fetch Error]", sheetErr.message);
+            }
+        }
+
+        if (skuListToProcess.length === 0) {
+            return res.status(400).json({ error: "Aucun code SKU fourni ou le Google Sheet est en accès restreint. Veuillez coller les SKUs ou mettre le fichier en accès 'Tous les utilisateurs disposant du lien'." });
+        }
+
+        const allCal = await dbService.getCalendrier(orgId);
+        const comptes = await dbService.getComptes(orgId);
+        const firstCompte = comptes[0] || { id: 'c_default', agent: 'Admin' };
+        const todayStr = getLocalDateString(new Date());
+
+        let countUpdated = 0;
+        let countCreated = 0;
+
+        for (const cleanSku of skuListToProcess) {
+            const matchingLines = allCal.filter(l => l.sku && String(l.sku).trim().toLowerCase() === cleanSku.toLowerCase());
+            if (matchingLines.length > 0) {
+                const ids = matchingLines.map(l => l.id);
+                await dbService.bulkUpdateCalendrierRows(ids, { classification: targetClassif });
+                countUpdated += ids.length;
+            } else {
+                const id = "sku_bulk_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+                await dbService.createCalendrierRow({
+                    id,
+                    organisationId: orgId,
+                    date: todayStr,
+                    jour: "Enregistrement",
+                    compteId: firstCompte.id,
+                    agent: firstCompte.agent || "Admin",
+                    heurePrevue: "12:00",
+                    sku: cleanSku,
+                    produit: "Article " + cleanSku,
+                    lien: "",
+                    vues: 0,
+                    likes: 0,
+                    favoris: 0,
+                    messages: 0,
+                    vente: 0,
+                    score: 0,
+                    classification: targetClassif,
+                    statut: "Non fait"
+                });
+                countCreated++;
+            }
+        }
+
+        await dbService.logAction("Qualification SKU en masse", `${skuListToProcess.length} SKUs qualifiés comme "${targetClassif}"`, "Succès", orgId);
+        return res.json({
+            success: true,
+            message: `✅ ${skuListToProcess.length} SKU(s) qualifié(s) avec succès sous la classification "${targetClassif}" !`,
+            processedCount: skuListToProcess.length,
+            createdCount: countCreated,
+            updatedCount: countUpdated
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 
 // ------------------- INCIDENTS -------------------
 app.get('/api/incidents', async (req, res) => {

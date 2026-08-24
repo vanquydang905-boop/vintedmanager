@@ -5020,10 +5020,44 @@ function ClassementView({
   const [skuFilterVentes, setSkuFilterVentes] = useState('all');
   const [skuSortBy, setSkuSortBy] = useState('score');
 
-  // CSV Import State
+  // CSV & Google Sheet Bulk SKU Import State
+  const [bulkSheetUrlInput, setBulkSheetUrlInput] = useState('https://docs.google.com/spreadsheets/d/1_8zZWfVVCU96VLLIlyulK2gchbrNkBVOyMb6WTr0X6w/edit?gid=0#gid=0');
+  const [bulkSkusTextInput, setBulkSkusTextInput] = useState('');
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [csvInputText, setCsvInputText] = useState('');
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [csvImportResult, setCsvImportResult] = useState(null);
+  const handleBulkRegisterSkus = async e => {
+    if (e) e.preventDefault();
+    setIsBulkProcessing(true);
+    const userOrgId = appState.currentUser && appState.currentUser.organisationId || 'org_default';
+    try {
+      const res = await fetch('/api/sku/bulk-register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sheetUrl: bulkSheetUrlInput.trim(),
+          skus: bulkSkusTextInput.trim(),
+          classification: 'À retester',
+          organisationId: userOrgId
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (window.showToast) window.showToast(data.message || `✅ SKUs qualifiés comme "À retester" !`);
+        if (window.loadAppState) await window.loadAppState();
+      } else {
+        if (window.showToast) window.showToast(`⚠️ ${data.error || 'Erreur lors de l\'importation'}`, true);
+      }
+    } catch (err) {
+      console.error("Erreur Bulk SKU Register:", err);
+      if (window.showToast) window.showToast("❌ Erreur lors de la qualification en masse", true);
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
 
   // SKU Detail & Propagation Modal State
   const [selectedSkuDetail, setSelectedSkuDetail] = useState(null);
@@ -6190,7 +6224,133 @@ function ClassementView({
       color: '#16a34a',
       fontSize: '15px'
     }
-  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "SKU Valide & Conforme :"), " Ce code est prêt à être enregistré et classé sous ", /*#__PURE__*/React.createElement("b", null, "\"", newClassifInput, "\""), ".")))), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "SKU Valide & Conforme :"), " Ce code est prêt à être enregistré et classé sous ", /*#__PURE__*/React.createElement("b", null, "\"", newClassifInput, "\""), ".")))), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleBulkRegisterSkus,
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '14px',
+      marginBottom: '24px',
+      backgroundColor: '#f1f5f9',
+      padding: '18px',
+      borderRadius: '12px',
+      border: '1px solid #cbd5e1'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-file-spreadsheet",
+    style: {
+      color: '#059669',
+      fontSize: '18px'
+    }
+  }), /*#__PURE__*/React.createElement("h4", {
+    style: {
+      margin: 0,
+      fontSize: '14px',
+      fontWeight: 700,
+      color: '#0f172a'
+    }
+  }, "Qualification de Masse depuis Google Sheet ou Liste (Statut : ", /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-retester",
+    style: {
+      backgroundColor: '#3b82f6',
+      color: '#fff',
+      padding: '2px 8px'
+    }
+  }, "🔄 À retester"), ")")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11.5px',
+      color: '#64748b'
+    }
+  }, "Importation directe de tous les articles du Google Sheet")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '12px',
+      flexWrap: 'wrap',
+      alignItems: 'flex-end'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 3,
+      minWidth: '260px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 600,
+      color: '#334155',
+      marginBottom: '4px',
+      display: 'block'
+    }
+  }, "Lien Google Sheet ou Liste de SKUs (Séparez par virgule ou saut de ligne)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "input",
+    value: bulkSheetUrlInput,
+    onChange: e => setBulkSheetUrlInput(e.target.value),
+    placeholder: "ex: https://docs.google.com/spreadsheets/d/1_8zZWfVVCU96VLLIlyulK2gchbrNkBVOyMb6WTr0X6w...",
+    style: {
+      height: '40px',
+      fontSize: '12.5px',
+      backgroundColor: '#ffffff'
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    disabled: isBulkProcessing,
+    className: "btn btn-secondary",
+    style: {
+      height: '40px',
+      padding: '0 20px',
+      fontSize: '13px',
+      fontWeight: 600,
+      backgroundColor: '#059669',
+      color: '#ffffff',
+      border: 'none',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, isBulkProcessing ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-spinner fa-spin"
+  }), " Traitement...") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-cloud-arrow-down"
+  }), " Classer les SKUs du Sheet comme \"À retester\""))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      color: '#475569',
+      backgroundColor: '#ffffff',
+      padding: '10px 14px',
+      borderRadius: '8px',
+      border: '1px solid #e2e8f0',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, "Note sur les permissions Google Sheet :"), " Si le fichier est en accès restreint, assurez-vous de régler le partage sur ", /*#__PURE__*/React.createElement("i", null, "\"Tous les utilisateurs disposant du lien\""), " ou collez directement la liste des SKUs ci-dessous :"), /*#__PURE__*/React.createElement("textarea", {
+    className: "input",
+    rows: "2",
+    value: bulkSkusTextInput,
+    onChange: e => setBulkSkusTextInput(e.target.value),
+    placeholder: "Collez vos codes SKUs ici (ex: sz26001, sz26002, sz26003...)",
+    style: {
+      fontSize: '12px',
+      fontFamily: 'monospace',
+      marginTop: '4px',
+      backgroundColor: '#f8fafc'
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'space-between',
