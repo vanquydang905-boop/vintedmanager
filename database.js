@@ -47,7 +47,12 @@ const camelMap = {
     dateecheance: 'dateEcheance',
     heureecheance: 'heureEcheance',
     rappelminutes: 'rappelMinutes',
-    alertesonore: 'alerteSonore'
+    alertesonore: 'alerteSonore',
+    creepar: 'creePar',
+    terminepar: 'terminePar',
+    dateterminee: 'dateTerminee',
+    comptenom: 'compteNom',
+    comptepseudo: 'comptePseudo'
 };
 
 function toDbFormat(obj) {
@@ -766,47 +771,96 @@ const dbService = {
         return targetCompte || { id, pseudo: id };
     },
 
-    // ------------------- TO-DOS & TÂCHES -------------------
+    // ------------------- TO-DOS & TÂCHES (PERSISTANCE HYBRIDE SUPABASE) -------------------
+    async persistTodosBackup(organisationId = null) {
+        if (!supabaseUrl || !supabaseKey) return;
+        try {
+            const oid = (organisationId || 'org_default').toLowerCase();
+            const todosForOrg = DEFAULT_TODOS.filter(t => !t.organisationId || t.organisationId.toLowerCase() === oid);
+            await supabase.from('parametres').upsert([{
+                id: 'todos_' + oid,
+                organisationid: oid,
+                data: { todos: todosForOrg }
+            }]);
+        } catch(err) {
+            console.error('[Supabase Backup Todos error]', err);
+        }
+    },
+
     async getTodos(organisationId = null) {
-        let list = [...DEFAULT_TODOS];
+        const orgKey = (organisationId || 'org_default').toLowerCase();
+        let loadedFromRemote = false;
+
         if (supabaseUrl && supabaseKey) {
+            // 1. Essai direct sur la table 'todos'
             try {
                 let query = supabase.from('todos').select('*');
-                if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
+                if (organisationId) query = query.eq('organisationid', orgKey);
                 const { data, error } = await query;
-                if (!error && Array.isArray(data)) {
+                if (!error && Array.isArray(data) && data.length > 0) {
                     data.map(fromDbFormat).forEach(dbRow => {
-                        const idx = list.findIndex(item => item.id === dbRow.id);
-                        if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
-                        else list.push(dbRow);
+                        const idx = DEFAULT_TODOS.findIndex(item => item.id === dbRow.id);
+                        if (idx >= 0) DEFAULT_TODOS[idx] = { ...DEFAULT_TODOS[idx], ...dbRow };
+                        else DEFAULT_TODOS.push(dbRow);
                     });
+                    loadedFromRemote = true;
                 }
             } catch (e) {}
+
+            // 2. Si la table 'todos' n'existe pas ou est vide, synchroniser depuis le stockage cloud Supabase 'parametres'
+            if (!loadedFromRemote) {
+                try {
+                    const { data: paramData, error: paramError } = await supabase
+                        .from('parametres')
+                        .select('*')
+                        .eq('id', 'todos_' + orgKey);
+                    
+                    if (!paramError && Array.isArray(paramData) && paramData.length > 0 && paramData[0].data && Array.isArray(paramData[0].data.todos)) {
+                        const remoteTodos = paramData[0].data.todos;
+                        // Conserver les tâches des autres organisations et charger celles de cette org
+                        DEFAULT_TODOS = DEFAULT_TODOS.filter(t => t.organisationId && t.organisationId.toLowerCase() !== orgKey);
+                        remoteTodos.forEach(rt => DEFAULT_TODOS.push(rt));
+                        loadedFromRemote = true;
+                    }
+                } catch(e) {}
+            }
         }
+
+        // Si première initialisation, sauvegarder l'état initial dans Supabase
+        if (!loadedFromRemote && supabaseUrl && supabaseKey) {
+            await this.persistTodosBackup(organisationId || 'org_default');
+        }
+
         if (organisationId) {
-            return list.filter(t => !t.organisationId || t.organisationId === organisationId);
+            return DEFAULT_TODOS.filter(t => !t.organisationId || t.organisationId.toLowerCase() === orgKey);
         }
-        return list;
+        return [...DEFAULT_TODOS];
     },
 
     async createTodo(todo) {
+        const orgId = (todo.organisationId || 'org_default').toLowerCase();
         const payload = {
             id: todo.id || ("todo_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4)),
-            organisationId: todo.organisationId || 'org_default',
+            organisationId: orgId,
             titre: todo.titre || 'Nouvelle tâche',
             description: todo.description || '',
             priorite: todo.priorite || 'moyenne',
             statut: todo.statut || 'a_faire',
-            agent: todo.agent || 'Tous',
+            agent: todo.agent || todo.agentAssigne || 'Tous',
+            agentAssigne: todo.agentAssigne || todo.agent || 'Tous',
             compteId: todo.compteId || '',
-            comptePseudo: todo.comptePseudo || '',
+            compteNom: todo.compteNom || todo.comptePseudo || '',
+            comptePseudo: todo.comptePseudo || todo.compteNom || '',
             categorie: todo.categorie || 'Autre',
             dateEcheance: todo.dateEcheance || new Date().toISOString().split('T')[0],
             heureEcheance: todo.heureEcheance || '18:00',
             rappelMinutes: parseInt(todo.rappelMinutes) || 15,
+            alerteSonore: todo.alerteSonore !== false,
             sousTaches: Array.isArray(todo.sousTaches) ? todo.sousTaches : [],
             dateCreation: todo.dateCreation || new Date().toISOString(),
-            dateTerminee: todo.dateTerminee || null
+            dateTerminee: todo.statut === 'terminee' ? (todo.dateTerminee || new Date().toISOString()) : null,
+            creePar: todo.creePar || todo.auteur || 'Florencio',
+            terminePar: todo.statut === 'terminee' ? (todo.terminePar || todo.modifiePar || todo.creePar || '') : null
         };
         const idx = DEFAULT_TODOS.findIndex(t => t.id === payload.id);
         if (idx >= 0) DEFAULT_TODOS[idx] = payload;
@@ -816,27 +870,52 @@ const dbService = {
             try {
                 await supabase.from('todos').upsert([toDbFormat(payload)]);
             } catch (e) {}
+            await this.persistTodosBackup(orgId);
         }
         return payload;
     },
 
     async updateTodo(id, fields) {
         const idx = DEFAULT_TODOS.findIndex(t => t.id === id);
+        let updatedItem = null;
+        let orgId = 'org_default';
+
         if (idx >= 0) {
             const oldItem = { ...DEFAULT_TODOS[idx] };
             await this.saveToCorbeille('todos', id, 'UPDATE', oldItem, oldItem.titre);
-            DEFAULT_TODOS[idx] = { ...DEFAULT_TODOS[idx], ...fields };
+            
+            const mergedFields = { ...fields };
+            if (fields.statut === 'terminee' && oldItem.statut !== 'terminee') {
+                mergedFields.dateTerminee = fields.dateTerminee || new Date().toISOString();
+                if (fields.modifiePar || fields.terminePar) {
+                    mergedFields.terminePar = fields.terminePar || fields.modifiePar;
+                }
+            } else if (fields.statut && fields.statut !== 'terminee') {
+                mergedFields.dateTerminee = null;
+                mergedFields.terminePar = null;
+            }
+
+            DEFAULT_TODOS[idx] = { ...DEFAULT_TODOS[idx], ...mergedFields };
+            updatedItem = DEFAULT_TODOS[idx];
+            orgId = updatedItem.organisationId || 'org_default';
+        } else {
+            updatedItem = { id, ...fields };
+            DEFAULT_TODOS.unshift(updatedItem);
+            orgId = updatedItem.organisationId || 'org_default';
         }
+
         if (supabaseUrl && supabaseKey) {
             try {
                 await supabase.from('todos').update(toDbFormat(fields)).eq('id', id);
             } catch (e) {}
+            await this.persistTodosBackup(orgId);
         }
-        return DEFAULT_TODOS.find(t => t.id === id) || { id, ...fields };
+        return updatedItem;
     },
 
     async deleteTodo(id) {
         const target = DEFAULT_TODOS.find(t => t.id === id);
+        const orgId = target ? (target.organisationId || 'org_default') : 'org_default';
         if (target) {
             await this.saveToCorbeille('todos', id, 'DELETE', target, target.titre);
         }
@@ -845,36 +924,60 @@ const dbService = {
             try {
                 await supabase.from('todos').delete().eq('id', id);
             } catch (e) {}
+            await this.persistTodosBackup(orgId);
         }
         return true;
     },
 
     async bulkUpdateTodos(ids, fields) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
+        let orgId = 'org_default';
         for (const id of ids) {
             const item = DEFAULT_TODOS.find(t => t.id === id);
-            if (item) await this.saveToCorbeille('todos', id, 'UPDATE', { ...item }, item.titre);
+            if (item) {
+                orgId = item.organisationId || orgId;
+                await this.saveToCorbeille('todos', id, 'UPDATE', { ...item }, item.titre);
+            }
         }
-        DEFAULT_TODOS = DEFAULT_TODOS.map(t => ids.includes(t.id) ? { ...t, ...fields } : t);
+        DEFAULT_TODOS = DEFAULT_TODOS.map(t => {
+            if (!ids.includes(t.id)) return t;
+            const merged = { ...t, ...fields };
+            if (fields.statut === 'terminee' && t.statut !== 'terminee') {
+                merged.dateTerminee = fields.dateTerminee || new Date().toISOString();
+                if (fields.modifiePar || fields.terminePar) {
+                    merged.terminePar = fields.terminePar || fields.modifiePar;
+                }
+            } else if (fields.statut && fields.statut !== 'terminee') {
+                merged.dateTerminee = null;
+                merged.terminePar = null;
+            }
+            return merged;
+        });
         if (supabaseUrl && supabaseKey) {
             try {
                 await supabase.from('todos').update(toDbFormat(fields)).in('id', ids);
             } catch (e) {}
+            await this.persistTodosBackup(orgId);
         }
         return true;
     },
 
     async bulkDeleteTodos(ids) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
+        let orgId = 'org_default';
         for (const id of ids) {
             const item = DEFAULT_TODOS.find(t => t.id === id);
-            if (item) await this.saveToCorbeille('todos', id, 'DELETE', item, item.titre);
+            if (item) {
+                orgId = item.organisationId || orgId;
+                await this.saveToCorbeille('todos', id, 'DELETE', item, item.titre);
+            }
         }
         DEFAULT_TODOS = DEFAULT_TODOS.filter(t => !ids.includes(t.id));
         if (supabaseUrl && supabaseKey) {
             try {
                 await supabase.from('todos').delete().in('id', ids);
             } catch (e) {}
+            await this.persistTodosBackup(orgId);
         }
         return true;
     },

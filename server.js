@@ -925,7 +925,8 @@ app.post('/api/todos', async (req, res) => {
     try {
         const orgId = req.body.organisationId || 'org_default';
         const todo = await dbService.createTodo({ ...req.body, organisationId: orgId });
-        await dbService.logAction("To-Do", `Création de la tâche "${todo.titre}" (Priorité: ${todo.priorite})`, "Succès", orgId);
+        const creator = todo.creePar || req.body.creePar || 'Utilisateur';
+        await dbService.logAction("To-Do", `Création de la tâche "${todo.titre}" par ${creator} (Priorité: ${todo.priorite})`, "Succès", orgId);
         res.json(todo);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -936,6 +937,16 @@ app.put('/api/todos/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const updated = await dbService.updateTodo(id, req.body);
+        const orgId = updated.organisationId || req.body.organisationId || 'org_default';
+        const author = req.body.modifiePar || req.body.terminePar || req.body.creePar || 'Utilisateur';
+        
+        if (req.body.statut === 'terminee') {
+            await dbService.logAction("To-Do", `Tâche "${updated.titre || id}" marquée comme RÉALISÉE par ${author}`, "Succès", orgId);
+        } else if (req.body.statut === 'a_faire' || req.body.statut === 'en_cours') {
+            await dbService.logAction("To-Do", `Tâche "${updated.titre || id}" mise à jour (${req.body.statut}) par ${author}`, "Succès", orgId);
+        } else {
+            await dbService.logAction("To-Do", `Modification de la tâche "${updated.titre || id}" par ${author}`, "Succès", orgId);
+        }
         res.json(updated);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -945,7 +956,9 @@ app.put('/api/todos/:id', async (req, res) => {
 app.delete('/api/todos/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        const orgId = req.query.organisationId || 'org_default';
         await dbService.deleteTodo(id);
+        await dbService.logAction("To-Do", `Suppression de la tâche ID ${id}`, "Succès", orgId);
         res.json({ success: true, id });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -954,9 +967,18 @@ app.delete('/api/todos/:id', async (req, res) => {
 
 app.post('/api/todos/bulk-update', async (req, res) => {
     try {
-        const { ids, fields } = req.body;
-        await dbService.bulkUpdateTodos(ids, fields);
-        res.json({ success: true, count: (ids || []).length });
+        const { ids, fields, modifiePar, organisationId } = req.body;
+        const orgId = organisationId || 'org_default';
+        const author = modifiePar || 'Utilisateur';
+        await dbService.bulkUpdateTodos(ids, { ...fields, modifiePar: author });
+        
+        const count = (ids || []).length;
+        const actionDesc = fields && fields.statut === 'terminee'
+            ? `${count} tâche(s) marquée(s) comme RÉALISÉE(S) par ${author}`
+            : `Mise à jour groupée de ${count} tâche(s) par ${author}`;
+        await dbService.logAction("To-Do", actionDesc, "Succès", orgId);
+        
+        res.json({ success: true, count });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -964,8 +986,10 @@ app.post('/api/todos/bulk-update', async (req, res) => {
 
 app.post('/api/todos/bulk-delete', async (req, res) => {
     try {
-        const { ids } = req.body;
+        const { ids, organisationId } = req.body;
+        const orgId = organisationId || 'org_default';
         await dbService.bulkDeleteTodos(ids);
+        await dbService.logAction("To-Do", `Suppression groupée de ${(ids || []).length} tâche(s)`, "Succès", orgId);
         res.json({ success: true, count: (ids || []).length });
     } catch (err) {
         res.status(500).json({ error: err.message });

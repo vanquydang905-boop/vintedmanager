@@ -211,16 +211,16 @@ const API = {
             method: 'DELETE'
         });
     },
-    async bulkUpdateTodos(ids, fields) {
+    async bulkUpdateTodos(ids, fields, modifiePar = null, organisationId = null) {
         return this.fetchJSON('/api/todos/bulk-update', {
             method: 'POST',
-            body: JSON.stringify({ ids, fields })
+            body: JSON.stringify({ ids, fields, modifiePar, organisationId })
         });
     },
-    async bulkDeleteTodos(ids) {
+    async bulkDeleteTodos(ids, organisationId = null) {
         return this.fetchJSON('/api/todos/bulk-delete', {
             method: 'POST',
-            body: JSON.stringify({ ids })
+            body: JSON.stringify({ ids, organisationId })
         });
     },
 

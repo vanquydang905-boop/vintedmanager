@@ -280,12 +280,30 @@ function App() {
 
     const handleSaveTodo = async (todoData) => {
         try {
+            const author = currentUser ? (currentUser.nom || currentUser.agentAssigne || 'Utilisateur') : 'Utilisateur';
+            const isCompleting = todoData.statut === 'terminee';
+
             if (todoData.id) {
-                await API.updateTodo(todoData.id, todoData);
-                showToast("Tâche mise à jour avec succès");
+                await API.updateTodo(todoData.id, {
+                    ...todoData,
+                    modifiePar: author,
+                    terminePar: isCompleting ? (todoData.terminePar || author) : null
+                });
+                if (isCompleting) {
+                    showToast(`🎉 Tâche "${todoData.titre}" réalisée avec succès !`);
+                    if (window.SystemNotifications) {
+                        window.SystemNotifications.notify("Tâche Réalisée ! ✅", `"${todoData.titre}" a été complétée par ${author}.`);
+                    }
+                } else {
+                    showToast("Tâche mise à jour avec succès");
+                }
             } else {
-                await API.createTodo({ ...todoData, organisationId: currentOrgId });
-                showToast("Tâche créée avec succès");
+                await API.createTodo({
+                    ...todoData,
+                    creePar: todoData.creePar || author,
+                    organisationId: currentOrgId
+                });
+                showToast(`Tâche créée par ${todoData.creePar || author} avec succès`);
             }
             await loadData();
         } catch (err) {
@@ -305,8 +323,16 @@ function App() {
 
     const handleBulkUpdateTodos = async (ids, fields) => {
         try {
-            await API.bulkUpdateTodos(ids, fields);
-            showToast(`${ids.length} tâche(s) mise(s) à jour en masse !`);
+            const author = currentUser ? (currentUser.nom || currentUser.agentAssigne || 'Utilisateur') : 'Utilisateur';
+            await API.bulkUpdateTodos(ids, fields, author, currentOrgId);
+            if (fields.statut === 'terminee') {
+                showToast(`🎉 ${ids.length} tâche(s) marquée(s) comme réalisée(s) !`);
+                if (window.SystemNotifications) {
+                    window.SystemNotifications.notify("Tâches Réalisées ! ✅", `${ids.length} tâche(s) marquée(s) comme terminées par ${author}.`);
+                }
+            } else {
+                showToast(`${ids.length} tâche(s) mise(s) à jour en masse !`);
+            }
             await loadData();
         } catch (err) {
             showToast("Erreur lors de la mise à jour des tâches en masse", true);
@@ -315,7 +341,7 @@ function App() {
 
     const handleBulkDeleteTodos = async (ids) => {
         try {
-            await API.bulkDeleteTodos(ids);
+            await API.bulkDeleteTodos(ids, currentOrgId);
             showToast(`${ids.length} tâche(s) supprimée(s) en masse !`);
             await loadData();
         } catch (err) {
@@ -541,6 +567,7 @@ function App() {
                 }}>
                     <NotificationBellCenter
                         todos={appState.todos || []}
+                        currentUser={currentUser}
                         onNavigateTodo={(todoId) => {
                             setActiveView('todos');
                         }}

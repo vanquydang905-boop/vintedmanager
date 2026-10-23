@@ -2874,16 +2874,28 @@ function ClassementView({ appState, onUpdateRow }) {
     // State du Filtre par Classification d'Agent (Même logique de présentation que les SKUs)
     const [agentFilterClassif, setAgentFilterClassif] = useState('all');
 
-    // Nombre de comptes assignés à chaque agent
-    const agentComptesCount = useMemo(() => {
-        const counts = {};
+    // Détail des comptes assignés à chaque agent (Actifs, Bannis, Restreints / Pause, Total)
+    const agentComptesStats = useMemo(() => {
+        const stats = {};
         (comptesAll || []).forEach(c => {
             if (c.agent && c.agent !== 'À attribuer' && c.agent !== 'Non assigné') {
                 const k = c.agent.trim().toLowerCase();
-                counts[k] = (counts[k] || 0) + 1;
+                if (!stats[k]) {
+                    stats[k] = { total: 0, actifs: 0, bannis: 0, restreints: 0 };
+                }
+                stats[k].total += 1;
+                const st = (c.statut || '').trim().toLowerCase();
+                if (st === 'actif') {
+                    stats[k].actifs += 1;
+                } else if (st === 'banni' || st === 'ban' || st === 'bloqué') {
+                    stats[k].bannis += 1;
+                } else {
+                    // Limité, Restreint, Pause, Shadowban
+                    stats[k].restreints += 1;
+                }
             }
         });
-        return counts;
+        return stats;
     }, [comptesAll]);
 
     // Classement et performance des agents filtré par la période sélectionnée avec Classification
@@ -2895,10 +2907,15 @@ function ClassementView({ appState, onUpdateRow }) {
             const name = (u.nom || u.agentAssigne || '').trim();
             if (name && !statsMap[name.toLowerCase()]) {
                 const key = name.toLowerCase();
+                const cStats = agentComptesStats[key] || { total: 0, actifs: 0, bannis: 0, restreints: 0 };
                 statsMap[key] = {
                     name,
                     role: u.role || 'agent',
-                    comptesCount: agentComptesCount[key] || 0,
+                    comptesCount: cStats.total,
+                    comptesTotal: cStats.total,
+                    comptesActifs: cStats.actifs,
+                    comptesBannis: cStats.bannis,
+                    comptesRestreints: cStats.restreints,
                     pubsFaites: 0,
                     pubsTotales: 0,
                     ventes: 0,
@@ -2919,10 +2936,15 @@ function ClassementView({ appState, onUpdateRow }) {
             if (!agentName || agentName.toLowerCase().includes('attribuer') || agentName.toLowerCase().includes('bot dotb') || agentName.toLowerCase().includes('non assign')) return;
             const key = agentName.toLowerCase();
             if (!statsMap[key]) {
+                const cStats = agentComptesStats[key] || { total: 0, actifs: 0, bannis: 0, restreints: 0 };
                 statsMap[key] = {
                     name: agentName,
                     role: 'agent',
-                    comptesCount: agentComptesCount[key] || 0,
+                    comptesCount: cStats.total,
+                    comptesTotal: cStats.total,
+                    comptesActifs: cStats.actifs,
+                    comptesBannis: cStats.bannis,
+                    comptesRestreints: cStats.restreints,
                     pubsFaites: 0,
                     pubsTotales: 0,
                     ventes: 0,
@@ -2958,7 +2980,7 @@ function ClassementView({ appState, onUpdateRow }) {
                 classification = '🏆 Agent Top';
             } else if (a.scoreTotal >= 150 || a.ventes >= 2 || (taux >= 50 && a.pubsFaites >= 5)) {
                 classification = '⚡ En Progression';
-            } else if (a.pubsTotales > 0 || a.comptesCount > 0) {
+            } else if (a.pubsTotales > 0 || a.comptesTotal > 0) {
                 classification = '🌟 Nouvel Agent';
             } else {
                 classification = '🛑 Inactif';
@@ -2975,7 +2997,7 @@ function ClassementView({ appState, onUpdateRow }) {
             if (b.ventes !== a.ventes) return b.ventes - a.ventes;
             return b.pubsFaites - a.pubsFaites;
         });
-    }, [filteredCalendrierForRanking, appState.utilisateurs, appState.parametres, agentComptesCount, comptesMap]);
+    }, [filteredCalendrierForRanking, appState.utilisateurs, appState.parametres, agentComptesStats, comptesMap]);
 
     // Agent Ranking filtré par la classification sélectionnée
     const filteredAgentRanking = useMemo(() => {
@@ -3234,7 +3256,7 @@ function ClassementView({ appState, onUpdateRow }) {
                             <tr>
                                 <th style={{ width: '65px', textAlign: 'center' }}>Rang</th>
                                 <th>Agent & Rôle</th>
-                                <th>Comptes</th>
+                                <th style={{ minWidth: '170px' }}>Comptes</th>
                                 <th>Classification</th>
                                 <th>Publications</th>
                                 <th>Taux Réussite</th>
@@ -3265,11 +3287,72 @@ function ClassementView({ appState, onUpdateRow }) {
                                             </div>
                                         </td>
                                         <td>
-                                            {a.comptesCount > 0 ? (
-                                                <span className="badge badge-retester" style={{ padding: '3px 8px', fontSize: '11.5px', backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' }} title={`${a.comptesCount} compte(s) assigné(s)`}>
-                                                    <i className="fa-solid fa-users-viewfinder" style={{ marginRight: '4px', color: '#64748b' }}></i>
-                                                    {a.comptesCount} compte{a.comptesCount > 1 ? 's' : ''}
-                                                </span>
+                                            {a.comptesTotal > 0 ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '150px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                                        <span 
+                                                            title={`${a.comptesActifs} compte(s) actif(s)`}
+                                                            style={{ 
+                                                                display: 'inline-flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '4px', 
+                                                                padding: '2px 7px', 
+                                                                borderRadius: '12px', 
+                                                                fontSize: '11px', 
+                                                                fontWeight: 600, 
+                                                                backgroundColor: a.comptesActifs > 0 ? '#ecfdf5' : '#f8fafc', 
+                                                                color: a.comptesActifs > 0 ? '#059669' : '#94a3b8', 
+                                                                border: `1px solid ${a.comptesActifs > 0 ? '#a7f3d0' : '#e2e8f0'}` 
+                                                            }}
+                                                        >
+                                                            <i className="fa-solid fa-circle-check" style={{ fontSize: '9.5px', color: a.comptesActifs > 0 ? '#10b981' : '#cbd5e1' }}></i>
+                                                            {a.comptesActifs} actif{a.comptesActifs > 1 ? 's' : ''}
+                                                        </span>
+                                                        {a.comptesBannis > 0 && (
+                                                            <span 
+                                                                title={`${a.comptesBannis} compte(s) banni(s)`}
+                                                                style={{ 
+                                                                    display: 'inline-flex', 
+                                                                    alignItems: 'center', 
+                                                                    gap: '4px', 
+                                                                    padding: '2px 7px', 
+                                                                    borderRadius: '12px', 
+                                                                    fontSize: '11px', 
+                                                                    fontWeight: 600, 
+                                                                    backgroundColor: '#fef2f2', 
+                                                                    color: '#dc2626', 
+                                                                    border: '1px solid #fecaca' 
+                                                                }}
+                                                            >
+                                                                <i className="fa-solid fa-ban" style={{ fontSize: '9.5px', color: '#ef4444' }}></i>
+                                                                {a.comptesBannis} ban{a.comptesBannis > 1 ? 's' : ''}
+                                                            </span>
+                                                        )}
+                                                        {a.comptesRestreints > 0 && (
+                                                            <span 
+                                                                title={`${a.comptesRestreints} compte(s) restreint(s) ou en pause`}
+                                                                style={{ 
+                                                                    display: 'inline-flex', 
+                                                                    alignItems: 'center', 
+                                                                    gap: '4px', 
+                                                                    padding: '2px 7px', 
+                                                                    borderRadius: '12px', 
+                                                                    fontSize: '11px', 
+                                                                    fontWeight: 600, 
+                                                                    backgroundColor: '#fffbeb', 
+                                                                    color: '#d97706', 
+                                                                    border: '1px solid #fde68a' 
+                                                                }}
+                                                            >
+                                                                <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: '9.5px', color: '#f59e0b' }}></i>
+                                                                {a.comptesRestreints} restr.
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                                                        Total : <b style={{ color: 'var(--text-secondary)' }}>{a.comptesTotal}</b>
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
                                             )}
@@ -4719,7 +4802,7 @@ var TodoUtils = {
 // ============================================================
 // NOTIFICATION BELL CENTER (HEADER COMPONENT)
 // ============================================================
-function NotificationBellCenter({ todos = [], onNavigateTodo, onSaveTodo, showToast }) {
+function NotificationBellCenter({ todos = [], currentUser = null, onNavigateTodo, onSaveTodo, showToast }) {
     const [isOpen, setIsOpen] = useState(false);
     const [soundMuted, setSoundMuted] = useState(() => SoundEngine.isMuted());
     const [pushPerm, setPushPerm] = useState(() => SystemNotifications.getPermission());
@@ -4782,10 +4865,18 @@ function NotificationBellCenter({ todos = [], onNavigateTodo, onSaveTodo, showTo
     const handleQuickDone = async (todo, e) => {
         e.stopPropagation();
         SoundEngine.playSuccess();
+        const author = currentUser ? (currentUser.nom || currentUser.agentAssigne || 'Utilisateur') : 'Utilisateur';
         if (onSaveTodo) {
-            await onSaveTodo({ ...todo, statut: 'terminee' });
+            await onSaveTodo({
+                ...todo,
+                statut: 'terminee',
+                terminePar: author,
+                dateTerminee: new Date().toISOString(),
+                modifiePar: author
+            });
         }
-        if (showToast) showToast(`✅ Tâche "${todo.titre}" terminée !`);
+        if (showToast) showToast(`🎉 Tâche "${todo.titre}" réalisée avec succès !`);
+        SystemNotifications.notify('Tâche Réalisée ! ✅', `"${todo.titre}" a été complétée par ${author}.`);
     };
 
     // Quick snooze (+1 hour or +1 day)
@@ -5118,6 +5209,7 @@ function TodoView({
     const [heureEcheance, setHeureEcheance] = useState('18:00');
     const [rappelMinutes, setRappelMinutes] = useState(30);
     const [alerteSonore, setAlerteSonore] = useState(true);
+    const [creePar, setCreePar] = useState('');
     const [sousTaches, setSousTaches] = useState([]);
     const [newSubtaskText, setNewSubtaskText] = useState('');
 
@@ -5163,7 +5255,8 @@ function TodoView({
                 const matchCat = (t.categorie || '').toLowerCase().includes(q);
                 const matchCompte = (t.compteNom || '').toLowerCase().includes(q);
                 const matchAgent = (t.agentAssigne || '').toLowerCase().includes(q);
-                if (!matchTitle && !matchDesc && !matchCat && !matchCompte && !matchAgent) return false;
+                const matchCreator = (t.creePar || '').toLowerCase().includes(q);
+                if (!matchTitle && !matchDesc && !matchCat && !matchCompte && !matchAgent && !matchCreator) return false;
             }
             return true;
         }).sort((a, b) => {
@@ -5201,6 +5294,7 @@ function TodoView({
         setCategorie('Expédition');
         setCompteId(comptes[0] ? comptes[0].id : '');
         setAgentAssigne(currentUser ? (currentUser.agentAssigne || currentUser.nom) : '');
+        setCreePar(currentUser ? (currentUser.nom || currentUser.agentAssigne || 'Florencio') : 'Florencio');
         const today = new Date();
         setDateEcheance(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`);
         setHeureEcheance('18:00');
@@ -5221,6 +5315,7 @@ function TodoView({
         setCategorie(todo.categorie || 'Expédition');
         setCompteId(todo.compteId || '');
         setAgentAssigne(todo.agentAssigne || '');
+        setCreePar(todo.creePar || (currentUser ? (currentUser.nom || currentUser.agentAssigne) : 'Florencio'));
         setDateEcheance(todo.dateEcheance || '');
         setHeureEcheance(todo.heureEcheance || '18:00');
         setRappelMinutes(todo.rappelMinutes !== undefined ? todo.rappelMinutes : 30);
@@ -5251,6 +5346,7 @@ function TodoView({
             compteId,
             compteNom,
             agentAssigne,
+            creePar: creePar.trim() || (currentUser ? currentUser.nom : 'Florencio'),
             dateEcheance,
             heureEcheance,
             rappelMinutes: Number(rappelMinutes),
@@ -5275,12 +5371,22 @@ function TodoView({
     const handleToggleDone = async (todo) => {
         const isCurrentlyDone = todo.statut === 'terminee';
         const nextStatut = isCurrentlyDone ? 'a_faire' : 'terminee';
+        const author = currentUser ? (currentUser.nom || currentUser.agentAssigne || 'Florencio') : 'Florencio';
         if (!isCurrentlyDone) {
             SoundEngine.playSuccess();
+            if (showToast) showToast(`🎉 Tâche "${todo.titre}" réalisée par ${author} !`);
+            SystemNotifications.notify('Tâche Réalisée ! ✅', `"${todo.titre}" a été complétée par ${author}.`);
         } else {
             SoundEngine.playCheck();
+            if (showToast) showToast(`Tâche "${todo.titre}" remise à faire`);
         }
-        await onSaveTodo({ ...todo, statut: nextStatut });
+        await onSaveTodo({
+            ...todo,
+            statut: nextStatut,
+            terminePar: !isCurrentlyDone ? author : null,
+            dateTerminee: !isCurrentlyDone ? new Date().toISOString() : null,
+            modifiePar: author
+        });
     };
 
     // Toggle Subtask
@@ -5682,6 +5788,40 @@ function TodoView({
                                                             {todo.categorie}
                                                         </span>
                                                     )}
+                                                    {todo.creePar && (
+                                                        <span style={{
+                                                            fontSize: '11px',
+                                                            backgroundColor: '#eef2ff',
+                                                            color: '#4338ca',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '12px',
+                                                            fontWeight: 600,
+                                                            border: '1px solid #c7d2fe',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }} title={`Tâche ajoutée par ${todo.creePar}`}>
+                                                            <i className="fa-solid fa-user-pen" style={{ fontSize: '10px' }}></i>
+                                                            Ajouté par : {todo.creePar}
+                                                        </span>
+                                                    )}
+                                                    {isDone && (
+                                                        <span style={{
+                                                            fontSize: '11px',
+                                                            backgroundColor: '#ecfdf5',
+                                                            color: '#065f46',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '12px',
+                                                            fontWeight: 600,
+                                                            border: '1px solid #a7f3d0',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}>
+                                                            <i className="fa-solid fa-check" style={{ fontSize: '10px' }}></i>
+                                                            Réalisée{todo.terminePar ? ` par ${todo.terminePar}` : ''}
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 {todo.description && (
@@ -5895,8 +6035,8 @@ function TodoView({
                                     </div>
                                 </div>
 
-                                {/* Compte Vinted & Agent */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                                {/* Compte Vinted, Agent & Auteur */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                                     <div className="form-group">
                                         <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
                                             Compte Vinted Associé
@@ -5919,6 +6059,19 @@ function TodoView({
                                                 <option key={u.id} value={u.agentAssigne || u.nom}>{u.nom} ({u.agentAssigne || u.role})</option>
                                             ))}
                                         </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Ajouté par (Auteur)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={creePar}
+                                            onChange={(e) => setCreePar(e.target.value)}
+                                            placeholder="Nom de l'auteur..."
+                                        />
                                     </div>
                                 </div>
 
