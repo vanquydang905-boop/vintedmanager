@@ -9365,6 +9365,383 @@ function TodoView({
   }), editingTodo ? 'Mettre à jour' : 'Enregistrer la tâche'))))));
 }
 
+// ============================================================
+// POPUP NOTIFICATION TÂCHES NON RÉALISÉES (OUVERTURE APP)
+// ============================================================
+function StartupTodoModal({
+  isOpen,
+  onClose,
+  todos = [],
+  currentUser = null,
+  onNavigateToTodos,
+  onSaveTodo,
+  showToast
+}) {
+  if (!isOpen) return null;
+  const pendingTodos = (todos || []).filter(t => t && t.statut !== 'terminee');
+  if (pendingTodos.length === 0) return null;
+  const urgentesCount = pendingTodos.filter(t => t.priorite === 'urgente').length;
+  const enRetardCount = pendingTodos.filter(t => TodoUtils.getStatusInfo(t).isOverdue).length;
+
+  // Trier les tâches : En retard d'abord, puis urgentes, puis échéance proche
+  const sortedPending = [...pendingTodos].sort((a, b) => {
+    const infoA = TodoUtils.getStatusInfo(a);
+    const infoB = TodoUtils.getStatusInfo(b);
+    if (infoA.isOverdue && !infoB.isOverdue) return -1;
+    if (!infoA.isOverdue && infoB.isOverdue) return 1;
+    if (a.priorite === 'urgente' && b.priorite !== 'urgente') return -1;
+    if (a.priorite !== 'urgente' && b.priorite === 'urgente') return 1;
+    const da = TodoUtils.parseDeadline(a) || new Date('2099-12-31');
+    const db = TodoUtils.parseDeadline(b) || new Date('2099-12-31');
+    return da - db;
+  });
+  const displayTodos = sortedPending.slice(0, 5);
+  const extraCount = sortedPending.length - displayTodos.length;
+  const handleQuickDone = async (todo, e) => {
+    e.stopPropagation();
+    if (onSaveTodo) {
+      SoundEngine.playSuccess();
+      await onSaveTodo({
+        ...todo,
+        statut: 'terminee',
+        dateTerminee: new Date().toISOString(),
+        terminePar: currentUser ? currentUser.nom || currentUser.agentAssigne || 'Florencio' : 'Florencio'
+      });
+      if (showToast) showToast(`✅ Tâche "${todo.titre}" marquée comme terminée !`);
+    }
+  };
+  const handleGoToTodos = () => {
+    onClose();
+    if (onNavigateToTodos) {
+      onNavigateToTodos();
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-backdrop",
+    style: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.75)',
+      backdropFilter: 'blur(5px)',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '16px'
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-content",
+    style: {
+      maxWidth: '580px',
+      width: '100%',
+      backgroundColor: '#ffffff',
+      borderRadius: '20px',
+      boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      maxHeight: '90vh'
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+      padding: '20px 24px',
+      color: '#ffffff',
+      position: 'relative',
+      borderBottom: '2px solid #09b1ba'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: '46px',
+      height: '46px',
+      borderRadius: '12px',
+      background: 'linear-gradient(135deg, #09b1ba 0%, #0284c7 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#ffffff',
+      fontSize: '20px',
+      flexShrink: 0,
+      boxShadow: '0 4px 14px rgba(9, 177, 186, 0.45)'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-bell"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      margin: 0,
+      fontSize: '18px',
+      fontWeight: 800,
+      color: '#ffffff',
+      letterSpacing: '-0.3px'
+    }
+  }, "Rappel des T\xE2ches en Attente"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: '4px 0 0 0',
+      fontSize: '12.5px',
+      color: '#94a3b8'
+    }
+  }, "Bonjour ", currentUser ? currentUser.nom || 'Florencio' : 'Florencio', " ! Vous avez des actions \xE0 r\xE9aliser."))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClose,
+    style: {
+      background: 'rgba(255, 255, 255, 0.1)',
+      border: 'none',
+      color: '#ffffff',
+      width: '32px',
+      height: '32px',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '15px'
+    },
+    title: "Fermer"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px',
+      marginTop: '14px',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11.5px',
+      fontWeight: 700,
+      padding: '4px 10px',
+      borderRadius: '20px',
+      background: 'rgba(9, 177, 186, 0.2)',
+      color: '#5eead4',
+      border: '1px solid rgba(9, 177, 186, 0.4)',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-list-check"
+  }), pendingTodos.length, " t\xE2che", pendingTodos.length > 1 ? 's' : '', " non r\xE9alis\xE9e", pendingTodos.length > 1 ? 's' : ''), urgentesCount > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11.5px',
+      fontWeight: 700,
+      padding: '4px 10px',
+      borderRadius: '20px',
+      background: 'rgba(239, 68, 68, 0.25)',
+      color: '#fca5a5',
+      border: '1px solid rgba(239, 68, 68, 0.45)',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px'
+    }
+  }, "\uD83D\uDEA8 ", urgentesCount, " urgente", urgentesCount > 1 ? 's' : ''), enRetardCount > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11.5px',
+      fontWeight: 700,
+      padding: '4px 10px',
+      borderRadius: '20px',
+      background: 'rgba(245, 158, 11, 0.25)',
+      color: '#fde68a',
+      border: '1px solid rgba(245, 158, 11, 0.45)',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px'
+    }
+  }, "\u26A0\uFE0F ", enRetardCount, " en retard"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '18px 24px',
+      overflowY: 'auto',
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 700,
+      color: '#64748b',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+      marginBottom: '12px'
+    }
+  }, "Actions prioritaires \xE0 traiter :"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px'
+    }
+  }, displayTodos.map(todo => {
+    const info = TodoUtils.getStatusInfo(todo);
+    const subtasks = Array.isArray(todo.sousTaches) ? todo.sousTaches : [];
+    const subDone = subtasks.filter(s => s.fait).length;
+    return /*#__PURE__*/React.createElement("div", {
+      key: todo.id,
+      style: {
+        border: info.isOverdue ? '1px solid #fecdd3' : todo.priorite === 'urgente' ? '1px solid #fed7aa' : '1px solid #e2e8f0',
+        backgroundColor: info.isOverdue ? '#fff1f2' : todo.priorite === 'urgente' ? '#fffbeb' : '#f8fafc',
+        borderRadius: '12px',
+        padding: '12px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '3px',
+        flexWrap: 'wrap'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: '13.5px',
+        color: '#0f172a'
+      }
+    }, todo.titre), todo.priorite === 'urgente' && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '10px',
+        fontWeight: 800,
+        padding: '2px 6px',
+        borderRadius: '8px',
+        background: '#fee2e2',
+        color: '#dc2626'
+      }
+    }, "\uD83D\uDEA8 URGENTE"), todo.categorie && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '10.5px',
+        fontWeight: 600,
+        padding: '1px 6px',
+        borderRadius: '6px',
+        background: '#e2e8f0',
+        color: '#475569'
+      }
+    }, todo.categorie)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        fontSize: '11.5px',
+        color: '#64748b',
+        flexWrap: 'wrap'
+      }
+    }, todo.compteNom && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#09b1ba',
+        fontWeight: 600
+      }
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-store",
+      style: {
+        marginRight: '3px'
+      }
+    }), "@", todo.compteNom), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: info.isOverdue ? '#dc2626' : info.isImminent ? '#ea580c' : '#475569',
+        fontWeight: info.isOverdue ? 700 : 500
+      }
+    }, /*#__PURE__*/React.createElement("i", {
+      className: `fa-solid ${info.isOverdue ? 'fa-triangle-exclamation' : 'fa-clock'}`,
+      style: {
+        marginRight: '4px'
+      }
+    }), info.label), subtasks.length > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#64748b'
+      }
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-list-check",
+      style: {
+        marginRight: '3px'
+      }
+    }), subDone, "/", subtasks.length))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => handleQuickDone(todo, e),
+      className: "btn btn-outline-success btn-xs",
+      style: {
+        border: '1px solid #a7f3d0',
+        backgroundColor: '#f0fdf4',
+        color: '#16a34a',
+        borderRadius: '8px',
+        padding: '6px 10px',
+        fontSize: '11.5px',
+        fontWeight: 600,
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        flexShrink: 0
+      },
+      title: "Marquer directement comme termin\xE9e"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-check"
+    }), /*#__PURE__*/React.createElement("span", null, "Fait")));
+  })), extraCount > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      marginTop: '12px',
+      fontSize: '12px',
+      color: '#64748b',
+      fontWeight: 600
+    }
+  }, "+ ", extraCount, " autre", extraCount > 1 ? 's' : '', " t\xE2che", extraCount > 1 ? 's' : '', " en attente dans votre To-Do List")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '14px 24px',
+      background: '#f8fafc',
+      borderTop: '1px solid #e2e8f0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    onClick: onClose,
+    style: {
+      fontSize: '13px',
+      fontWeight: 600
+    }
+  }, "Plus tard"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    onClick: handleGoToTodos,
+    style: {
+      fontSize: '13px',
+      fontWeight: 700,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px',
+      background: 'linear-gradient(135deg, #09b1ba 0%, #0d9488 100%)',
+      boxShadow: '0 2px 8px rgba(9, 177, 186, 0.35)'
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Ouvrir la To-Do List"), /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-arrow-right"
+  })))));
+}
+
 // Export global React components
 window.ReactComponents = {
   PermissionManager,
@@ -9387,7 +9764,8 @@ window.ReactComponents = {
   SystemNotifications,
   TodoUtils,
   NotificationBellCenter,
-  TodoView
+  TodoView,
+  StartupTodoModal
 };
 ;
 // ============================================================
@@ -9413,6 +9791,8 @@ function App() {
     isError: false
   });
   const [loginError, setLoginError] = useState('');
+  const [showStartupTodoModal, setShowStartupTodoModal] = useState(false);
+  const [hasCheckedStartupTodos, setHasCheckedStartupTodos] = useState(false);
   const [isSyncingDotB, setIsSyncingDotB] = useState(false);
   const handleSwitchTZ = tz => {
     setTimeZone(tz);
@@ -9494,6 +9874,28 @@ function App() {
     }
   }, [currentUser, currentOrgId, loadData]);
 
+  // Popup d'alerte automatique à l'ouverture de l'application si des tâches sont non réalisées
+  useEffect(() => {
+    if (!currentUser) {
+      setHasCheckedStartupTodos(false);
+      return;
+    }
+    if (!hasCheckedStartupTodos && Array.isArray(appState.todos) && appState.todos.length > 0) {
+      const pending = appState.todos.filter(t => t && t.statut !== 'terminee');
+      if (pending.length > 0) {
+        setShowStartupTodoModal(true);
+        if (typeof SoundEngine !== 'undefined' && SoundEngine.playWarningAlert) {
+          setTimeout(() => {
+            try {
+              SoundEngine.playWarningAlert();
+            } catch (e) {}
+          }, 400);
+        }
+      }
+      setHasCheckedStartupTodos(true);
+    }
+  }, [currentUser, appState.todos, hasCheckedStartupTodos]);
+
   // Cache des alertes sonores et push déjà émises pour éviter le spam
   const alertedTasksRef = React.useRef(new Set());
   useEffect(() => {
@@ -9551,6 +9953,7 @@ function App() {
       const user = await API.login(payload);
       localStorage.setItem('vinted_manager_user', JSON.stringify(user));
       setCurrentUser(user);
+      setHasCheckedStartupTodos(false);
       if (user.role !== 'admin' && user.organisationId) {
         setCurrentOrgId(user.organisationId);
       }
@@ -10104,7 +10507,18 @@ function App() {
     onDeleteItem: handleDeleteCorbeilleItem,
     onEmptyCorbeille: handleEmptyCorbeille,
     onRefresh: () => loadData()
-  })), /*#__PURE__*/React.createElement(Toast, {
+  })), /*#__PURE__*/React.createElement(StartupTodoModal, {
+    isOpen: showStartupTodoModal,
+    onClose: () => setShowStartupTodoModal(false),
+    todos: appState.todos || [],
+    currentUser: currentUser,
+    onNavigateToTodos: () => {
+      setActiveView('todos');
+      setShowStartupTodoModal(false);
+    },
+    onSaveTodo: handleSaveTodo,
+    showToast: showToast
+  }), /*#__PURE__*/React.createElement(Toast, {
     toast: toast
   }));
 }

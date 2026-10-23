@@ -6438,6 +6438,340 @@ function TodoView({
 }
 
 
+// ============================================================
+// POPUP NOTIFICATION TÂCHES NON RÉALISÉES (OUVERTURE APP)
+// ============================================================
+function StartupTodoModal({ isOpen, onClose, todos = [], currentUser = null, onNavigateToTodos, onSaveTodo, showToast }) {
+    if (!isOpen) return null;
+
+    const pendingTodos = (todos || []).filter(t => t && t.statut !== 'terminee');
+    if (pendingTodos.length === 0) return null;
+
+    const urgentesCount = pendingTodos.filter(t => t.priorite === 'urgente').length;
+    const enRetardCount = pendingTodos.filter(t => TodoUtils.getStatusInfo(t).isOverdue).length;
+
+    // Trier les tâches : En retard d'abord, puis urgentes, puis échéance proche
+    const sortedPending = [...pendingTodos].sort((a, b) => {
+        const infoA = TodoUtils.getStatusInfo(a);
+        const infoB = TodoUtils.getStatusInfo(b);
+        if (infoA.isOverdue && !infoB.isOverdue) return -1;
+        if (!infoA.isOverdue && infoB.isOverdue) return 1;
+        if (a.priorite === 'urgente' && b.priorite !== 'urgente') return -1;
+        if (a.priorite !== 'urgente' && b.priorite === 'urgente') return 1;
+        const da = TodoUtils.parseDeadline(a) || new Date('2099-12-31');
+        const db = TodoUtils.parseDeadline(b) || new Date('2099-12-31');
+        return da - db;
+    });
+
+    const displayTodos = sortedPending.slice(0, 5);
+    const extraCount = sortedPending.length - displayTodos.length;
+
+    const handleQuickDone = async (todo, e) => {
+        e.stopPropagation();
+        if (onSaveTodo) {
+            SoundEngine.playSuccess();
+            await onSaveTodo({
+                ...todo,
+                statut: 'terminee',
+                dateTerminee: new Date().toISOString(),
+                terminePar: currentUser ? (currentUser.nom || currentUser.agentAssigne || 'Florencio') : 'Florencio'
+            });
+            if (showToast) showToast(`✅ Tâche "${todo.titre}" marquée comme terminée !`);
+        }
+    };
+
+    const handleGoToTodos = () => {
+        onClose();
+        if (onNavigateToTodos) {
+            onNavigateToTodos();
+        }
+    };
+
+    return (
+        <div 
+            className="modal-backdrop"
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(5px)',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px'
+            }}
+            onClick={onClose}
+        >
+            <div 
+                className="modal-content"
+                style={{
+                    maxWidth: '580px',
+                    width: '100%',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '20px',
+                    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    maxHeight: '90vh'
+                }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header moderne avec dégradé sombre et liseré turquoise */}
+                <div style={{
+                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                    padding: '20px 24px',
+                    color: '#ffffff',
+                    position: 'relative',
+                    borderBottom: '2px solid #09b1ba'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <div style={{
+                                width: '46px',
+                                height: '46px',
+                                borderRadius: '12px',
+                                background: 'linear-gradient(135deg, #09b1ba 0%, #0284c7 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ffffff',
+                                fontSize: '20px',
+                                flexShrink: 0,
+                                boxShadow: '0 4px 14px rgba(9, 177, 186, 0.45)'
+                            }}>
+                                <i className="fa-solid fa-bell"></i>
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px' }}>
+                                    Rappel des Tâches en Attente
+                                </h3>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#94a3b8' }}>
+                                    Bonjour {currentUser ? (currentUser.nom || 'Florencio') : 'Florencio'} ! Vous avez des actions à réaliser.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                border: 'none',
+                                color: '#ffffff',
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '15px'
+                            }}
+                            title="Fermer"
+                        >
+                            <i className="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    {/* Synthèse des alertes */}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
+                        <span style={{
+                            fontSize: '11.5px',
+                            fontWeight: 700,
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            background: 'rgba(9, 177, 186, 0.2)',
+                            color: '#5eead4',
+                            border: '1px solid rgba(9, 177, 186, 0.4)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                        }}>
+                            <i className="fa-solid fa-list-check"></i>
+                            {pendingTodos.length} tâche{pendingTodos.length > 1 ? 's' : ''} non réalisée{pendingTodos.length > 1 ? 's' : ''}
+                        </span>
+
+                        {urgentesCount > 0 && (
+                            <span style={{
+                                fontSize: '11.5px',
+                                fontWeight: 700,
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                background: 'rgba(239, 68, 68, 0.25)',
+                                color: '#fca5a5',
+                                border: '1px solid rgba(239, 68, 68, 0.45)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                            }}>
+                                🚨 {urgentesCount} urgente{urgentesCount > 1 ? 's' : ''}
+                            </span>
+                        )}
+
+                        {enRetardCount > 0 && (
+                            <span style={{
+                                fontSize: '11.5px',
+                                fontWeight: 700,
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                background: 'rgba(245, 158, 11, 0.25)',
+                                color: '#fde68a',
+                                border: '1px solid rgba(245, 158, 11, 0.45)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                            }}>
+                                ⚠️ {enRetardCount} en retard
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Corps avec liste des tâches */}
+                <div style={{ padding: '18px 24px', overflowY: 'auto', flex: 1 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                        Actions prioritaires à traiter :
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {displayTodos.map(todo => {
+                            const info = TodoUtils.getStatusInfo(todo);
+                            const subtasks = Array.isArray(todo.sousTaches) ? todo.sousTaches : [];
+                            const subDone = subtasks.filter(s => s.fait).length;
+
+                            return (
+                                <div
+                                    key={todo.id}
+                                    style={{
+                                        border: info.isOverdue ? '1px solid #fecdd3' : (todo.priorite === 'urgente' ? '1px solid #fed7aa' : '1px solid #e2e8f0'),
+                                        backgroundColor: info.isOverdue ? '#fff1f2' : (todo.priorite === 'urgente' ? '#fffbeb' : '#f8fafc'),
+                                        borderRadius: '12px',
+                                        padding: '12px 14px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '12px'
+                                    }}
+                                >
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                                            <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>
+                                                {todo.titre}
+                                            </span>
+                                            {todo.priorite === 'urgente' && (
+                                                <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '8px', background: '#fee2e2', color: '#dc2626' }}>
+                                                    🚨 URGENTE
+                                                </span>
+                                            )}
+                                            {todo.categorie && (
+                                                <span style={{ fontSize: '10.5px', fontWeight: 600, padding: '1px 6px', borderRadius: '6px', background: '#e2e8f0', color: '#475569' }}>
+                                                    {todo.categorie}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11.5px', color: '#64748b', flexWrap: 'wrap' }}>
+                                            {todo.compteNom && (
+                                                <span style={{ color: '#09b1ba', fontWeight: 600 }}>
+                                                    <i className="fa-solid fa-store" style={{ marginRight: '3px' }}></i>
+                                                    @{todo.compteNom}
+                                                </span>
+                                            )}
+                                            <span style={{ color: info.isOverdue ? '#dc2626' : (info.isImminent ? '#ea580c' : '#475569'), fontWeight: info.isOverdue ? 700 : 500 }}>
+                                                <i className={`fa-solid ${info.isOverdue ? 'fa-triangle-exclamation' : 'fa-clock'}`} style={{ marginRight: '4px' }}></i>
+                                                {info.label}
+                                            </span>
+                                            {subtasks.length > 0 && (
+                                                <span style={{ color: '#64748b' }}>
+                                                    <i className="fa-solid fa-list-check" style={{ marginRight: '3px' }}></i>
+                                                    {subDone}/{subtasks.length}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Action rapide cocher comme terminée */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleQuickDone(todo, e)}
+                                        className="btn btn-outline-success btn-xs"
+                                        style={{
+                                            border: '1px solid #a7f3d0',
+                                            backgroundColor: '#f0fdf4',
+                                            color: '#16a34a',
+                                            borderRadius: '8px',
+                                            padding: '6px 10px',
+                                            fontSize: '11.5px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            flexShrink: 0
+                                        }}
+                                        title="Marquer directement comme terminée"
+                                    >
+                                        <i className="fa-solid fa-check"></i>
+                                        <span>Fait</span>
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {extraCount > 0 && (
+                        <div style={{ textAlign: 'center', marginTop: '12px', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+                            + {extraCount} autre{extraCount > 1 ? 's' : ''} tâche{extraCount > 1 ? 's' : ''} en attente dans votre To-Do List
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer avec boutons d'action */}
+                <div style={{
+                    padding: '14px 24px',
+                    background: '#f8fafc',
+                    borderTop: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px'
+                }}>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={onClose}
+                        style={{ fontSize: '13px', fontWeight: 600 }}
+                    >
+                        Plus tard
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleGoToTodos}
+                        style={{
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'linear-gradient(135deg, #09b1ba 0%, #0d9488 100%)',
+                            boxShadow: '0 2px 8px rgba(9, 177, 186, 0.35)'
+                        }}
+                    >
+                        <span>Ouvrir la To-Do List</span>
+                        <i className="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
 // Export global React components
 window.ReactComponents = {
     PermissionManager,
@@ -6460,5 +6794,6 @@ window.ReactComponents = {
     SystemNotifications,
     TodoUtils,
     NotificationBellCenter,
-    TodoView
+    TodoView,
+    StartupTodoModal
 };

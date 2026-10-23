@@ -18,6 +18,8 @@ function App() {
     const [timeZone, setTimeZone] = useState(() => localStorage.getItem('vinted_timezone') || 'FR');
     const [toast, setToast] = useState({ visible: false, message: '', isError: false });
     const [loginError, setLoginError] = useState('');
+    const [showStartupTodoModal, setShowStartupTodoModal] = useState(false);
+    const [hasCheckedStartupTodos, setHasCheckedStartupTodos] = useState(false);
 
     const [isSyncingDotB, setIsSyncingDotB] = useState(false);
 
@@ -93,6 +95,27 @@ function App() {
         }
     }, [currentUser, currentOrgId, loadData]);
 
+    // Popup d'alerte automatique à l'ouverture de l'application si des tâches sont non réalisées
+    useEffect(() => {
+        if (!currentUser) {
+            setHasCheckedStartupTodos(false);
+            return;
+        }
+
+        if (!hasCheckedStartupTodos && Array.isArray(appState.todos) && appState.todos.length > 0) {
+            const pending = appState.todos.filter(t => t && t.statut !== 'terminee');
+            if (pending.length > 0) {
+                setShowStartupTodoModal(true);
+                if (typeof SoundEngine !== 'undefined' && SoundEngine.playWarningAlert) {
+                    setTimeout(() => {
+                        try { SoundEngine.playWarningAlert(); } catch (e) {}
+                    }, 400);
+                }
+            }
+            setHasCheckedStartupTodos(true);
+        }
+    }, [currentUser, appState.todos, hasCheckedStartupTodos]);
+
     // Cache des alertes sonores et push déjà émises pour éviter le spam
     const alertedTasksRef = React.useRef(new Set());
 
@@ -157,6 +180,7 @@ function App() {
             const user = await API.login(payload);
             localStorage.setItem('vinted_manager_user', JSON.stringify(user));
             setCurrentUser(user);
+            setHasCheckedStartupTodos(false);
             if (user.role !== 'admin' && user.organisationId) {
                 setCurrentOrgId(user.organisationId);
             }
@@ -762,6 +786,19 @@ function App() {
                     />
                 )}
             </main>
+
+            <StartupTodoModal
+                isOpen={showStartupTodoModal}
+                onClose={() => setShowStartupTodoModal(false)}
+                todos={appState.todos || []}
+                currentUser={currentUser}
+                onNavigateToTodos={() => {
+                    setActiveView('todos');
+                    setShowStartupTodoModal(false);
+                }}
+                onSaveTodo={handleSaveTodo}
+                showToast={showToast}
+            />
 
             <Toast toast={toast} />
         </div>
