@@ -7717,6 +7717,8 @@ function TodoView({
   const [agentFilter, setAgentFilter] = useState('all');
   const [compteFilter, setCompteFilter] = useState('all');
   const [sortBy, setSortBy] = useState('echeance_asc'); // echeance_asc, echeance_desc, priorite_desc, date_desc, titre_asc
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'done'
+  const [isDoneSectionCollapsed, setIsDoneSectionCollapsed] = useState(false);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState([]);
@@ -7823,6 +7825,14 @@ function TodoView({
       return 0;
     });
   }, [todos, statusFilter, priorityFilter, categoryFilter, agentFilter, compteFilter, searchTerm, sortBy]);
+
+  // Séparation des tâches en attente et terminées
+  const pendingTodos = useMemo(() => {
+    return filteredTodos.filter(t => t.statut !== 'terminee');
+  }, [filteredTodos]);
+  const doneTodos = useMemo(() => {
+    return filteredTodos.filter(t => t.statut === 'terminee');
+  }, [filteredTodos]);
 
   // Open Add Modal
   const handleOpenAdd = () => {
@@ -8013,465 +8023,55 @@ function TodoView({
     setSelectedIds([]);
     if (showToast) showToast(`${selectedIds.length} tâche(s) supprimée(s)`);
   };
-  return /*#__PURE__*/React.createElement("div", {
-    className: "todo-view-container"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '20px',
-      flexWrap: 'wrap',
-      gap: '12px'
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontSize: '24px',
-      fontWeight: 800,
-      color: 'var(--text-main)',
-      margin: 0,
-      display: 'flex',
-      alignItems: 'center',
-      gap: '10px'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-list-check",
-    style: {
-      color: 'var(--primary-color)'
-    }
-  }), "To-Do List & Rappels Intelligents"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: '4px 0 0 0',
-      color: 'var(--text-muted)',
-      fontSize: '13px'
-    }
-  }, "Suivi en temps r\xE9el des actions, alertes sonores instantan\xE9es et synchronisation d'\xE9quipe.")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      flexWrap: 'wrap'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary btn-sm",
-    onClick: () => {
-      SoundEngine.playUrgentAlert();
-      if (showToast) showToast('🔊 Test alerte sonore effectué');
-    },
-    title: "Tester le son du synth\xE9tiseur Web Audio"
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-volume-high"
-  }), " Tester Alerte"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-primary",
-    onClick: handleOpenAdd,
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      fontWeight: 600
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-plus"
-  }), " Nouvelle T\xE2che"))), /*#__PURE__*/React.createElement("div", {
-    className: "dashboard-grid",
-    style: {
-      marginBottom: '24px',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-card",
-    style: {
-      borderLeft: '4px solid var(--primary-color)'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-header"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "stat-card-title"
-  }, "Total T\xE2ches"), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-icon",
-    style: {
-      background: 'rgba(99, 102, 241, 0.1)',
-      color: 'var(--primary-color)'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-clipboard-list"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-value"
-  }, stats.total), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '12px',
-      color: 'var(--text-muted)',
-      marginTop: '4px'
-    }
-  }, "Taux d'ach\xE8vement : ", /*#__PURE__*/React.createElement("strong", null, stats.percentDone, "%"))), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card",
-    style: {
-      borderLeft: '4px solid #ef4444'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-header"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "stat-card-title"
-  }, "\uD83D\uDEA8 Urgentes & Critiques"), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-icon",
-    style: {
-      background: 'rgba(239, 68, 68, 0.1)',
-      color: '#ef4444'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-fire-flame-curved"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-value",
-    style: {
-      color: stats.urgentes > 0 ? '#ef4444' : 'inherit'
-    }
-  }, stats.urgentes), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '12px',
-      color: '#ef4444',
-      marginTop: '4px',
-      fontWeight: 600
-    }
-  }, stats.urgentes > 0 ? 'Priorité immédiate requise' : 'Aucune urgence en attente')), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card",
-    style: {
-      borderLeft: '4px solid #f59e0b'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-header"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "stat-card-title"
-  }, "\u26A0\uFE0F En Retard"), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-icon",
-    style: {
-      background: 'rgba(245, 158, 11, 0.1)',
-      color: '#f59e0b'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-triangle-exclamation"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-value",
-    style: {
-      color: stats.enRetard > 0 ? '#f59e0b' : 'inherit'
-    }
-  }, stats.enRetard), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '12px',
-      color: 'var(--text-muted)',
-      marginTop: '4px'
-    }
-  }, "\xC9ch\xE9ances d\xE9pass\xE9es")), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card",
-    style: {
-      borderLeft: '4px solid #0284c7'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-header"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "stat-card-title"
-  }, "\u23F3 En Cours"), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-icon",
-    style: {
-      background: 'rgba(2, 132, 199, 0.1)',
-      color: '#0284c7'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-spinner"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-value"
-  }, stats.enCours), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '12px',
-      color: 'var(--text-muted)',
-      marginTop: '4px'
-    }
-  }, "T\xE2ches en traitement actif")), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card",
-    style: {
-      borderLeft: '4px solid #10b981'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-header"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "stat-card-title"
-  }, "\u2705 Termin\xE9es"), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-icon",
-    style: {
-      background: 'rgba(16, 185, 129, 0.1)',
-      color: '#10b981'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-circle-check"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card-value",
-    style: {
-      color: '#10b981'
-    }
-  }, stats.terminees), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '12px',
-      color: '#10b981',
-      marginTop: '4px',
-      fontWeight: 600
-    }
-  }, stats.percentDone, "% accompli"))), /*#__PURE__*/React.createElement("div", {
-    className: "table-card",
-    style: {
-      padding: '16px',
-      marginBottom: '20px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-      gap: '12px',
-      marginBottom: '14px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      gridColumn: 'span 2'
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '11px',
-      textTransform: 'uppercase',
-      color: 'var(--text-muted)',
-      fontWeight: 700,
-      display: 'block',
-      marginBottom: '4px'
-    }
-  }, "Recherche"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'relative'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-magnifying-glass",
-    style: {
-      position: 'absolute',
-      left: '10px',
-      top: '10px',
-      color: '#94a3b8'
-    }
-  }), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    className: "form-control",
-    placeholder: "Rechercher par titre, description, compte, agent...",
-    value: searchTerm,
-    onChange: e => setSearchTerm(e.target.value),
-    style: {
-      paddingLeft: '32px'
-    }
-  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '11px',
-      textTransform: 'uppercase',
-      color: 'var(--text-muted)',
-      fontWeight: 700,
-      display: 'block',
-      marginBottom: '4px'
-    }
-  }, "Statut"), /*#__PURE__*/React.createElement("select", {
-    className: "form-control",
-    value: statusFilter,
-    onChange: e => setStatusFilter(e.target.value)
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "all"
-  }, "Tous les statuts"), /*#__PURE__*/React.createElement("option", {
-    value: "a_faire"
-  }, "\xC0 faire"), /*#__PURE__*/React.createElement("option", {
-    value: "en_cours"
-  }, "En cours"), /*#__PURE__*/React.createElement("option", {
-    value: "terminee"
-  }, "Termin\xE9es"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '11px',
-      textTransform: 'uppercase',
-      color: 'var(--text-muted)',
-      fontWeight: 700,
-      display: 'block',
-      marginBottom: '4px'
-    }
-  }, "Priorit\xE9"), /*#__PURE__*/React.createElement("select", {
-    className: "form-control",
-    value: priorityFilter,
-    onChange: e => setPriorityFilter(e.target.value)
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "all"
-  }, "Toutes priorit\xE9s"), /*#__PURE__*/React.createElement("option", {
-    value: "urgente"
-  }, "\uD83D\uDEA8 Urgente"), /*#__PURE__*/React.createElement("option", {
-    value: "haute"
-  }, "Haute"), /*#__PURE__*/React.createElement("option", {
-    value: "moyenne"
-  }, "Moyenne"), /*#__PURE__*/React.createElement("option", {
-    value: "basse"
-  }, "Basse"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '11px',
-      textTransform: 'uppercase',
-      color: 'var(--text-muted)',
-      fontWeight: 700,
-      display: 'block',
-      marginBottom: '4px'
-    }
-  }, "Cat\xE9gorie"), /*#__PURE__*/React.createElement("select", {
-    className: "form-control",
-    value: categoryFilter,
-    onChange: e => setCategoryFilter(e.target.value)
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "all"
-  }, "Toutes cat\xE9gories"), predefinedCategories.map(c => /*#__PURE__*/React.createElement("option", {
-    key: c,
-    value: c
-  }, c)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '11px',
-      textTransform: 'uppercase',
-      color: 'var(--text-muted)',
-      fontWeight: 700,
-      display: 'block',
-      marginBottom: '4px'
-    }
-  }, "Compte Vinted"), /*#__PURE__*/React.createElement("select", {
-    className: "form-control",
-    value: compteFilter,
-    onChange: e => setCompteFilter(e.target.value)
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "all"
-  }, "Tous les comptes"), comptes.map(c => /*#__PURE__*/React.createElement("option", {
-    key: c.id,
-    value: c.id
-  }, "@", c.nomCompte || c.nom || c.pseudo)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '11px',
-      textTransform: 'uppercase',
-      color: 'var(--text-muted)',
-      fontWeight: 700,
-      display: 'block',
-      marginBottom: '4px'
-    }
-  }, "Trier par"), /*#__PURE__*/React.createElement("select", {
-    className: "form-control",
-    value: sortBy,
-    onChange: e => setSortBy(e.target.value)
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "echeance_asc"
-  }, "\xC9ch\xE9ance (Plus proche)"), /*#__PURE__*/React.createElement("option", {
-    value: "echeance_desc"
-  }, "\xC9ch\xE9ance (Plus lointaine)"), /*#__PURE__*/React.createElement("option", {
-    value: "priorite_desc"
-  }, "Priorit\xE9 (Haute en premier)"), /*#__PURE__*/React.createElement("option", {
-    value: "date_desc"
-  }, "Date de cr\xE9ation (R\xE9cent)"), /*#__PURE__*/React.createElement("option", {
-    value: "titre_asc"
-  }, "Titre (A-Z)")))), selectedIds.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '10px 14px',
-      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1))',
-      border: '1px solid rgba(99, 102, 241, 0.3)',
-      borderRadius: '8px',
-      marginTop: '10px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600,
-      fontSize: '13px',
-      color: 'var(--primary-color)'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-check-double",
-    style: {
-      marginRight: '6px'
-    }
-  }), selectedIds.length, " t\xE2che(s) s\xE9lectionn\xE9e(s)"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: '8px'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-success btn-sm",
-    onClick: handleBulkMarkDone
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-check"
-  }), " Marquer Termin\xE9es"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-danger btn-sm",
-    onClick: handleBulkDelete
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-trash"
-  }), " Supprimer")))), /*#__PURE__*/React.createElement("div", {
-    className: "table-card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "table-responsive"
-  }, /*#__PURE__*/React.createElement("table", {
-    className: "data-table"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
-    style: {
-      width: '40px',
-      textAlign: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    checked: filteredTodos.length > 0 && selectedIds.length === filteredTodos.length,
-    onChange: handleSelectAll,
-    style: {
-      cursor: 'pointer'
-    }
-  })), /*#__PURE__*/React.createElement("th", {
-    style: {
-      width: '50px',
-      textAlign: 'center'
-    }
-  }, "Statut"), /*#__PURE__*/React.createElement("th", null, "T\xE2che & D\xE9tails"), /*#__PURE__*/React.createElement("th", {
-    style: {
-      width: '130px'
-    }
-  }, "Priorit\xE9"), /*#__PURE__*/React.createElement("th", {
-    style: {
-      width: '140px'
-    }
-  }, "Compte / Agent"), /*#__PURE__*/React.createElement("th", {
-    style: {
-      width: '170px'
-    }
-  }, "\xC9ch\xE9ance & Alerte"), /*#__PURE__*/React.createElement("th", {
-    style: {
-      width: '150px',
-      textAlign: 'right'
-    }
-  }, "Actions"))), /*#__PURE__*/React.createElement("tbody", null, filteredTodos.length === 0 ? /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: "7",
-    style: {
-      textAlign: 'center',
-      padding: '40px 16px',
-      color: 'var(--text-muted)'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-list-check",
-    style: {
-      fontSize: '36px',
-      color: '#cbd5e1',
-      marginBottom: '10px',
-      display: 'block'
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600,
-      fontSize: '14px',
-      color: 'var(--text-main)'
-    }
-  }, "Aucune t\xE2che trouv\xE9e"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '12px',
-      marginTop: '4px'
-    }
-  }, "Modifiez vos filtres ou cr\xE9ez une nouvelle t\xE2che To-Do."))) : filteredTodos.map(todo => {
+  const renderTableHeader = (list = []) => {
+    const isAllSelected = list.length > 0 && list.every(t => selectedIds.includes(t.id));
+    const handleToggleSelectAllInList = () => {
+      if (isAllSelected) {
+        const listIds = list.map(t => t.id);
+        setSelectedIds(prev => prev.filter(id => !listIds.includes(id)));
+      } else {
+        const listIds = list.map(t => t.id);
+        setSelectedIds(prev => Array.from(new Set([...prev, ...listIds])));
+      }
+    };
+    return /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+      style: {
+        width: '40px',
+        textAlign: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: isAllSelected,
+      onChange: handleToggleSelectAllInList,
+      style: {
+        cursor: 'pointer'
+      },
+      title: "S\xE9lectionner toutes les t\xE2ches de cette section"
+    })), /*#__PURE__*/React.createElement("th", {
+      style: {
+        width: '50px',
+        textAlign: 'center'
+      }
+    }, "Statut"), /*#__PURE__*/React.createElement("th", null, "T\xE2che & D\xE9tails"), /*#__PURE__*/React.createElement("th", {
+      style: {
+        width: '130px'
+      }
+    }, "Priorit\xE9"), /*#__PURE__*/React.createElement("th", {
+      style: {
+        width: '140px'
+      }
+    }, "Compte / Agent"), /*#__PURE__*/React.createElement("th", {
+      style: {
+        width: '170px'
+      }
+    }, "\xC9ch\xE9ance & Alerte"), /*#__PURE__*/React.createElement("th", {
+      style: {
+        width: '140px',
+        textAlign: 'right'
+      }
+    }, "Actions")));
+  };
+  const renderTodoRow = todo => {
     const isDone = todo.statut === 'terminee';
     const info = TodoUtils.getStatusInfo(todo);
     const isSelected = selectedIds.includes(todo.id);
@@ -8482,7 +8082,7 @@ function TodoView({
       key: todo.id,
       className: `todo-row ${isDone ? 'done' : ''} ${info.isOverdue ? 'overdue' : ''} ${todo.priorite === 'urgente' && !isDone ? 'urgent-glow' : ''}`,
       style: {
-        backgroundColor: isSelected ? 'rgba(99, 102, 241, 0.05)' : undefined
+        backgroundColor: isSelected ? 'rgba(9, 177, 186, 0.06)' : undefined
       }
     }, /*#__PURE__*/React.createElement("td", {
       style: {
@@ -8502,13 +8102,14 @@ function TodoView({
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => handleToggleDone(todo),
-      title: isDone ? 'Marquer comme non terminée' : 'Marquer comme terminée',
+      title: isDone ? 'Rétablir comme non terminée' : 'Marquer comme terminée',
       style: {
         background: 'none',
         border: 'none',
         cursor: 'pointer',
-        fontSize: '18px',
-        color: isDone ? '#10b981' : '#94a3b8'
+        fontSize: '19px',
+        color: isDone ? '#10b981' : '#94a3b8',
+        transition: 'color 0.15s ease, transform 0.15s ease'
       }
     }, /*#__PURE__*/React.createElement("i", {
       className: `fa-regular ${isDone ? 'fa-circle-check fa-solid' : 'fa-circle'}`
@@ -8524,7 +8125,7 @@ function TodoView({
       style: {
         fontWeight: 700,
         fontSize: '14px',
-        color: isDone ? 'var(--text-muted)' : 'var(--text-main)',
+        color: isDone ? '#64748b' : 'var(--text-main)',
         textDecoration: isDone ? 'line-through' : 'none'
       }
     }, todo.titre), todo.categorie && /*#__PURE__*/React.createElement("span", {
@@ -8739,7 +8340,632 @@ function TodoView({
     }, /*#__PURE__*/React.createElement("i", {
       className: "fa-solid fa-trash"
     })))));
-  }))))), isModalOpen && /*#__PURE__*/React.createElement("div", {
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "todo-view-container"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '20px',
+      flexWrap: 'wrap',
+      gap: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    style: {
+      fontSize: '24px',
+      fontWeight: 800,
+      color: 'var(--text-main)',
+      margin: 0,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-list-check",
+    style: {
+      color: 'var(--primary-color)'
+    }
+  }), "To-Do List & Rappels Intelligents"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: '4px 0 0 0',
+      color: 'var(--text-muted)',
+      fontSize: '13px'
+    }
+  }, "Suivi en temps r\xE9el des actions, alertes sonores instantan\xE9es et synchronisation d'\xE9quipe.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      flexWrap: 'wrap'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary btn-sm",
+    onClick: () => {
+      SoundEngine.playUrgentAlert();
+      if (showToast) showToast('🔊 Test alerte sonore effectué');
+    },
+    title: "Tester le son du synth\xE9tiseur Web Audio"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-volume-high"
+  }), " Tester Alerte"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    onClick: handleOpenAdd,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-plus"
+  }), " Nouvelle T\xE2che"))), /*#__PURE__*/React.createElement("div", {
+    className: "todo-tracking-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-donut-container"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-donut-svg-wrapper"
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 120 120",
+    className: "todo-donut-svg"
+  }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+    id: "todoCircleGrad",
+    x1: "0%",
+    y1: "0%",
+    x2: "100%",
+    y2: "100%"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0%",
+    stopColor: "#09b1ba"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "100%",
+    stopColor: "#10b981"
+  }))), /*#__PURE__*/React.createElement("circle", {
+    className: "todo-donut-track",
+    cx: "60",
+    cy: "60",
+    r: "46"
+  }), /*#__PURE__*/React.createElement("circle", {
+    className: "todo-donut-progress",
+    cx: "60",
+    cy: "60",
+    r: "46",
+    stroke: "url(#todoCircleGrad)",
+    strokeDasharray: 289.03,
+    strokeDashoffset: 289.03 - 289.03 * (stats.percentDone || 0) / 100
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "todo-donut-text"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "todo-donut-percent"
+  }, stats.percentDone, "%"), /*#__PURE__*/React.createElement("span", {
+    className: "todo-donut-sub"
+  }, "Accompli"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '16px',
+      fontWeight: 800,
+      color: '#0f172a',
+      marginBottom: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-chart-pie",
+    style: {
+      color: '#09b1ba'
+    }
+  }), "Progression Globale"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '13px',
+      color: '#64748b',
+      marginBottom: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("strong", null, stats.terminees), " sur ", /*#__PURE__*/React.createElement("strong", null, stats.total), " t\xE2che", stats.total > 1 ? 's' : '', " r\xE9alis\xE9e", stats.terminees > 1 ? 's' : ''), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      fontSize: '11.5px',
+      fontWeight: 600,
+      color: stats.percentDone === 100 ? '#15803d' : stats.percentDone >= 50 ? '#0284c7' : '#ea580c',
+      backgroundColor: stats.percentDone === 100 ? '#f0fdf4' : stats.percentDone >= 50 ? '#f0f9ff' : '#fffbeb',
+      padding: '3px 10px',
+      borderRadius: '12px',
+      border: `1px solid ${stats.percentDone === 100 ? '#bbf7d0' : stats.percentDone >= 50 ? '#bae6fd' : '#fde68a'}`
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: `fa-solid ${stats.percentDone === 100 ? 'fa-circle-check' : stats.percentDone >= 50 ? 'fa-bolt' : 'fa-clock'}`
+  }), /*#__PURE__*/React.createElement("span", null, stats.percentDone === 100 ? 'Toutes tâches terminées !' : stats.percentDone >= 50 ? 'Rythme optimal' : 'Actions en attente')))), /*#__PURE__*/React.createElement("div", {
+    className: "todo-kpis-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-kpi-item urgent",
+    onClick: () => setPriorityFilter(priorityFilter === 'urgente' ? 'all' : 'urgente'),
+    style: {
+      cursor: 'pointer'
+    },
+    title: "Filtrer les t\xE2ches urgentes"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 700,
+      color: '#9f1239'
+    }
+  }, "\uD83D\uDEA8 Urgentes"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      background: stats.urgentes > 0 ? '#e11d48' : '#cbd5e1'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '24px',
+      fontWeight: 800,
+      color: '#e11d48',
+      margin: '4px 0 2px 0'
+    }
+  }, stats.urgentes), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      color: '#be123c',
+      fontWeight: 600
+    }
+  }, stats.urgentes > 0 ? 'Priorité immédiate' : 'Aucune urgence')), /*#__PURE__*/React.createElement("div", {
+    className: "todo-kpi-item late",
+    onClick: () => setSortBy('echeance_asc'),
+    style: {
+      cursor: 'pointer'
+    },
+    title: "Trier par \xE9ch\xE9ance la plus proche"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 700,
+      color: '#92400e'
+    }
+  }, "\u26A0\uFE0F En Retard"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      background: stats.enRetard > 0 ? '#d97706' : '#cbd5e1'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '24px',
+      fontWeight: 800,
+      color: '#d97706',
+      margin: '4px 0 2px 0'
+    }
+  }, stats.enRetard), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      color: '#b45309',
+      fontWeight: 600
+    }
+  }, stats.enRetard > 0 ? 'Échéances passées' : 'Toutes à jour')), /*#__PURE__*/React.createElement("div", {
+    className: "todo-kpi-item progress",
+    onClick: () => setStatusFilter(statusFilter === 'en_cours' ? 'all' : 'en_cours'),
+    style: {
+      cursor: 'pointer'
+    },
+    title: "Filtrer les t\xE2ches en cours"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 700,
+      color: '#075985'
+    }
+  }, "\u23F3 En Cours"), /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-spinner",
+    style: {
+      fontSize: '11px',
+      color: '#0284c7'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '24px',
+      fontWeight: 800,
+      color: '#0284c7',
+      margin: '4px 0 2px 0'
+    }
+  }, stats.enCours), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      color: '#0369a1',
+      fontWeight: 600
+    }
+  }, "En traitement actif")), /*#__PURE__*/React.createElement("div", {
+    className: "todo-kpi-item done",
+    onClick: () => setActiveTab('done'),
+    style: {
+      cursor: 'pointer'
+    },
+    title: "Afficher les t\xE2ches termin\xE9es"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      fontWeight: 700,
+      color: '#166534'
+    }
+  }, "\u2705 Termin\xE9es"), /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-circle-check",
+    style: {
+      fontSize: '12px',
+      color: '#16a34a'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '24px',
+      fontWeight: 800,
+      color: '#16a34a',
+      margin: '4px 0 2px 0'
+    }
+  }, stats.terminees), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      color: '#15803d',
+      fontWeight: 600
+    }
+  }, stats.percentDone, "% accomplies")))), /*#__PURE__*/React.createElement("div", {
+    className: "table-card",
+    style: {
+      padding: '16px',
+      marginBottom: '20px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+      gap: '12px',
+      marginBottom: '14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      gridColumn: 'span 2'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '11px',
+      textTransform: 'uppercase',
+      color: 'var(--text-muted)',
+      fontWeight: 700,
+      display: 'block',
+      marginBottom: '4px'
+    }
+  }, "Recherche"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'relative'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-magnifying-glass",
+    style: {
+      position: 'absolute',
+      left: '10px',
+      top: '10px',
+      color: '#94a3b8'
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-control",
+    placeholder: "Rechercher par titre, description, compte, agent...",
+    value: searchTerm,
+    onChange: e => setSearchTerm(e.target.value),
+    style: {
+      paddingLeft: '32px'
+    }
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '11px',
+      textTransform: 'uppercase',
+      color: 'var(--text-muted)',
+      fontWeight: 700,
+      display: 'block',
+      marginBottom: '4px'
+    }
+  }, "Statut"), /*#__PURE__*/React.createElement("select", {
+    className: "form-control",
+    value: statusFilter,
+    onChange: e => setStatusFilter(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Tous les statuts"), /*#__PURE__*/React.createElement("option", {
+    value: "a_faire"
+  }, "\xC0 faire"), /*#__PURE__*/React.createElement("option", {
+    value: "en_cours"
+  }, "En cours"), /*#__PURE__*/React.createElement("option", {
+    value: "terminee"
+  }, "Termin\xE9es"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '11px',
+      textTransform: 'uppercase',
+      color: 'var(--text-muted)',
+      fontWeight: 700,
+      display: 'block',
+      marginBottom: '4px'
+    }
+  }, "Priorit\xE9"), /*#__PURE__*/React.createElement("select", {
+    className: "form-control",
+    value: priorityFilter,
+    onChange: e => setPriorityFilter(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Toutes priorit\xE9s"), /*#__PURE__*/React.createElement("option", {
+    value: "urgente"
+  }, "\uD83D\uDEA8 Urgente"), /*#__PURE__*/React.createElement("option", {
+    value: "haute"
+  }, "Haute"), /*#__PURE__*/React.createElement("option", {
+    value: "moyenne"
+  }, "Moyenne"), /*#__PURE__*/React.createElement("option", {
+    value: "basse"
+  }, "Basse"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '11px',
+      textTransform: 'uppercase',
+      color: 'var(--text-muted)',
+      fontWeight: 700,
+      display: 'block',
+      marginBottom: '4px'
+    }
+  }, "Cat\xE9gorie"), /*#__PURE__*/React.createElement("select", {
+    className: "form-control",
+    value: categoryFilter,
+    onChange: e => setCategoryFilter(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Toutes cat\xE9gories"), predefinedCategories.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c,
+    value: c
+  }, c)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '11px',
+      textTransform: 'uppercase',
+      color: 'var(--text-muted)',
+      fontWeight: 700,
+      display: 'block',
+      marginBottom: '4px'
+    }
+  }, "Compte Vinted"), /*#__PURE__*/React.createElement("select", {
+    className: "form-control",
+    value: compteFilter,
+    onChange: e => setCompteFilter(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Tous les comptes"), comptes.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.id
+  }, "@", c.nomCompte || c.nom || c.pseudo)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '11px',
+      textTransform: 'uppercase',
+      color: 'var(--text-muted)',
+      fontWeight: 700,
+      display: 'block',
+      marginBottom: '4px'
+    }
+  }, "Trier par"), /*#__PURE__*/React.createElement("select", {
+    className: "form-control",
+    value: sortBy,
+    onChange: e => setSortBy(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "echeance_asc"
+  }, "\xC9ch\xE9ance (Plus proche)"), /*#__PURE__*/React.createElement("option", {
+    value: "echeance_desc"
+  }, "\xC9ch\xE9ance (Plus lointaine)"), /*#__PURE__*/React.createElement("option", {
+    value: "priorite_desc"
+  }, "Priorit\xE9 (Haute en premier)"), /*#__PURE__*/React.createElement("option", {
+    value: "date_desc"
+  }, "Date de cr\xE9ation (R\xE9cent)"), /*#__PURE__*/React.createElement("option", {
+    value: "titre_asc"
+  }, "Titre (A-Z)")))), selectedIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '10px 14px',
+      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1))',
+      border: '1px solid rgba(99, 102, 241, 0.3)',
+      borderRadius: '8px',
+      marginTop: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: '13px',
+      color: 'var(--primary-color)'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-check-double",
+    style: {
+      marginRight: '6px'
+    }
+  }), selectedIds.length, " t\xE2che(s) s\xE9lectionn\xE9e(s)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-success btn-sm",
+    onClick: handleBulkMarkDone
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-check"
+  }), " Marquer Termin\xE9es"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-danger btn-sm",
+    onClick: handleBulkDelete
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-trash"
+  }), " Supprimer")))), /*#__PURE__*/React.createElement("div", {
+    className: "todo-tab-pills"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `todo-tab-pill ${activeTab === 'all' ? 'active' : ''}`,
+    onClick: () => setActiveTab('all')
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-table-cells-large"
+  }), /*#__PURE__*/React.createElement("span", null, "Vue S\xE9par\xE9e (Toutes)"), /*#__PURE__*/React.createElement("span", {
+    className: "todo-tab-badge"
+  }, filteredTodos.length)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `todo-tab-pill ${activeTab === 'pending' ? 'active' : ''}`,
+    onClick: () => setActiveTab('pending')
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-clock"
+  }), /*#__PURE__*/React.createElement("span", null, "\xC0 R\xE9aliser & En Cours"), /*#__PURE__*/React.createElement("span", {
+    className: "todo-tab-badge"
+  }, pendingTodos.length)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `todo-tab-pill ${activeTab === 'done' ? 'active' : ''}`,
+    onClick: () => setActiveTab('done')
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-circle-check"
+  }), /*#__PURE__*/React.createElement("span", null, "Termin\xE9es & R\xE9alis\xE9es"), /*#__PURE__*/React.createElement("span", {
+    className: "todo-tab-badge"
+  }, doneTodos.length))), (activeTab === 'all' || activeTab === 'pending') && /*#__PURE__*/React.createElement("div", {
+    className: "todo-section-container"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-section-title-wrap"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "todo-section-title"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-list-check",
+    style: {
+      color: '#09b1ba'
+    }
+  }), "T\xE2ches \xE0 R\xE9aliser & En Cours"), /*#__PURE__*/React.createElement("span", {
+    className: `todo-section-count ${pendingTodos.some(t => t.priorite === 'urgente') ? 'urgent' : ''}`
+  }, pendingTodos.length, " t\xE2che", pendingTodos.length > 1 ? 's' : '', " active", pendingTodos.length > 1 ? 's' : '')), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '12px',
+      color: '#64748b'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-regular fa-circle-check",
+    style: {
+      marginRight: '5px',
+      color: '#10b981'
+    }
+  }), "Cochez le cercle pour marquer une t\xE2che comme termin\xE9e")), /*#__PURE__*/React.createElement("div", {
+    className: "table-responsive"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "data-table"
+  }, renderTableHeader(pendingTodos), /*#__PURE__*/React.createElement("tbody", null, pendingTodos.length === 0 ? /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: "7",
+    style: {
+      textAlign: 'center',
+      padding: '36px 16px',
+      color: 'var(--text-muted)'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-circle-check",
+    style: {
+      fontSize: '36px',
+      color: '#10b981',
+      marginBottom: '8px',
+      display: 'block'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: '15px',
+      color: '#0f172a'
+    }
+  }, "Toutes les t\xE2ches sont termin\xE9es !"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      marginTop: '4px',
+      color: '#64748b'
+    }
+  }, "Bravo ! Aucune action en attente pour les crit\xE8res s\xE9lectionn\xE9s."))) : pendingTodos.map(renderTodoRow))))), (activeTab === 'all' || activeTab === 'done') && /*#__PURE__*/React.createElement("div", {
+    className: "todo-section-container"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-section-title-wrap"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "todo-section-title"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-circle-check",
+    style: {
+      color: '#10b981'
+    }
+  }), "T\xE2ches Termin\xE9es & R\xE9alis\xE9es"), /*#__PURE__*/React.createElement("span", {
+    className: "todo-section-count done"
+  }, doneTodos.length, " termin\xE9e", doneTodos.length > 1 ? 's' : '')), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary btn-xs",
+    onClick: () => setIsDoneSectionCollapsed(!isDoneSectionCollapsed),
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      fontSize: '11.5px',
+      padding: '4px 10px'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: `fa-solid ${isDoneSectionCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}`
+  }), /*#__PURE__*/React.createElement("span", null, isDoneSectionCollapsed ? 'Afficher les terminées' : 'Masquer cette section'))), !isDoneSectionCollapsed && /*#__PURE__*/React.createElement("div", {
+    className: "table-responsive"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "data-table"
+  }, renderTableHeader(doneTodos), /*#__PURE__*/React.createElement("tbody", null, doneTodos.length === 0 ? /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: "7",
+    style: {
+      textAlign: 'center',
+      padding: '36px 16px',
+      color: 'var(--text-muted)'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-clipboard-check",
+    style: {
+      fontSize: '34px',
+      color: '#cbd5e1',
+      marginBottom: '8px',
+      display: 'block'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: '14px',
+      color: '#475569'
+    }
+  }, "Aucune t\xE2che termin\xE9e pour le moment"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      marginTop: '4px',
+      color: '#94a3b8'
+    }
+  }, "Les t\xE2ches termin\xE9es appara\xEEtront ici avec la date et le nom de l'agent."))) : doneTodos.map(renderTodoRow))))), isModalOpen && /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     style: {
       display: 'flex'

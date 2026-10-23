@@ -5201,6 +5201,8 @@ function TodoView({
     const [agentFilter, setAgentFilter] = useState('all');
     const [compteFilter, setCompteFilter] = useState('all');
     const [sortBy, setSortBy] = useState('echeance_asc'); // echeance_asc, echeance_desc, priorite_desc, date_desc, titre_asc
+    const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'done'
+    const [isDoneSectionCollapsed, setIsDoneSectionCollapsed] = useState(false);
 
     // Selection
     const [selectedIds, setSelectedIds] = useState([]);
@@ -5298,6 +5300,15 @@ function TodoView({
             return 0;
         });
     }, [todos, statusFilter, priorityFilter, categoryFilter, agentFilter, compteFilter, searchTerm, sortBy]);
+
+    // Séparation des tâches en attente et terminées
+    const pendingTodos = useMemo(() => {
+        return filteredTodos.filter(t => t.statut !== 'terminee');
+    }, [filteredTodos]);
+
+    const doneTodos = useMemo(() => {
+        return filteredTodos.filter(t => t.statut === 'terminee');
+    }, [filteredTodos]);
 
     // Open Add Modal
     const handleOpenAdd = () => {
@@ -5490,6 +5501,279 @@ function TodoView({
         if (showToast) showToast(`${selectedIds.length} tâche(s) supprimée(s)`);
     };
 
+    const renderTableHeader = (list = []) => {
+        const isAllSelected = list.length > 0 && list.every(t => selectedIds.includes(t.id));
+        const handleToggleSelectAllInList = () => {
+            if (isAllSelected) {
+                const listIds = list.map(t => t.id);
+                setSelectedIds(prev => prev.filter(id => !listIds.includes(id)));
+            } else {
+                const listIds = list.map(t => t.id);
+                setSelectedIds(prev => Array.from(new Set([...prev, ...listIds])));
+            }
+        };
+
+        return (
+            <thead>
+                <tr>
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                        <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            onChange={handleToggleSelectAllInList}
+                            style={{ cursor: 'pointer' }}
+                            title="Sélectionner toutes les tâches de cette section"
+                        />
+                    </th>
+                    <th style={{ width: '50px', textAlign: 'center' }}>Statut</th>
+                    <th>Tâche & Détails</th>
+                    <th style={{ width: '130px' }}>Priorité</th>
+                    <th style={{ width: '140px' }}>Compte / Agent</th>
+                    <th style={{ width: '170px' }}>Échéance & Alerte</th>
+                    <th style={{ width: '140px', textAlign: 'right' }}>Actions</th>
+                </tr>
+            </thead>
+        );
+    };
+
+    const renderTodoRow = (todo) => {
+        const isDone = todo.statut === 'terminee';
+        const info = TodoUtils.getStatusInfo(todo);
+        const isSelected = selectedIds.includes(todo.id);
+        const subtasks = Array.isArray(todo.sousTaches) ? todo.sousTaches : [];
+        const subtasksDone = subtasks.filter(s => s.fait).length;
+        const subtasksPercent = subtasks.length > 0 ? Math.round((subtasksDone / subtasks.length) * 100) : 0;
+
+        return (
+            <tr
+                key={todo.id}
+                className={`todo-row ${isDone ? 'done' : ''} ${info.isOverdue ? 'overdue' : ''} ${todo.priorite === 'urgente' && !isDone ? 'urgent-glow' : ''}`}
+                style={{ backgroundColor: isSelected ? 'rgba(9, 177, 186, 0.06)' : undefined }}
+            >
+                {/* Selection Checkbox */}
+                <td style={{ textAlign: 'center' }}>
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleSelectOne(todo.id)}
+                        style={{ cursor: 'pointer' }}
+                    />
+                </td>
+
+                {/* Done Checkbox */}
+                <td style={{ textAlign: 'center' }}>
+                    <button
+                        type="button"
+                        onClick={() => handleToggleDone(todo)}
+                        title={isDone ? 'Rétablir comme non terminée' : 'Marquer comme terminée'}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '19px',
+                            color: isDone ? '#10b981' : '#94a3b8',
+                            transition: 'color 0.15s ease, transform 0.15s ease'
+                        }}
+                    >
+                        <i className={`fa-regular ${isDone ? 'fa-circle-check fa-solid' : 'fa-circle'}`}></i>
+                    </button>
+                </td>
+
+                {/* Task Details & Subtasks */}
+                <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                        <span style={{
+                            fontWeight: 700,
+                            fontSize: '14px',
+                            color: isDone ? '#64748b' : 'var(--text-main)',
+                            textDecoration: isDone ? 'line-through' : 'none'
+                        }}>
+                            {todo.titre}
+                        </span>
+                        {todo.categorie && (
+                            <span className="badge badge-secondary" style={{ fontSize: '11px', padding: '1px 6px' }}>
+                                {todo.categorie}
+                            </span>
+                        )}
+                        {(todo.creePar || todo.dateCreation) && (
+                            <span style={{
+                                fontSize: '11px',
+                                backgroundColor: '#eef2ff',
+                                color: '#4338ca',
+                                padding: '2px 9px',
+                                borderRadius: '12px',
+                                fontWeight: 600,
+                                border: '1px solid #c7d2fe',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }} title={`Tâche ajoutée par ${todo.creePar || 'Florencio'}${todo.dateCreation ? ` le ${TodoUtils.formatDateTime(todo.dateCreation)}` : ''}`}>
+                                <i className="fa-solid fa-user-pen" style={{ fontSize: '10px' }}></i>
+                                <span>Ajouté par : <strong>{todo.creePar || 'Florencio'}</strong></span>
+                                {todo.dateCreation && (
+                                    <span style={{ color: '#6366f1', fontWeight: 500, marginLeft: '2px' }}>
+                                        le {TodoUtils.formatDateTime(todo.dateCreation)}
+                                    </span>
+                                )}
+                            </span>
+                        )}
+                        {isDone && (
+                            <span style={{
+                                fontSize: '11px',
+                                backgroundColor: '#ecfdf5',
+                                color: '#065f46',
+                                padding: '2px 9px',
+                                borderRadius: '12px',
+                                fontWeight: 600,
+                                border: '1px solid #a7f3d0',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }} title={`Tâche terminée${todo.terminePar ? ` par ${todo.terminePar}` : ''}${todo.dateTerminee ? ` le ${TodoUtils.formatDateTime(todo.dateTerminee)}` : ''}`}>
+                                <i className="fa-solid fa-check" style={{ fontSize: '10px' }}></i>
+                                <span>Réalisée{todo.terminePar ? ` par ${todo.terminePar}` : ''}</span>
+                                {todo.dateTerminee && (
+                                    <span style={{ color: '#047857', fontWeight: 500, marginLeft: '2px' }}>
+                                        le {TodoUtils.formatDateTime(todo.dateTerminee)}
+                                    </span>
+                                )}
+                            </span>
+                        )}
+                    </div>
+
+                    {todo.description && (
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', whiteSpace: 'pre-line' }}>
+                            {todo.description}
+                        </div>
+                    )}
+
+                    {/* Checklist Subtasks */}
+                    {subtasks.length > 0 && (
+                        <div style={{ marginTop: '8px', padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', maxWidth: '500px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
+                                <span>
+                                    <i className="fa-solid fa-list-check" style={{ marginRight: '5px' }}></i>
+                                    Sous-tâches : {subtasksDone}/{subtasks.length} ({subtasksPercent}%)
+                                </span>
+                            </div>
+                            <div className="subtask-progress-bar" style={{ marginBottom: '8px' }}>
+                                <div className="subtask-progress-fill" style={{ width: `${subtasksPercent}%` }} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {subtasks.map((st, sIdx) => (
+                                    <label
+                                        key={st.id || sIdx}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            fontSize: '11.5px',
+                                            color: st.fait ? '#94a3b8' : '#334155',
+                                            textDecoration: st.fait ? 'line-through' : 'none',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(st.fait)}
+                                            onChange={() => handleToggleSubtask(todo, sIdx)}
+                                            style={{ cursor: 'pointer' }}
+                                        />
+                                        <span>{st.texte}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </td>
+
+                {/* Priority */}
+                <td>
+                    <span className={`badge-priority badge-priority-${todo.priorite || 'moyenne'}`}>
+                        {todo.priorite === 'urgente' && (
+                            <span className="urgent-ping" style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '5px' }} />
+                        )}
+                        {todo.priorite === 'urgente' ? '🚨 URGENTE' : (todo.priorite || 'Moyenne').toUpperCase()}
+                    </span>
+                </td>
+
+                {/* Compte & Agent */}
+                <td>
+                    {todo.compteNom ? (
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '2px' }}>
+                            <i className="fa-solid fa-store" style={{ marginRight: '4px', fontSize: '11px' }}></i>
+                            @{todo.compteNom}
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>-</div>
+                    )}
+                    {todo.agentAssigne && (
+                        <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                            <i className="fa-solid fa-user" style={{ marginRight: '4px', fontSize: '10px' }}></i>
+                            {todo.agentAssigne}
+                        </div>
+                    )}
+                </td>
+
+                {/* Échéance & Countdown */}
+                <td>
+                    <div style={{
+                        fontSize: '12px',
+                        fontWeight: info.isOverdue ? 700 : (info.isImminent ? 600 : 500),
+                        color: info.isOverdue ? '#dc2626' : (info.isImminent ? '#ea580c' : '#334155'),
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                    }}>
+                        <i className={`fa-solid ${info.isOverdue ? 'fa-triangle-exclamation' : 'fa-calendar-day'}`}></i>
+                        <span>{info.label}</span>
+                    </div>
+                    {todo.heureEcheance && (
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                            Heure : {todo.heureEcheance}
+                        </div>
+                    )}
+                </td>
+
+                {/* Actions */}
+                <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'inline-flex', gap: '4px' }}>
+                        {!isDone && (
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-xs"
+                                onClick={() => handleQuickSnooze(todo, 1)}
+                                title="Reporter de 1 heure"
+                            >
+                                +1h
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-xs"
+                            onClick={() => handleOpenEdit(todo)}
+                            title="Modifier la tâche"
+                        >
+                            <i className="fa-solid fa-pen"></i>
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-danger btn-xs"
+                            onClick={() => {
+                                if (confirm(`Supprimer la tâche "${todo.titre}" ?`)) {
+                                    onDeleteTodo(todo.id);
+                                }
+                            }}
+                            title="Supprimer la tâche"
+                        >
+                            <i className="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        );
+    };
+
     return (
         <div className="todo-view-container">
             {/* View Header */}
@@ -5527,74 +5811,137 @@ function TodoView({
                 </div>
             </div>
 
-            {/* Stats Overview Banner */}
-            <div className="dashboard-grid" style={{ marginBottom: '24px', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                <div className="stat-card" style={{ borderLeft: '4px solid var(--primary-color)' }}>
-                    <div className="stat-card-header">
-                        <span className="stat-card-title">Total Tâches</span>
-                        <div className="stat-card-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary-color)' }}>
-                            <i className="fa-solid fa-clipboard-list"></i>
+            {/* Suivi Visuel & Graphe Circulaire */}
+            <div className="todo-tracking-card">
+                {/* Donut Chart Gauge */}
+                <div className="todo-donut-container">
+                    <div className="todo-donut-svg-wrapper">
+                        <svg viewBox="0 0 120 120" className="todo-donut-svg">
+                            <defs>
+                                <linearGradient id="todoCircleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#09b1ba" />
+                                    <stop offset="100%" stopColor="#10b981" />
+                                </linearGradient>
+                            </defs>
+                            <circle className="todo-donut-track" cx="60" cy="60" r="46" />
+                            <circle
+                                className="todo-donut-progress"
+                                cx="60"
+                                cy="60"
+                                r="46"
+                                stroke="url(#todoCircleGrad)"
+                                strokeDasharray={289.03}
+                                strokeDashoffset={289.03 - (289.03 * (stats.percentDone || 0)) / 100}
+                            />
+                        </svg>
+                        <div className="todo-donut-text">
+                            <span className="todo-donut-percent">{stats.percentDone}%</span>
+                            <span className="todo-donut-sub">Accompli</span>
                         </div>
                     </div>
-                    <div className="stat-card-value">{stats.total}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Taux d'achèvement : <strong>{stats.percentDone}%</strong>
+
+                    <div>
+                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <i className="fa-solid fa-chart-pie" style={{ color: '#09b1ba' }}></i>
+                            Progression Globale
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>
+                            <strong>{stats.terminees}</strong> sur <strong>{stats.total}</strong> tâche{stats.total > 1 ? 's' : ''} réalisée{stats.terminees > 1 ? 's' : ''}
+                        </div>
+                        <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            color: stats.percentDone === 100 ? '#15803d' : (stats.percentDone >= 50 ? '#0284c7' : '#ea580c'),
+                            backgroundColor: stats.percentDone === 100 ? '#f0fdf4' : (stats.percentDone >= 50 ? '#f0f9ff' : '#fffbeb'),
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            border: `1px solid ${stats.percentDone === 100 ? '#bbf7d0' : (stats.percentDone >= 50 ? '#bae6fd' : '#fde68a')}`
+                        }}>
+                            <i className={`fa-solid ${stats.percentDone === 100 ? 'fa-circle-check' : (stats.percentDone >= 50 ? 'fa-bolt' : 'fa-clock')}`}></i>
+                            <span>{stats.percentDone === 100 ? 'Toutes tâches terminées !' : (stats.percentDone >= 50 ? 'Rythme optimal' : 'Actions en attente')}</span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
-                    <div className="stat-card-header">
-                        <span className="stat-card-title">🚨 Urgentes & Critiques</span>
-                        <div className="stat-card-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
-                            <i className="fa-solid fa-fire-flame-curved"></i>
+                {/* KPI Metrics Grid */}
+                <div className="todo-kpis-grid">
+                    {/* Urgentes */}
+                    <div
+                        className="todo-kpi-item urgent"
+                        onClick={() => setPriorityFilter(priorityFilter === 'urgente' ? 'all' : 'urgente')}
+                        style={{ cursor: 'pointer' }}
+                        title="Filtrer les tâches urgentes"
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#9f1239' }}>🚨 Urgentes</span>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stats.urgentes > 0 ? '#e11d48' : '#cbd5e1' }} />
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 800, color: '#e11d48', margin: '4px 0 2px 0' }}>
+                            {stats.urgentes}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#be123c', fontWeight: 600 }}>
+                            {stats.urgentes > 0 ? 'Priorité immédiate' : 'Aucune urgence'}
                         </div>
                     </div>
-                    <div className="stat-card-value" style={{ color: stats.urgentes > 0 ? '#ef4444' : 'inherit' }}>
-                        {stats.urgentes}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', fontWeight: 600 }}>
-                        {stats.urgentes > 0 ? 'Priorité immédiate requise' : 'Aucune urgence en attente'}
-                    </div>
-                </div>
 
-                <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
-                    <div className="stat-card-header">
-                        <span className="stat-card-title">⚠️ En Retard</span>
-                        <div className="stat-card-icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
-                            <i className="fa-solid fa-triangle-exclamation"></i>
+                    {/* En Retard */}
+                    <div
+                        className="todo-kpi-item late"
+                        onClick={() => setSortBy('echeance_asc')}
+                        style={{ cursor: 'pointer' }}
+                        title="Trier par échéance la plus proche"
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#92400e' }}>⚠️ En Retard</span>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: stats.enRetard > 0 ? '#d97706' : '#cbd5e1' }} />
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 800, color: '#d97706', margin: '4px 0 2px 0' }}>
+                            {stats.enRetard}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#b45309', fontWeight: 600 }}>
+                            {stats.enRetard > 0 ? 'Échéances passées' : 'Toutes à jour'}
                         </div>
                     </div>
-                    <div className="stat-card-value" style={{ color: stats.enRetard > 0 ? '#f59e0b' : 'inherit' }}>
-                        {stats.enRetard}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Échéances dépassées
-                    </div>
-                </div>
 
-                <div className="stat-card" style={{ borderLeft: '4px solid #0284c7' }}>
-                    <div className="stat-card-header">
-                        <span className="stat-card-title">⏳ En Cours</span>
-                        <div className="stat-card-icon" style={{ background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7' }}>
-                            <i className="fa-solid fa-spinner"></i>
+                    {/* En Cours */}
+                    <div
+                        className="todo-kpi-item progress"
+                        onClick={() => setStatusFilter(statusFilter === 'en_cours' ? 'all' : 'en_cours')}
+                        style={{ cursor: 'pointer' }}
+                        title="Filtrer les tâches en cours"
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#075985' }}>⏳ En Cours</span>
+                            <i className="fa-solid fa-spinner" style={{ fontSize: '11px', color: '#0284c7' }}></i>
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 800, color: '#0284c7', margin: '4px 0 2px 0' }}>
+                            {stats.enCours}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600 }}>
+                            En traitement actif
                         </div>
                     </div>
-                    <div className="stat-card-value">{stats.enCours}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Tâches en traitement actif
-                    </div>
-                </div>
 
-                <div className="stat-card" style={{ borderLeft: '4px solid #10b981' }}>
-                    <div className="stat-card-header">
-                        <span className="stat-card-title">✅ Terminées</span>
-                        <div className="stat-card-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
-                            <i className="fa-solid fa-circle-check"></i>
+                    {/* Terminées */}
+                    <div
+                        className="todo-kpi-item done"
+                        onClick={() => setActiveTab('done')}
+                        style={{ cursor: 'pointer' }}
+                        title="Afficher les tâches terminées"
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#166534' }}>✅ Terminées</span>
+                            <i className="fa-solid fa-circle-check" style={{ fontSize: '12px', color: '#16a34a' }}></i>
                         </div>
-                    </div>
-                    <div className="stat-card-value" style={{ color: '#10b981' }}>{stats.terminees}</div>
-                    <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px', fontWeight: 600 }}>
-                        {stats.percentDone}% accompli
+                        <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a', margin: '4px 0 2px 0' }}>
+                            {stats.terminees}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>
+                            {stats.percentDone}% accomplies
+                        </div>
                     </div>
                 </div>
             </div>
@@ -5716,279 +6063,123 @@ function TodoView({
                 )}
             </div>
 
-            {/* Todo List Table */}
-            <div className="table-card">
-                <div className="table-responsive">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: '40px', textAlign: 'center' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={filteredTodos.length > 0 && selectedIds.length === filteredTodos.length}
-                                        onChange={handleSelectAll}
-                                        style={{ cursor: 'pointer' }}
-                                    />
-                                </th>
-                                <th style={{ width: '50px', textAlign: 'center' }}>Statut</th>
-                                <th>Tâche & Détails</th>
-                                <th style={{ width: '130px' }}>Priorité</th>
-                                <th style={{ width: '140px' }}>Compte / Agent</th>
-                                <th style={{ width: '170px' }}>Échéance & Alerte</th>
-                                <th style={{ width: '150px', textAlign: 'right' }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredTodos.length === 0 ? (
-                                <tr>
-                                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
-                                        <i className="fa-solid fa-list-check" style={{ fontSize: '36px', color: '#cbd5e1', marginBottom: '10px', display: 'block' }}></i>
-                                        <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-main)' }}>Aucune tâche trouvée</div>
-                                        <div style={{ fontSize: '12px', marginTop: '4px' }}>Modifiez vos filtres ou créez une nouvelle tâche To-Do.</div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredTodos.map(todo => {
-                                    const isDone = todo.statut === 'terminee';
-                                    const info = TodoUtils.getStatusInfo(todo);
-                                    const isSelected = selectedIds.includes(todo.id);
-                                    const subtasks = Array.isArray(todo.sousTaches) ? todo.sousTaches : [];
-                                    const subtasksDone = subtasks.filter(s => s.fait).length;
-                                    const subtasksPercent = subtasks.length > 0 ? Math.round((subtasksDone / subtasks.length) * 100) : 0;
+            {/* Navigation Tabs : Vue Complète, À Réaliser, Terminées */}
+            <div className="todo-tab-pills">
+                <button
+                    type="button"
+                    className={`todo-tab-pill ${activeTab === 'all' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('all')}
+                >
+                    <i className="fa-solid fa-table-cells-large"></i>
+                    <span>Vue Séparée (Toutes)</span>
+                    <span className="todo-tab-badge">{filteredTodos.length}</span>
+                </button>
+                <button
+                    type="button"
+                    className={`todo-tab-pill ${activeTab === 'pending' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('pending')}
+                >
+                    <i className="fa-solid fa-clock"></i>
+                    <span>À Réaliser & En Cours</span>
+                    <span className="todo-tab-badge">{pendingTodos.length}</span>
+                </button>
+                <button
+                    type="button"
+                    className={`todo-tab-pill ${activeTab === 'done' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('done')}
+                >
+                    <i className="fa-solid fa-circle-check"></i>
+                    <span>Terminées & Réalisées</span>
+                    <span className="todo-tab-badge">{doneTodos.length}</span>
+                </button>
+            </div>
 
-                                    return (
-                                        <tr
-                                            key={todo.id}
-                                            className={`todo-row ${isDone ? 'done' : ''} ${info.isOverdue ? 'overdue' : ''} ${todo.priorite === 'urgente' && !isDone ? 'urgent-glow' : ''}`}
-                                            style={{ backgroundColor: isSelected ? 'rgba(99, 102, 241, 0.05)' : undefined }}
-                                        >
-                                            {/* Selection Checkbox */}
-                                            <td style={{ textAlign: 'center' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => handleSelectOne(todo.id)}
-                                                    style={{ cursor: 'pointer' }}
-                                                />
-                                            </td>
+            {/* SECTION 1 : TÂCHES À RÉALISER & EN COURS */}
+            {(activeTab === 'all' || activeTab === 'pending') && (
+                <div className="todo-section-container">
+                    <div className="todo-section-header">
+                        <div className="todo-section-title-wrap">
+                            <h3 className="todo-section-title">
+                                <i className="fa-solid fa-list-check" style={{ color: '#09b1ba' }}></i>
+                                Tâches à Réaliser & En Cours
+                            </h3>
+                            <span className={`todo-section-count ${pendingTodos.some(t => t.priorite === 'urgente') ? 'urgent' : ''}`}>
+                                {pendingTodos.length} tâche{pendingTodos.length > 1 ? 's' : ''} active{pendingTodos.length > 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                            <i className="fa-regular fa-circle-check" style={{ marginRight: '5px', color: '#10b981' }}></i>
+                            Cochez le cercle pour marquer une tâche comme terminée
+                        </span>
+                    </div>
 
-                                            {/* Done Checkbox */}
-                                            <td style={{ textAlign: 'center' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleToggleDone(todo)}
-                                                    title={isDone ? 'Marquer comme non terminée' : 'Marquer comme terminée'}
-                                                    style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        cursor: 'pointer',
-                                                        fontSize: '18px',
-                                                        color: isDone ? '#10b981' : '#94a3b8'
-                                                    }}
-                                                >
-                                                    <i className={`fa-regular ${isDone ? 'fa-circle-check fa-solid' : 'fa-circle'}`}></i>
-                                                </button>
-                                            </td>
+                    <div className="table-responsive">
+                        <table className="data-table">
+                            {renderTableHeader(pendingTodos)}
+                            <tbody>
+                                {pendingTodos.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
+                                            <i className="fa-solid fa-circle-check" style={{ fontSize: '36px', color: '#10b981', marginBottom: '8px', display: 'block' }}></i>
+                                            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Toutes les tâches sont terminées !</div>
+                                            <div style={{ fontSize: '12px', marginTop: '4px', color: '#64748b' }}>Bravo ! Aucune action en attente pour les critères sélectionnés.</div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    pendingTodos.map(renderTodoRow)
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
-                                            {/* Task Details & Subtasks */}
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                                                    <span style={{
-                                                        fontWeight: 700,
-                                                        fontSize: '14px',
-                                                        color: isDone ? 'var(--text-muted)' : 'var(--text-main)',
-                                                        textDecoration: isDone ? 'line-through' : 'none'
-                                                    }}>
-                                                        {todo.titre}
-                                                    </span>
-                                                    {todo.categorie && (
-                                                        <span className="badge badge-secondary" style={{ fontSize: '11px', padding: '1px 6px' }}>
-                                                            {todo.categorie}
-                                                        </span>
-                                                    )}
-                                                    {(todo.creePar || todo.dateCreation) && (
-                                                        <span style={{
-                                                            fontSize: '11px',
-                                                            backgroundColor: '#eef2ff',
-                                                            color: '#4338ca',
-                                                            padding: '2px 9px',
-                                                            borderRadius: '12px',
-                                                            fontWeight: 600,
-                                                            border: '1px solid #c7d2fe',
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px'
-                                                        }} title={`Tâche ajoutée par ${todo.creePar || 'Florencio'}${todo.dateCreation ? ` le ${TodoUtils.formatDateTime(todo.dateCreation)}` : ''}`}>
-                                                            <i className="fa-solid fa-user-pen" style={{ fontSize: '10px' }}></i>
-                                                            <span>Ajouté par : <strong>{todo.creePar || 'Florencio'}</strong></span>
-                                                            {todo.dateCreation && (
-                                                                <span style={{ color: '#6366f1', fontWeight: 500, marginLeft: '2px' }}>
-                                                                    le {TodoUtils.formatDateTime(todo.dateCreation)}
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                    )}
-                                                    {isDone && (
-                                                        <span style={{
-                                                            fontSize: '11px',
-                                                            backgroundColor: '#ecfdf5',
-                                                            color: '#065f46',
-                                                            padding: '2px 9px',
-                                                            borderRadius: '12px',
-                                                            fontWeight: 600,
-                                                            border: '1px solid #a7f3d0',
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px'
-                                                        }} title={`Tâche terminée${todo.terminePar ? ` par ${todo.terminePar}` : ''}${todo.dateTerminee ? ` le ${TodoUtils.formatDateTime(todo.dateTerminee)}` : ''}`}>
-                                                            <i className="fa-solid fa-check" style={{ fontSize: '10px' }}></i>
-                                                            <span>Réalisée{todo.terminePar ? ` par ${todo.terminePar}` : ''}</span>
-                                                            {todo.dateTerminee && (
-                                                                <span style={{ color: '#047857', fontWeight: 500, marginLeft: '2px' }}>
-                                                                    le {TodoUtils.formatDateTime(todo.dateTerminee)}
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                    )}
-                                                </div>
+            {/* SECTION 2 : TÂCHES TERMINÉES & RÉALISÉES */}
+            {(activeTab === 'all' || activeTab === 'done') && (
+                <div className="todo-section-container">
+                    <div className="todo-section-header">
+                        <div className="todo-section-title-wrap">
+                            <h3 className="todo-section-title">
+                                <i className="fa-solid fa-circle-check" style={{ color: '#10b981' }}></i>
+                                Tâches Terminées & Réalisées
+                            </h3>
+                            <span className="todo-section-count done">
+                                {doneTodos.length} terminée{doneTodos.length > 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-xs"
+                            onClick={() => setIsDoneSectionCollapsed(!isDoneSectionCollapsed)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', padding: '4px 10px' }}
+                        >
+                            <i className={`fa-solid ${isDoneSectionCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}`}></i>
+                            <span>{isDoneSectionCollapsed ? 'Afficher les terminées' : 'Masquer cette section'}</span>
+                        </button>
+                    </div>
 
-                                                {todo.description && (
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', whiteSpace: 'pre-line' }}>
-                                                        {todo.description}
-                                                    </div>
-                                                )}
-
-                                                {/* Checklist Subtasks */}
-                                                {subtasks.length > 0 && (
-                                                    <div style={{ marginTop: '8px', padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', maxWidth: '500px' }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
-                                                            <span>
-                                                                <i className="fa-solid fa-list-check" style={{ marginRight: '5px' }}></i>
-                                                                Sous-tâches : {subtasksDone}/{subtasks.length} ({subtasksPercent}%)
-                                                            </span>
-                                                        </div>
-                                                        <div className="subtask-progress-bar" style={{ marginBottom: '8px' }}>
-                                                            <div className="subtask-progress-fill" style={{ width: `${subtasksPercent}%` }} />
-                                                        </div>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                            {subtasks.map((st, sIdx) => (
-                                                                <label
-                                                                    key={st.id || sIdx}
-                                                                    style={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '8px',
-                                                                        fontSize: '11.5px',
-                                                                        color: st.fait ? '#94a3b8' : '#334155',
-                                                                        textDecoration: st.fait ? 'line-through' : 'none',
-                                                                        cursor: 'pointer'
-                                                                    }}
-                                                                >
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={Boolean(st.fait)}
-                                                                        onChange={() => handleToggleSubtask(todo, sIdx)}
-                                                                        style={{ cursor: 'pointer' }}
-                                                                    />
-                                                                    <span>{st.texte}</span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            {/* Priority */}
-                                            <td>
-                                                <span className={`badge-priority badge-priority-${todo.priorite || 'moyenne'}`}>
-                                                    {todo.priorite === 'urgente' && (
-                                                        <span className="urgent-ping" style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '5px' }} />
-                                                    )}
-                                                    {todo.priorite === 'urgente' ? '🚨 URGENTE' : (todo.priorite || 'Moyenne').toUpperCase()}
-                                                </span>
-                                            </td>
-
-                                            {/* Compte & Agent */}
-                                            <td>
-                                                {todo.compteNom ? (
-                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '2px' }}>
-                                                        <i className="fa-solid fa-store" style={{ marginRight: '4px', fontSize: '11px' }}></i>
-                                                        @{todo.compteNom}
-                                                    </div>
-                                                ) : (
-                                                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>-</div>
-                                                )}
-                                                {todo.agentAssigne && (
-                                                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                                                        <i className="fa-solid fa-user" style={{ marginRight: '4px', fontSize: '10px' }}></i>
-                                                        {todo.agentAssigne}
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            {/* Échéance & Countdown */}
-                                            <td>
-                                                <div style={{
-                                                    fontSize: '12px',
-                                                    fontWeight: info.isOverdue ? 700 : (info.isImminent ? 600 : 500),
-                                                    color: info.isOverdue ? '#dc2626' : (info.isImminent ? '#ea580c' : '#334155'),
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px'
-                                                }}>
-                                                    <i className={`fa-solid ${info.isOverdue ? 'fa-triangle-exclamation' : 'fa-calendar-day'}`}></i>
-                                                    <span>{info.label}</span>
-                                                </div>
-                                                {todo.heureEcheance && (
-                                                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
-                                                        Heure : {todo.heureEcheance}
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            {/* Actions */}
-                                            <td style={{ textAlign: 'right' }}>
-                                                <div style={{ display: 'inline-flex', gap: '4px' }}>
-                                                    {!isDone && (
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-secondary btn-xs"
-                                                            onClick={() => handleQuickSnooze(todo, 1)}
-                                                            title="Reporter de 1 heure"
-                                                        >
-                                                            +1h
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-secondary btn-xs"
-                                                        onClick={() => handleOpenEdit(todo)}
-                                                        title="Modifier la tâche"
-                                                    >
-                                                        <i className="fa-solid fa-pen"></i>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-danger btn-xs"
-                                                        onClick={() => {
-                                                            if (confirm(`Supprimer la tâche "${todo.titre}" ?`)) {
-                                                                onDeleteTodo(todo.id);
-                                                            }
-                                                        }}
-                                                        title="Supprimer la tâche"
-                                                    >
-                                                        <i className="fa-solid fa-trash"></i>
-                                                    </button>
-                                                </div>
+                    {!isDoneSectionCollapsed && (
+                        <div className="table-responsive">
+                            <table className="data-table">
+                                {renderTableHeader(doneTodos)}
+                                <tbody>
+                                    {doneTodos.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="7" style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
+                                                <i className="fa-solid fa-clipboard-check" style={{ fontSize: '34px', color: '#cbd5e1', marginBottom: '8px', display: 'block' }}></i>
+                                                <div style={{ fontWeight: 600, fontSize: '14px', color: '#475569' }}>Aucune tâche terminée pour le moment</div>
+                                                <div style={{ fontSize: '12px', marginTop: '4px', color: '#94a3b8' }}>Les tâches terminées apparaîtront ici avec la date et le nom de l'agent.</div>
                                             </td>
                                         </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
+                                    ) : (
+                                        doneTodos.map(renderTodoRow)
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
-            </div>
+            )}
 
             {/* MODAL AJOUT / ÉDITION */}
             {isModalOpen && (
