@@ -7220,6 +7220,21 @@ var TodoUtils = {
       diffMinutes,
       diffHours
     };
+  },
+  formatDateTime: function (dateValue) {
+    if (!dateValue) return '';
+    try {
+      const d = new Date(dateValue);
+      if (isNaN(d.getTime())) return '';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${day}/${month}/${year} à ${hours}:${minutes}`;
+    } catch (e) {
+      return '';
+    }
   }
 };
 
@@ -7870,6 +7885,9 @@ function TodoView({
       compteNom,
       agentAssigne,
       creePar: creePar.trim() || (currentUser ? currentUser.nom : 'Florencio'),
+      dateCreation: editingTodo ? editingTodo.dateCreation || new Date().toISOString() : new Date().toISOString(),
+      dateTerminee: editingTodo ? editingTodo.dateTerminee : statut === 'terminee' ? new Date().toISOString() : null,
+      terminePar: editingTodo ? editingTodo.terminePar : statut === 'terminee' ? currentUser ? currentUser.nom : 'Florencio' : null,
       dateEcheance,
       heureEcheance,
       rappelMinutes: Number(rappelMinutes),
@@ -8515,12 +8533,12 @@ function TodoView({
         fontSize: '11px',
         padding: '1px 6px'
       }
-    }, todo.categorie), todo.creePar && /*#__PURE__*/React.createElement("span", {
+    }, todo.categorie), (todo.creePar || todo.dateCreation) && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: '11px',
         backgroundColor: '#eef2ff',
         color: '#4338ca',
-        padding: '2px 8px',
+        padding: '2px 9px',
         borderRadius: '12px',
         fontWeight: 600,
         border: '1px solid #c7d2fe',
@@ -8528,31 +8546,44 @@ function TodoView({
         alignItems: 'center',
         gap: '4px'
       },
-      title: `Tâche ajoutée par ${todo.creePar}`
+      title: `Tâche ajoutée par ${todo.creePar || 'Florencio'}${todo.dateCreation ? ` le ${TodoUtils.formatDateTime(todo.dateCreation)}` : ''}`
     }, /*#__PURE__*/React.createElement("i", {
       className: "fa-solid fa-user-pen",
       style: {
         fontSize: '10px'
       }
-    }), "Ajout\xE9 par : ", todo.creePar), isDone && /*#__PURE__*/React.createElement("span", {
+    }), /*#__PURE__*/React.createElement("span", null, "Ajout\xE9 par : ", /*#__PURE__*/React.createElement("strong", null, todo.creePar || 'Florencio')), todo.dateCreation && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#6366f1',
+        fontWeight: 500,
+        marginLeft: '2px'
+      }
+    }, "le ", TodoUtils.formatDateTime(todo.dateCreation))), isDone && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: '11px',
         backgroundColor: '#ecfdf5',
         color: '#065f46',
-        padding: '2px 8px',
+        padding: '2px 9px',
         borderRadius: '12px',
         fontWeight: 600,
         border: '1px solid #a7f3d0',
         display: 'inline-flex',
         alignItems: 'center',
         gap: '4px'
-      }
+      },
+      title: `Tâche terminée${todo.terminePar ? ` par ${todo.terminePar}` : ''}${todo.dateTerminee ? ` le ${TodoUtils.formatDateTime(todo.dateTerminee)}` : ''}`
     }, /*#__PURE__*/React.createElement("i", {
       className: "fa-solid fa-check",
       style: {
         fontSize: '10px'
       }
-    }), "R\xE9alis\xE9e", todo.terminePar ? ` par ${todo.terminePar}` : '')), todo.description && /*#__PURE__*/React.createElement("div", {
+    }), /*#__PURE__*/React.createElement("span", null, "R\xE9alis\xE9e", todo.terminePar ? ` par ${todo.terminePar}` : ''), todo.dateTerminee && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#047857',
+        fontWeight: 500,
+        marginLeft: '2px'
+      }
+    }, "le ", TodoUtils.formatDateTime(todo.dateTerminee)))), todo.description && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: '12px',
         color: 'var(--text-muted)',
@@ -8894,7 +8925,14 @@ function TodoView({
     value: creePar,
     onChange: e => setCreePar(e.target.value),
     placeholder: "Nom de l'auteur..."
-  }))), /*#__PURE__*/React.createElement("div", {
+  }), editingTodo && editingTodo.dateCreation && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '10.5px',
+      color: '#6366f1',
+      marginTop: '3px',
+      display: 'block'
+    }
+  }, "\uD83D\uDCC5 Ajout\xE9 le ", TodoUtils.formatDateTime(editingTodo.dateCreation)))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1.2fr 1fr 1.2fr',

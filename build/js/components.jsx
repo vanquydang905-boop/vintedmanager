@@ -4796,6 +4796,21 @@ var TodoUtils = {
         }
 
         return { isDone: false, isOverdue: false, isImminent, label: text, diffMinutes, diffHours };
+    },
+    formatDateTime: function(dateValue) {
+        if (!dateValue) return '';
+        try {
+            const d = new Date(dateValue);
+            if (isNaN(d.getTime())) return '';
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${day}/${month}/${year} à ${hours}:${minutes}`;
+        } catch(e) {
+            return '';
+        }
     }
 };
 
@@ -5347,6 +5362,9 @@ function TodoView({
             compteNom,
             agentAssigne,
             creePar: creePar.trim() || (currentUser ? currentUser.nom : 'Florencio'),
+            dateCreation: editingTodo ? (editingTodo.dateCreation || new Date().toISOString()) : new Date().toISOString(),
+            dateTerminee: editingTodo ? editingTodo.dateTerminee : (statut === 'terminee' ? new Date().toISOString() : null),
+            terminePar: editingTodo ? editingTodo.terminePar : (statut === 'terminee' ? (currentUser ? currentUser.nom : 'Florencio') : null),
             dateEcheance,
             heureEcheance,
             rappelMinutes: Number(rappelMinutes),
@@ -5788,21 +5806,26 @@ function TodoView({
                                                             {todo.categorie}
                                                         </span>
                                                     )}
-                                                    {todo.creePar && (
+                                                    {(todo.creePar || todo.dateCreation) && (
                                                         <span style={{
                                                             fontSize: '11px',
                                                             backgroundColor: '#eef2ff',
                                                             color: '#4338ca',
-                                                            padding: '2px 8px',
+                                                            padding: '2px 9px',
                                                             borderRadius: '12px',
                                                             fontWeight: 600,
                                                             border: '1px solid #c7d2fe',
                                                             display: 'inline-flex',
                                                             alignItems: 'center',
                                                             gap: '4px'
-                                                        }} title={`Tâche ajoutée par ${todo.creePar}`}>
+                                                        }} title={`Tâche ajoutée par ${todo.creePar || 'Florencio'}${todo.dateCreation ? ` le ${TodoUtils.formatDateTime(todo.dateCreation)}` : ''}`}>
                                                             <i className="fa-solid fa-user-pen" style={{ fontSize: '10px' }}></i>
-                                                            Ajouté par : {todo.creePar}
+                                                            <span>Ajouté par : <strong>{todo.creePar || 'Florencio'}</strong></span>
+                                                            {todo.dateCreation && (
+                                                                <span style={{ color: '#6366f1', fontWeight: 500, marginLeft: '2px' }}>
+                                                                    le {TodoUtils.formatDateTime(todo.dateCreation)}
+                                                                </span>
+                                                            )}
                                                         </span>
                                                     )}
                                                     {isDone && (
@@ -5810,16 +5833,21 @@ function TodoView({
                                                             fontSize: '11px',
                                                             backgroundColor: '#ecfdf5',
                                                             color: '#065f46',
-                                                            padding: '2px 8px',
+                                                            padding: '2px 9px',
                                                             borderRadius: '12px',
                                                             fontWeight: 600,
                                                             border: '1px solid #a7f3d0',
                                                             display: 'inline-flex',
                                                             alignItems: 'center',
                                                             gap: '4px'
-                                                        }}>
+                                                        }} title={`Tâche terminée${todo.terminePar ? ` par ${todo.terminePar}` : ''}${todo.dateTerminee ? ` le ${TodoUtils.formatDateTime(todo.dateTerminee)}` : ''}`}>
                                                             <i className="fa-solid fa-check" style={{ fontSize: '10px' }}></i>
-                                                            Réalisée{todo.terminePar ? ` par ${todo.terminePar}` : ''}
+                                                            <span>Réalisée{todo.terminePar ? ` par ${todo.terminePar}` : ''}</span>
+                                                            {todo.dateTerminee && (
+                                                                <span style={{ color: '#047857', fontWeight: 500, marginLeft: '2px' }}>
+                                                                    le {TodoUtils.formatDateTime(todo.dateTerminee)}
+                                                                </span>
+                                                            )}
                                                         </span>
                                                     )}
                                                 </div>
@@ -6072,6 +6100,11 @@ function TodoView({
                                             onChange={(e) => setCreePar(e.target.value)}
                                             placeholder="Nom de l'auteur..."
                                         />
+                                        {editingTodo && editingTodo.dateCreation && (
+                                            <span style={{ fontSize: '10.5px', color: '#6366f1', marginTop: '3px', display: 'block' }}>
+                                                📅 Ajouté le {TodoUtils.formatDateTime(editingTodo.dateCreation)}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
