@@ -148,6 +148,12 @@ const API = {
         });
     },
 
+    async deleteIncident(id) {
+        return this.fetchJSON(`/api/incidents/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+        });
+    },
+
     // Paramètres
     async getParametres(organisationId = 'org_default') {
         const query = `?organisationId=${encodeURIComponent(organisationId)}`;

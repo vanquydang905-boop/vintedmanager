@@ -3972,16 +3972,16 @@ function ClassementView({
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const referenceDate = useMemo(() => {
-    let maxMs = Date.now();
+    let maxMs = 0;
     (calendrier || []).forEach(l => {
       if (l.date) {
-        const d = new Date(l.date.replace(' ', 'T'));
+        const d = new Date(String(l.date).replace(' ', 'T'));
         if (!isNaN(d.getTime()) && d.getTime() > maxMs) {
           maxMs = d.getTime();
         }
       }
     });
-    return new Date(maxMs);
+    return maxMs > 0 ? new Date(maxMs) : new Date();
   }, [calendrier]);
   const filteredCalendrierForRanking = useMemo(() => {
     if (rankingDateFilter === 'all') return calendrier;
@@ -4161,34 +4161,64 @@ function ClassementView({
   // State du Filtre par Classification d'Agent (Même logique de présentation que les SKUs)
   const [agentFilterClassif, setAgentFilterClassif] = useState('all');
 
+  // Nombre de comptes assignés à chaque agent
+  const agentComptesCount = useMemo(() => {
+    const counts = {};
+    (comptesAll || []).forEach(c => {
+      if (c.agent && c.agent !== 'À attribuer' && c.agent !== 'Non assigné') {
+        const k = c.agent.trim().toLowerCase();
+        counts[k] = (counts[k] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [comptesAll]);
+
   // Classement et performance des agents filtré par la période sélectionnée avec Classification
   const agentRanking = useMemo(() => {
     const statsMap = {};
+    const poids = appState.parametres && appState.parametres.poidsScore || {
+      vues: 0.1,
+      likes: 1,
+      favoris: 2,
+      messages: 5,
+      vente: 20
+    };
     (appState.utilisateurs || []).forEach(u => {
       const name = (u.nom || u.agentAssigne || '').trim();
       if (name && !statsMap[name.toLowerCase()]) {
-        statsMap[name.toLowerCase()] = {
+        const key = name.toLowerCase();
+        statsMap[key] = {
           name,
           role: u.role || 'agent',
+          comptesCount: agentComptesCount[key] || 0,
           pubsFaites: 0,
           pubsTotales: 0,
           ventes: 0,
+          vues: 0,
+          likes: 0,
           scoreTotal: 0
         };
       }
     });
     filteredCalendrierForRanking.forEach(l => {
       if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
-      const agentName = (l.agent || '').trim();
-      if (!agentName) return;
+      let agentName = (l.agent || '').trim();
+      // Lier les créneaux sans agent direct à l'agent assigné au compte
+      if ((!agentName || agentName === 'À attribuer') && l.compteId && comptesMap[l.compteId] && comptesMap[l.compteId].agent && comptesMap[l.compteId].agent !== 'À attribuer') {
+        agentName = comptesMap[l.compteId].agent.trim();
+      }
+      if (!agentName || agentName.toLowerCase().includes('attribuer') || agentName.toLowerCase().includes('bot dotb') || agentName.toLowerCase().includes('non assign')) return;
       const key = agentName.toLowerCase();
       if (!statsMap[key]) {
         statsMap[key] = {
           name: agentName,
           role: 'agent',
+          comptesCount: agentComptesCount[key] || 0,
           pubsFaites: 0,
           pubsTotales: 0,
           ventes: 0,
+          vues: 0,
+          likes: 0,
           scoreTotal: 0
         };
       }
@@ -4197,18 +4227,25 @@ function ClassementView({
         statsMap[key].pubsFaites += 1;
       }
       statsMap[key].ventes += l.vente || 0;
-      statsMap[key].scoreTotal += l.score || 0;
+      statsMap[key].vues += l.vues || 0;
+      statsMap[key].likes += l.likes || 0;
+      const lineScore = typeof l.score === 'number' && l.score > 0 ? l.score : (l.vues || 0) * (poids.vues || 0.1) + (l.likes || 0) * (poids.likes || 1) + (l.favoris || 0) * (poids.favoris || 2) + (l.messages || 0) * (poids.messages || 5) + (l.vente || 0) * (poids.vente || 20);
+      statsMap[key].scoreTotal += lineScore;
     });
-    return Object.values(statsMap).filter(a => a.name !== 'Bot DotB' && a.name !== 'À attribuer').map(a => {
+    return Object.values(statsMap).filter(a => {
+      const n = (a.name || '').toLowerCase();
+      return !n.includes('attribuer') && !n.includes('bot dotb') && !n.includes('non assign') && n.trim().length > 0;
+    }).map(a => {
       const taux = a.pubsTotales > 0 ? Math.round(a.pubsFaites / a.pubsTotales * 100) : 0;
+      const scoreMoyen = a.pubsTotales > 0 ? (a.scoreTotal / a.pubsTotales).toFixed(1) : 0;
 
-      // Logique de classification des Agents (même niveau de présentation que les SKUs)
+      // Logique de classification cohérente basée sur l'activité réelle et les ventes
       let classification = '🌟 Nouvel Agent';
       if (a.scoreTotal >= 1000 || a.ventes >= 10 || taux >= 80 && a.pubsTotales >= 20) {
         classification = '🏆 Agent Top';
-      } else if (a.scoreTotal >= 200 || a.ventes >= 2 || taux >= 50 && a.pubsFaites >= 5) {
+      } else if (a.scoreTotal >= 150 || a.ventes >= 2 || taux >= 50 && a.pubsFaites >= 5) {
         classification = '⚡ En Progression';
-      } else if (a.pubsTotales > 0) {
+      } else if (a.pubsTotales > 0 || a.comptesCount > 0) {
         classification = '🌟 Nouvel Agent';
       } else {
         classification = '🛑 Inactif';
@@ -4216,14 +4253,15 @@ function ClassementView({
       return {
         ...a,
         taux,
+        scoreMoyen,
         classification
       };
     }).sort((a, b) => {
       if (b.scoreTotal !== a.scoreTotal) return b.scoreTotal - a.scoreTotal;
-      if (b.pubsFaites !== a.pubsFaites) return b.pubsFaites - a.pubsFaites;
-      return b.ventes - a.ventes;
+      if (b.ventes !== a.ventes) return b.ventes - a.ventes;
+      return b.pubsFaites - a.pubsFaites;
     });
-  }, [filteredCalendrierForRanking, appState.utilisateurs]);
+  }, [filteredCalendrierForRanking, appState.utilisateurs, appState.parametres, agentComptesCount, comptesMap]);
 
   // Agent Ranking filtré par la classification sélectionnée
   const filteredAgentRanking = useMemo(() => {
@@ -4665,36 +4703,91 @@ function ClassementView({
     className: "table-container"
   }, /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: {
-      width: '60px'
+      width: '65px',
+      textAlign: 'center'
     }
-  }, "Rang"), /*#__PURE__*/React.createElement("th", null, "Agent"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Publications"), /*#__PURE__*/React.createElement("th", null, "Taux R\xE9ussite"), /*#__PURE__*/React.createElement("th", null, "Ventes Total"), /*#__PURE__*/React.createElement("th", null, "Score Cumul\xE9"))), /*#__PURE__*/React.createElement("tbody", null, filteredAgentRanking.length > 0 ? filteredAgentRanking.map((a, idx) => /*#__PURE__*/React.createElement("tr", {
-    key: a.name
-  }, /*#__PURE__*/React.createElement("td", null, idx === 0 ? /*#__PURE__*/React.createElement("span", {
+  }, "Rang"), /*#__PURE__*/React.createElement("th", null, "Agent & R\xF4le"), /*#__PURE__*/React.createElement("th", null, "Comptes"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Publications"), /*#__PURE__*/React.createElement("th", null, "Taux R\xE9ussite"), /*#__PURE__*/React.createElement("th", null, "Engagement"), /*#__PURE__*/React.createElement("th", null, "Ventes"), /*#__PURE__*/React.createElement("th", {
     style: {
-      fontSize: '18px'
+      textAlign: 'right'
+    }
+  }, "Score Total"))), /*#__PURE__*/React.createElement("tbody", null, filteredAgentRanking.length > 0 ? filteredAgentRanking.map((a, idx) => /*#__PURE__*/React.createElement("tr", {
+    key: a.name
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      textAlign: 'center'
+    }
+  }, idx === 0 ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '20px'
     },
     title: "1er Place"
   }, "\uD83E\uDD47") : idx === 1 ? /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: '18px'
+      fontSize: '20px'
     },
     title: "2\xE8me Place"
   }, "\uD83E\uDD48") : idx === 2 ? /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: '18px'
+      fontSize: '20px'
     },
     title: "3\xE8me Place"
-  }, "\uD83E\uDD49") : /*#__PURE__*/React.createElement("b", null, "#", idx + 1)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", {
+  }, "\uD83E\uDD49") : /*#__PURE__*/React.createElement("b", {
     style: {
-      color: 'var(--text-primary)'
+      color: 'var(--text-muted)'
+    }
+  }, "#", idx + 1)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      backgroundColor: '#e0e7ff',
+      color: '#4338ca',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontWeight: 700,
+      fontSize: '13px'
+    }
+  }, a.name.slice(0, 2).toUpperCase()), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: 'var(--text-primary)',
+      display: 'block',
+      lineHeight: '1.2'
     }
   }, a.name), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: '11px',
       color: 'var(--text-muted)',
-      marginLeft: '6px'
+      textTransform: 'capitalize'
     }
-  }, "(", a.role, ")")), /*#__PURE__*/React.createElement("td", null, a.classification === '🏆 Agent Top' ? /*#__PURE__*/React.createElement("span", {
+  }, a.role)))), /*#__PURE__*/React.createElement("td", null, a.comptesCount > 0 ? /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-retester",
+    style: {
+      padding: '3px 8px',
+      fontSize: '11.5px',
+      backgroundColor: '#f1f5f9',
+      color: '#334155',
+      border: '1px solid #cbd5e1'
+    },
+    title: `${a.comptesCount} compte(s) assigné(s)`
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-users-viewfinder",
+    style: {
+      marginRight: '4px',
+      color: '#64748b'
+    }
+  }), a.comptesCount, " compte", a.comptesCount > 1 ? 's' : '') : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11px',
+      color: 'var(--text-muted)'
+    }
+  }, "\u2014")), /*#__PURE__*/React.createElement("td", null, a.classification === '🏆 Agent Top' ? /*#__PURE__*/React.createElement("span", {
     className: "badge badge-gagnant"
   }, "\uD83C\uDFC6 Agent Top") : a.classification === '⚡ En Progression' ? /*#__PURE__*/React.createElement("span", {
     className: "badge badge-retester",
@@ -4710,7 +4803,8 @@ function ClassementView({
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: '8px',
+      minWidth: '100px'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4718,8 +4812,7 @@ function ClassementView({
       backgroundColor: '#e2e8f0',
       borderRadius: '4px',
       height: '8px',
-      overflow: 'hidden',
-      minWidth: '60px'
+      overflow: 'hidden'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4732,14 +4825,57 @@ function ClassementView({
       fontSize: '12px',
       fontWeight: 600
     }
-  }, a.taux, "%"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, a.ventes), " vente", a.ventes > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
-    className: "badge badge-gagnant"
-  }, a.scoreTotal.toFixed(1), " pts")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: "7",
+  }, a.taux, "%"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      color: 'var(--text-secondary)',
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    title: "Vues"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-regular fa-eye",
+    style: {
+      color: '#64748b',
+      marginRight: '3px'
+    }
+  }), a.vues.toLocaleString('fr-FR')), /*#__PURE__*/React.createElement("span", {
+    title: "Likes"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-regular fa-heart",
+    style: {
+      color: '#e11d48',
+      marginRight: '3px'
+    }
+  }), a.likes.toLocaleString('fr-FR')))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      color: a.ventes > 0 ? '#059669' : 'inherit'
+    }
+  }, a.ventes, " vente", a.ventes > 1 ? 's' : '')), /*#__PURE__*/React.createElement("td", {
+    style: {
+      textAlign: 'right'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-gagnant",
+    style: {
+      fontSize: '13px',
+      fontWeight: 700
+    }
+  }, Math.round(a.scoreTotal).toLocaleString('fr-FR'), " pts"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '10.5px',
+      color: 'var(--text-muted)',
+      marginTop: '2px'
+    }
+  }, a.scoreMoyen, " pts/pub")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    colSpan: "9",
     style: {
       textAlign: 'center',
       color: 'var(--text-muted)',
-      padding: '16px'
+      padding: '20px'
     }
   }, "Aucun agent correspondant \xE0 ce filtre de classification.")))))), /*#__PURE__*/React.createElement("div", {
     className: "card",

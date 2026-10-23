@@ -2650,16 +2650,16 @@ function ClassementView({ appState, onUpdateRow }) {
     const [customEndDate, setCustomEndDate] = useState('');
 
     const referenceDate = useMemo(() => {
-        let maxMs = Date.now();
+        let maxMs = 0;
         (calendrier || []).forEach(l => {
             if (l.date) {
-                const d = new Date(l.date.replace(' ', 'T'));
+                const d = new Date(String(l.date).replace(' ', 'T'));
                 if (!isNaN(d.getTime()) && d.getTime() > maxMs) {
                     maxMs = d.getTime();
                 }
             }
         });
-        return new Date(maxMs);
+        return maxMs > 0 ? new Date(maxMs) : new Date();
     }, [calendrier]);
 
     const filteredCalendrierForRanking = useMemo(() => {
@@ -2874,18 +2874,36 @@ function ClassementView({ appState, onUpdateRow }) {
     // State du Filtre par Classification d'Agent (Même logique de présentation que les SKUs)
     const [agentFilterClassif, setAgentFilterClassif] = useState('all');
 
+    // Nombre de comptes assignés à chaque agent
+    const agentComptesCount = useMemo(() => {
+        const counts = {};
+        (comptesAll || []).forEach(c => {
+            if (c.agent && c.agent !== 'À attribuer' && c.agent !== 'Non assigné') {
+                const k = c.agent.trim().toLowerCase();
+                counts[k] = (counts[k] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [comptesAll]);
+
     // Classement et performance des agents filtré par la période sélectionnée avec Classification
     const agentRanking = useMemo(() => {
         const statsMap = {};
+        const poids = (appState.parametres && appState.parametres.poidsScore) || { vues: 0.1, likes: 1, favoris: 2, messages: 5, vente: 20 };
+
         (appState.utilisateurs || []).forEach(u => {
             const name = (u.nom || u.agentAssigne || '').trim();
             if (name && !statsMap[name.toLowerCase()]) {
-                statsMap[name.toLowerCase()] = {
+                const key = name.toLowerCase();
+                statsMap[key] = {
                     name,
                     role: u.role || 'agent',
+                    comptesCount: agentComptesCount[key] || 0,
                     pubsFaites: 0,
                     pubsTotales: 0,
                     ventes: 0,
+                    vues: 0,
+                    likes: 0,
                     scoreTotal: 0
                 };
             }
@@ -2893,16 +2911,23 @@ function ClassementView({ appState, onUpdateRow }) {
 
         filteredCalendrierForRanking.forEach(l => {
             if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return;
-            const agentName = (l.agent || '').trim();
-            if (!agentName) return;
+            let agentName = (l.agent || '').trim();
+            // Lier les créneaux sans agent direct à l'agent assigné au compte
+            if ((!agentName || agentName === 'À attribuer') && l.compteId && comptesMap[l.compteId] && comptesMap[l.compteId].agent && comptesMap[l.compteId].agent !== 'À attribuer') {
+                agentName = comptesMap[l.compteId].agent.trim();
+            }
+            if (!agentName || agentName.toLowerCase().includes('attribuer') || agentName.toLowerCase().includes('bot dotb') || agentName.toLowerCase().includes('non assign')) return;
             const key = agentName.toLowerCase();
             if (!statsMap[key]) {
                 statsMap[key] = {
                     name: agentName,
                     role: 'agent',
+                    comptesCount: agentComptesCount[key] || 0,
                     pubsFaites: 0,
                     pubsTotales: 0,
                     ventes: 0,
+                    vues: 0,
+                    likes: 0,
                     scoreTotal: 0
                 };
             }
@@ -2911,19 +2936,29 @@ function ClassementView({ appState, onUpdateRow }) {
                 statsMap[key].pubsFaites += 1;
             }
             statsMap[key].ventes += (l.vente || 0);
-            statsMap[key].scoreTotal += (l.score || 0);
+            statsMap[key].vues += (l.vues || 0);
+            statsMap[key].likes += (l.likes || 0);
+
+            const lineScore = (typeof l.score === 'number' && l.score > 0)
+                ? l.score
+                : ((l.vues || 0) * (poids.vues || 0.1) + (l.likes || 0) * (poids.likes || 1) + (l.favoris || 0) * (poids.favoris || 2) + (l.messages || 0) * (poids.messages || 5) + (l.vente || 0) * (poids.vente || 20));
+            statsMap[key].scoreTotal += lineScore;
         });
 
-        return Object.values(statsMap).filter(a => a.name !== 'Bot DotB' && a.name !== 'À attribuer').map(a => {
+        return Object.values(statsMap).filter(a => {
+            const n = (a.name || '').toLowerCase();
+            return !n.includes('attribuer') && !n.includes('bot dotb') && !n.includes('non assign') && n.trim().length > 0;
+        }).map(a => {
             const taux = a.pubsTotales > 0 ? Math.round((a.pubsFaites / a.pubsTotales) * 100) : 0;
+            const scoreMoyen = a.pubsTotales > 0 ? (a.scoreTotal / a.pubsTotales).toFixed(1) : 0;
             
-            // Logique de classification des Agents (même niveau de présentation que les SKUs)
+            // Logique de classification cohérente basée sur l'activité réelle et les ventes
             let classification = '🌟 Nouvel Agent';
             if (a.scoreTotal >= 1000 || a.ventes >= 10 || (taux >= 80 && a.pubsTotales >= 20)) {
                 classification = '🏆 Agent Top';
-            } else if (a.scoreTotal >= 200 || a.ventes >= 2 || (taux >= 50 && a.pubsFaites >= 5)) {
+            } else if (a.scoreTotal >= 150 || a.ventes >= 2 || (taux >= 50 && a.pubsFaites >= 5)) {
                 classification = '⚡ En Progression';
-            } else if (a.pubsTotales > 0) {
+            } else if (a.pubsTotales > 0 || a.comptesCount > 0) {
                 classification = '🌟 Nouvel Agent';
             } else {
                 classification = '🛑 Inactif';
@@ -2932,14 +2967,15 @@ function ClassementView({ appState, onUpdateRow }) {
             return {
                 ...a,
                 taux,
+                scoreMoyen,
                 classification
             };
         }).sort((a, b) => {
             if (b.scoreTotal !== a.scoreTotal) return b.scoreTotal - a.scoreTotal;
-            if (b.pubsFaites !== a.pubsFaites) return b.pubsFaites - a.pubsFaites;
-            return b.ventes - a.ventes;
+            if (b.ventes !== a.ventes) return b.ventes - a.ventes;
+            return b.pubsFaites - a.pubsFaites;
         });
-    }, [filteredCalendrierForRanking, appState.utilisateurs]);
+    }, [filteredCalendrierForRanking, appState.utilisateurs, appState.parametres, agentComptesCount, comptesMap]);
 
     // Agent Ranking filtré par la classification sélectionnée
     const filteredAgentRanking = useMemo(() => {
@@ -3196,28 +3232,47 @@ function ClassementView({ appState, onUpdateRow }) {
                     <table>
                         <thead>
                             <tr>
-                                <th style={{ width: '60px' }}>Rang</th>
-                                <th>Agent</th>
+                                <th style={{ width: '65px', textAlign: 'center' }}>Rang</th>
+                                <th>Agent & Rôle</th>
+                                <th>Comptes</th>
                                 <th>Classification</th>
                                 <th>Publications</th>
                                 <th>Taux Réussite</th>
-                                <th>Ventes Total</th>
-                                <th>Score Cumulé</th>
+                                <th>Engagement</th>
+                                <th>Ventes</th>
+                                <th style={{ textAlign: 'right' }}>Score Total</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredAgentRanking.length > 0 ? (
                                 filteredAgentRanking.map((a, idx) => (
                                     <tr key={a.name}>
-                                        <td>
-                                            {idx === 0 ? <span style={{ fontSize: '18px' }} title="1er Place">🥇</span> :
-                                             idx === 1 ? <span style={{ fontSize: '18px' }} title="2ème Place">🥈</span> :
-                                             idx === 2 ? <span style={{ fontSize: '18px' }} title="3ème Place">🥉</span> :
-                                             <b>#{idx + 1}</b>}
+                                        <td style={{ textAlign: 'center' }}>
+                                            {idx === 0 ? <span style={{ fontSize: '20px' }} title="1er Place">🥇</span> :
+                                             idx === 1 ? <span style={{ fontSize: '20px' }} title="2ème Place">🥈</span> :
+                                             idx === 2 ? <span style={{ fontSize: '20px' }} title="3ème Place">🥉</span> :
+                                             <b style={{ color: 'var(--text-muted)' }}>#{idx + 1}</b>}
                                         </td>
                                         <td>
-                                            <b style={{ color: 'var(--text-primary)' }}>{a.name}</b>
-                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>({a.role})</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px' }}>
+                                                    {a.name.slice(0, 2).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <b style={{ color: 'var(--text-primary)', display: 'block', lineHeight: '1.2' }}>{a.name}</b>
+                                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{a.role}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {a.comptesCount > 0 ? (
+                                                <span className="badge badge-retester" style={{ padding: '3px 8px', fontSize: '11.5px', backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' }} title={`${a.comptesCount} compte(s) assigné(s)`}>
+                                                    <i className="fa-solid fa-users-viewfinder" style={{ marginRight: '4px', color: '#64748b' }}></i>
+                                                    {a.comptesCount} compte{a.comptesCount > 1 ? 's' : ''}
+                                                </span>
+                                            ) : (
+                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                                            )}
                                         </td>
                                         <td>
                                             {a.classification === '🏆 Agent Top' ? (
@@ -3234,20 +3289,37 @@ function ClassementView({ appState, onUpdateRow }) {
                                             <b>{a.pubsFaites}</b> / {a.pubsTotales} pub{a.pubsTotales > 1 ? 's' : ''}
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ flex: 1, backgroundColor: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden', minWidth: '60px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '100px' }}>
+                                                <div style={{ flex: 1, backgroundColor: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
                                                     <div style={{ width: `${a.taux}%`, backgroundColor: a.taux >= 80 ? '#10b981' : a.taux >= 50 ? '#f59e0b' : '#ef4444', height: '100%' }}></div>
                                                 </div>
                                                 <span style={{ fontSize: '12px', fontWeight: 600 }}>{a.taux}%</span>
                                             </div>
                                         </td>
-                                        <td><b>{a.ventes}</b> vente{a.ventes > 1 ? 's' : ''}</td>
-                                        <td><span className="badge badge-gagnant">{a.scoreTotal.toFixed(1)} pts</span></td>
+                                        <td>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <span title="Vues"><i className="fa-regular fa-eye" style={{ color: '#64748b', marginRight: '3px' }}></i>{a.vues.toLocaleString('fr-FR')}</span>
+                                                <span title="Likes"><i className="fa-regular fa-heart" style={{ color: '#e11d48', marginRight: '3px' }}></i>{a.likes.toLocaleString('fr-FR')}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span style={{ fontWeight: 700, color: a.ventes > 0 ? '#059669' : 'inherit' }}>
+                                                {a.ventes} vente{a.ventes > 1 ? 's' : ''}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: 'right' }}>
+                                            <span className="badge badge-gagnant" style={{ fontSize: '13px', fontWeight: 700 }}>
+                                                {Math.round(a.scoreTotal).toLocaleString('fr-FR')} pts
+                                            </span>
+                                            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                                {a.scoreMoyen} pts/pub
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
+                                    <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
                                         Aucun agent correspondant à ce filtre de classification.
                                     </td>
                                 </tr>

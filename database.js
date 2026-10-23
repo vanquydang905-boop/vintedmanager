@@ -879,26 +879,138 @@ const dbService = {
         return true;
     },
 
-    // ------------------- CALENDRIER (DÉSACTIVÉ) -------------------
-    async getCalendrier() {
-        return [];
+    // ------------------- PUBLICATIONS & CALENDRIER (MÉTRIQUES AGENTS & SKUS) -------------------
+    async getCalendrier(organisationId = null) {
+        const now = Date.now();
+        if (!global._CACHED_CALENDRIER || (now - (global._CACHE_CALENDRIER_TIME || 0)) > 180000) {
+            try {
+                if (supabaseUrl && supabaseKey) {
+                    const { count, error: countErr } = await supabase.from('calendrier').select('*', { count: 'exact', head: true });
+                    if (!countErr && typeof count === 'number' && count > 0) {
+                        const batchPromises = [];
+                        for (let from = 0; from < count; from += 1000) {
+                            batchPromises.push(supabase.from('calendrier').select('*').range(from, from + 999));
+                        }
+                        const results = await Promise.all(batchPromises);
+                        let allRows = [];
+                        for (const r of results) {
+                            if (r.data && Array.isArray(r.data)) {
+                                allRows = allRows.concat(r.data.map(fromDbFormat));
+                            }
+                        }
+                        global._CACHED_CALENDRIER = allRows;
+                        global._CACHE_CALENDRIER_TIME = now;
+                    }
+                }
+            } catch (err) {
+                console.error("[getCalendrier Supabase Cache Error]", err.message);
+            }
+            if (!global._CACHED_CALENDRIER) {
+                global._CACHED_CALENDRIER = [...DEFAULT_CALENDRIER];
+            }
+        }
+
+        let list = global._CACHED_CALENDRIER || [];
+        if (organisationId) {
+            return list.filter(l => !l.organisationId || l.organisationId.toLowerCase() === organisationId.toLowerCase());
+        }
+        return list;
     },
-    async getCalendrierRowById() {
-        return null;
+
+    async getCalendrierRowById(id) {
+        const all = await this.getCalendrier();
+        return all.find(l => l.id === id) || null;
     },
-    async createCalendrierRow() {
-        return null;
+
+    async createCalendrierRow(row) {
+        const payload = {
+            id: row.id || ("ligne_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4)),
+            organisationId: row.organisationId || 'org_default',
+            ...row,
+            heuresVentesReposts: Array.isArray(row.heuresVentesReposts) ? row.heuresVentesReposts : []
+        };
+        if (!global._CACHED_CALENDRIER) global._CACHED_CALENDRIER = [];
+        const idx = global._CACHED_CALENDRIER.findIndex(l => l.id === payload.id);
+        if (idx >= 0) global._CACHED_CALENDRIER[idx] = payload;
+        else global._CACHED_CALENDRIER.unshift(payload);
+
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const dbPayload = toDbFormat(payload);
+                await supabase.from('calendrier').upsert([dbPayload]);
+            } catch (err) {}
+        }
+        return payload;
     },
-    async updateCalendrierRow() {
-        return null;
+
+    async updateCalendrierRow(id, fields) {
+        if (!global._CACHED_CALENDRIER) await this.getCalendrier();
+        const idx = (global._CACHED_CALENDRIER || []).findIndex(l => l.id === id);
+        if (idx >= 0) {
+            const oldRow = { ...global._CACHED_CALENDRIER[idx] };
+            await this.saveToCorbeille('calendrier', id, 'UPDATE', oldRow);
+            global._CACHED_CALENDRIER[idx] = { ...global._CACHED_CALENDRIER[idx], ...fields };
+        }
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const dbFields = toDbFormat(fields);
+                await supabase.from('calendrier').update(dbFields).eq('id', id);
+            } catch (err) {}
+        }
+        return { id, ...fields };
     },
-    async deleteCalendrierRow() {
+
+    async deleteCalendrierRow(id) {
+        if (!global._CACHED_CALENDRIER) await this.getCalendrier();
+        const targetRow = (global._CACHED_CALENDRIER || []).find(l => l.id === id);
+        if (targetRow) {
+            await this.saveToCorbeille('calendrier', id, 'DELETE', targetRow);
+        }
+        if (global._CACHED_CALENDRIER) {
+            global._CACHED_CALENDRIER = global._CACHED_CALENDRIER.filter(l => l.id !== id);
+        }
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('calendrier').delete().eq('id', id);
+            } catch (err) {}
+        }
         return true;
     },
-    async bulkUpdateCalendrierRows() {
+
+    async bulkUpdateCalendrierRows(ids, fields) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        if (!global._CACHED_CALENDRIER) await this.getCalendrier();
+        for (const id of ids) {
+            const item = (global._CACHED_CALENDRIER || []).find(l => l.id === id);
+            if (item) await this.saveToCorbeille('calendrier', id, 'UPDATE', { ...item });
+        }
+        if (global._CACHED_CALENDRIER) {
+            global._CACHED_CALENDRIER = global._CACHED_CALENDRIER.map(l => ids.includes(l.id) ? { ...l, ...fields } : l);
+        }
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const dbFields = toDbFormat(fields);
+                await supabase.from('calendrier').update(dbFields).in('id', ids);
+            } catch (err) {}
+        }
         return true;
     },
-    async bulkDeleteCalendrierRows() {
+
+    async bulkDeleteCalendrierRows(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        if (!global._CACHED_CALENDRIER) await this.getCalendrier();
+        for (const id of ids) {
+            const item = (global._CACHED_CALENDRIER || []).find(l => l.id === id);
+            if (item) await this.saveToCorbeille('calendrier', id, 'DELETE', item);
+        }
+        if (global._CACHED_CALENDRIER) {
+            global._CACHED_CALENDRIER = global._CACHED_CALENDRIER.filter(l => !ids.includes(l.id));
+        }
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('calendrier').delete().in('id', ids);
+            } catch (err) {}
+        }
         return true;
     },
 
@@ -1013,6 +1125,18 @@ const dbService = {
             try {
                 const dbPayload = toDbFormat(updates);
                 await supabase.from('incidents').update(dbPayload).eq('id', id);
+            } catch (err) {}
+        }
+        return true;
+    },
+
+    async deleteIncident(id) {
+        const item = DEFAULT_INCIDENTS.find(i => i.id === id);
+        if (item) await this.saveToCorbeille('incidents', id, 'DELETE', item);
+        DEFAULT_INCIDENTS = DEFAULT_INCIDENTS.filter(i => i.id !== id);
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('incidents').delete().eq('id', id);
             } catch (err) {}
         }
         return true;

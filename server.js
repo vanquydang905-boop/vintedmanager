@@ -116,7 +116,7 @@ app.get('/api/db', async (req, res) => {
         const parametres = await dbService.getParametres(orgId || 'org_default');
         const utilisateurs = await dbService.getUtilisateurs(orgId);
         const comptes = await dbService.getComptes(orgId);
-        const calendrier = [];
+        const calendrier = await dbService.getCalendrier(orgId);
         const incidents = await dbService.getIncidents(orgId);
         const journal = await dbService.getJournal(orgId);
         const corbeille = await dbService.getCorbeille(orgId);
@@ -801,6 +801,18 @@ app.delete('/api/users/:id', async (req, res) => {
     }
 });
 
+app.post('/api/users/bulk-delete', async (req, res) => {
+    try {
+        const { ids, organisationId } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "Aucun utilisateur sélectionné" });
+        await dbService.bulkDeleteUtilisateurs(ids);
+        await dbService.logAction("Gestion Utilisateur", `Suppression groupée de ${ids.length} utilisateurs`, "Succès", organisationId);
+        res.json({ success: true, count: ids.length });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ------------------- COMPTES -------------------
 app.get('/api/comptes', async (req, res) => {
     try {
@@ -869,6 +881,30 @@ app.delete('/api/comptes/:id', async (req, res) => {
         const deletedCompte = await dbService.deleteCompte(id);
         await dbService.logAction("Gestion Compte", `Suppression du compte ${deletedCompte ? deletedCompte.pseudo : id}`, "Succès");
         res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/comptes/bulk-update', async (req, res) => {
+    try {
+        const { ids, fields, organisationId } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "Aucun compte sélectionné" });
+        await dbService.bulkUpdateComptes(ids, fields || {});
+        await dbService.logAction("Gestion Compte", `Mise à jour groupée de ${ids.length} comptes`, "Succès", organisationId);
+        res.json({ success: true, count: ids.length });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/comptes/bulk-delete', async (req, res) => {
+    try {
+        const { ids, organisationId } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "Aucun compte sélectionné" });
+        await dbService.bulkDeleteComptes(ids);
+        await dbService.logAction("Gestion Compte", `Suppression groupée de ${ids.length} comptes`, "Succès", organisationId);
+        res.json({ success: true, count: ids.length });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1172,6 +1208,29 @@ app.put('/api/incidents/:id', async (req, res) => {
 
         await dbService.updateIncident(id, updates);
         res.json({ success: true, id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/incidents/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await dbService.deleteIncident(id);
+        await dbService.logAction("Incident", `Suppression de l'incident ${id}`, "Succès");
+        res.json({ success: true, id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/incidents/bulk-delete', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "Aucun incident sélectionné" });
+        await dbService.bulkDeleteIncidents(ids);
+        await dbService.logAction("Incident", `Suppression en masse de ${ids.length} incidents`, "Succès");
+        res.json({ success: true, count: ids.length });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
