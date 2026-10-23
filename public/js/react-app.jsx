@@ -13,7 +13,7 @@ function App() {
     });
 
     const [currentOrgId, setCurrentOrgId] = useState('org_default');
-    const [activeView, setActiveView] = useState('dashboard');
+    const [activeView, setActiveView] = useState('comptes');
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [timeZone, setTimeZone] = useState(() => localStorage.getItem('vinted_timezone') || 'FR');
     const [toast, setToast] = useState({ visible: false, message: '', isError: false });
@@ -56,7 +56,7 @@ function App() {
         parametres: {},
         utilisateurs: [],
         comptes: [],
-        calendrier: [],
+        todos: [],
         incidents: [],
         journal: [],
         corbeille: []
@@ -93,6 +93,63 @@ function App() {
         }
     }, [currentUser, currentOrgId, loadData]);
 
+    // Cache des alertes sonores et push déjà émises pour éviter le spam
+    const alertedTasksRef = React.useRef(new Set());
+
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const checkDeadlinesAndNotify = () => {
+            const currentTodos = appState.todos || [];
+            currentTodos.forEach(todo => {
+                if (todo.statut === 'terminee') return;
+
+                const info = TodoUtils.getStatusInfo(todo);
+                const isOverdue = info.isOverdue;
+                const isImminent = info.isImminent;
+
+                if (isOverdue || isImminent) {
+                    const alertKey = `${todo.id}_${isOverdue ? 'overdue' : 'imminent'}`;
+                    if (!alertedTasksRef.current.has(alertKey)) {
+                        alertedTasksRef.current.add(alertKey);
+
+                        if (todo.alerteSonore !== false) {
+                            if (todo.priorite === 'urgente' || isOverdue) {
+                                SoundEngine.playUrgentAlert();
+                            } else {
+                                SoundEngine.playWarningAlert();
+                            }
+                        }
+
+                        const pushTitle = isOverdue 
+                            ? '🚨 Vinted Manager: Tâche en retard !'
+                            : `⏰ Vinted Manager: Échéance imminente (${info.label})`;
+                        
+                        SystemNotifications.notify(pushTitle, `${todo.titre}${todo.compteNom ? ` (@${todo.compteNom})` : ''}`, {
+                            tag: `todo-${todo.id}`,
+                            urgent: todo.priorite === 'urgente' || isOverdue,
+                            onClick: () => {
+                                setActiveView('todos');
+                            }
+                        });
+                    }
+                }
+            });
+        };
+
+        checkDeadlinesAndNotify();
+        const timer = setInterval(checkDeadlinesAndNotify, 25000);
+        return () => clearInterval(timer);
+    }, [currentUser, appState.todos]);
+
+    const todoUrgentCount = useMemo(() => {
+        return (appState.todos || []).filter(t => {
+            if (t.statut === 'terminee') return false;
+            const info = TodoUtils.getStatusInfo(t);
+            return info.isOverdue || t.priorite === 'urgente' || info.isImminent;
+        }).length;
+    }, [appState.todos]);
+
     const handleLoginSubmit = async (loginInput, password, role = null) => {
         setLoginError('');
         try {
@@ -126,91 +183,6 @@ function App() {
         showToast("Chargement de l'organisation...");
     };
 
-    const handleUpdateRow = async (id, fields) => {
-        try {
-            // Chercher la ligne avant mise à jour pour détecter le passage à vente=1
-            const existingRow = appState.calendrier.find(l => l.id === id);
-            await API.updateCalendrierRow(id, fields);
-
-            // Si on vient de marquer une VENTE (passage de 0 → 1), créer un créneau de republication
-            if (fields.vente === 1 && existingRow && existingRow.vente !== 1) {
-                try {
-                    // Date de repub = même jour que la vente
-                    const repubDate = existingRow.date || new Date().toISOString().split('T')[0];
-
-                    // Heure de repub = heure originale + 20 à 30 min aléatoire
-                    let repubHeure = '12:00';
-                    try {
-                        const [h, m] = (existingRow.heurePrevue || '12:00').split(':').map(Number);
-                        const delayMin = 20 + Math.floor(Math.random() * 11); // 20..30 min
-                        const totalMin = h * 60 + m + delayMin;
-                        const newH = Math.floor(totalMin / 60) % 24;
-                        const newM = totalMin % 60;
-                        repubHeure = `${String(newH).padStart(2,'0')}:${String(newM).padStart(2,'0')}`;
-                    } catch(e) { repubHeure = '12:30'; }
-
-                    const newRepubRow = {
-                        date: repubDate,
-                        compteId: existingRow.compteId || '',
-                        agent: existingRow.agent || '',
-                        heurePrevue: repubHeure,
-                        sku: existingRow.sku || '',
-                        statut: 'Non fait',
-                        vente: 0,
-                        vues: 0,
-                        favoris: 0,
-                        score: 0,
-                        notes: `Repub auto après vente du ${existingRow.date || '?'}`,
-                        organisationId: currentOrgId
-                    };
-
-                    await API.createCalendrierRow(newRepubRow);
-                    showToast(`💰 Vente enregistrée ! Créneau de repub ajouté pour le ${repubDate} à ${repubHeure}`);
-                } catch(repErr) {
-                    showToast('Vente enregistrée (erreur création repub automatique)', true);
-                }
-            }
-
-            await loadData();
-        } catch (err) {
-            showToast("Erreur de mise à jour de la ligne", true);
-        }
-    };
-
-
-    const handleDeleteRow = async (id) => {
-        if (!confirm("Voulez-vous vraiment supprimer cette ligne ?")) return;
-        try {
-            await API.deleteCalendrierRow(id);
-            showToast("Ligne supprimée du calendrier");
-            await loadData();
-        } catch (err) {
-            showToast("Erreur lors de la suppression", true);
-        }
-    };
-
-    const handleAddRow = async () => {
-        const activeCompte = appState.comptes.find(c => c.statut === 'Actif');
-        if (!activeCompte) {
-            showToast("Aucun compte actif trouvé pour créer une ligne", true);
-            return;
-        }
-        try {
-            const todayStr = new Date().toISOString().split('T')[0];
-            await API.createCalendrierRow({
-                date: todayStr,
-                jour: 'Aujourd\'hui',
-                compteId: activeCompte.id,
-                agent: activeCompte.agent,
-                heurePrevue: '12:00',
-                organisationId: currentOrgId
-            });
-            showToast("Nouvelle ligne ajoutée au calendrier");
-            await loadData();
-        } catch (err) {
-            showToast("Erreur lors de l'ajout de ligne", true);
-        }
-    };
 
     const handleSaveCompte = async (compteData) => {
         try {
@@ -238,15 +210,6 @@ function App() {
         }
     };
 
-    const handleGeneratePlanning = async (dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents) => {
-        try {
-            const res = await API.generatePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents, currentOrgId);
-            showToast(res.message || "Planning généré avec succès");
-            await loadData();
-        } catch (err) {
-            showToast("Erreur lors de la génération du planning: " + err.message, true);
-        }
-    };
 
     const handleSaveIncident = async (incidentData) => {
         try {
@@ -273,25 +236,7 @@ function App() {
         }
     };
 
-    const handleBulkUpdateCalendrier = async (ids, fields) => {
-        try {
-            await API.bulkUpdateCalendrier(ids, fields);
-            showToast(`${ids.length} ligne(s) mise(s) à jour en masse !`);
-            await loadData();
-        } catch (err) {
-            showToast("Erreur lors de la mise à jour en masse", true);
-        }
-    };
 
-    const handleBulkDeleteCalendrier = async (ids) => {
-        try {
-            await API.bulkDeleteCalendrier(ids);
-            showToast(`${ids.length} ligne(s) supprimée(s) en masse !`);
-            await loadData();
-        } catch (err) {
-            showToast("Erreur lors de la suppression en masse", true);
-        }
-    };
 
     const handleBulkUpdateComptes = async (ids, fields) => {
         try {
@@ -333,26 +278,92 @@ function App() {
         }
     };
 
+    const handleSaveTodo = async (todoData) => {
+        try {
+            if (todoData.id) {
+                await API.updateTodo(todoData.id, todoData);
+                showToast("Tâche mise à jour avec succès");
+            } else {
+                await API.createTodo({ ...todoData, organisationId: currentOrgId });
+                showToast("Tâche créée avec succès");
+            }
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de l'enregistrement de la tâche", true);
+        }
+    };
+
+    const handleDeleteTodo = async (id) => {
+        try {
+            await API.deleteTodo(id);
+            showToast("Tâche supprimée");
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la suppression de la tâche", true);
+        }
+    };
+
+    const handleBulkUpdateTodos = async (ids, fields) => {
+        try {
+            await API.bulkUpdateTodos(ids, fields);
+            showToast(`${ids.length} tâche(s) mise(s) à jour en masse !`);
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la mise à jour des tâches en masse", true);
+        }
+    };
+
+    const handleBulkDeleteTodos = async (ids) => {
+        try {
+            await API.bulkDeleteTodos(ids);
+            showToast(`${ids.length} tâche(s) supprimée(s) en masse !`);
+            await loadData();
+        } catch (err) {
+            showToast("Erreur lors de la suppression des tâches en masse", true);
+        }
+    };
+
     const handleSaveUser = async (userData) => {
         try {
             const finalData = { ...userData };
             // Restriction Cadre : Cadres can ONLY create agent profiles for their own organisation
-            if (currentUser && currentUser.role !== 'admin') {
+            if (currentUser && currentUser.role !== 'admin' && !finalData.role) {
                 finalData.role = 'agent';
                 finalData.organisationId = currentUser.organisationId || 'org_default';
             }
             if (finalData.id) {
-                await API.updateUtilisateur(finalData.id, finalData);
-                showToast("Profil utilisateur mis à jour");
+                const updated = await API.updateUtilisateur(finalData.id, finalData);
+                showToast("Profil utilisateur et permissions mis à jour");
+                if (currentUser && currentUser.id === finalData.id) {
+                    const mergedUser = { ...currentUser, ...updated, permissions: finalData.permissions || updated.permissions };
+                    setCurrentUser(mergedUser);
+                    localStorage.setItem('vinted_manager_user', JSON.stringify(mergedUser));
+                }
             } else {
                 await API.createUtilisateur({ ...finalData, organisationId: finalData.organisationId || currentOrgId });
-                showToast("Profil agent créé avec succès");
+                showToast("Profil agent créé avec succès avec permissions personnalisées");
             }
             await loadData();
         } catch (err) {
             showToast("Erreur lors de l'enregistrement utilisateur", true);
         }
     };
+
+    // Vérification de permission d'accès à la vue active
+    useEffect(() => {
+        if (!currentUser) return;
+        const availableViews = [
+            'comptes', 'todos', 'classement', 'gagnants', 'incidents',
+            'messagerie', 'organisations', 'utilisateurs', 'corbeille',
+            'parametres', 'journal'
+        ];
+        if (!PermissionManager.can(currentUser, activeView)) {
+            const firstAllowed = availableViews.find(v => PermissionManager.can(currentUser, v));
+            if (firstAllowed && firstAllowed !== activeView) {
+                setActiveView(firstAllowed);
+            }
+        }
+    }, [currentUser, activeView]);
 
     const handleDeleteUser = async (id) => {
         if (!confirm("Voulez-vous vraiment supprimer cet utilisateur ?")) return;
@@ -516,6 +527,7 @@ function App() {
                 onExportJSON={handleExportJSON}
                 onImportJSON={handleImportJSON}
                 corbeilleCount={(appState.corbeille || []).length}
+                todoUrgentCount={todoUrgentCount}
                 isOpen={mobileMenuOpen}
             />
 
@@ -527,6 +539,15 @@ function App() {
                     gap: '12px',
                     marginBottom: '16px'
                 }}>
+                    <NotificationBellCenter
+                        todos={appState.todos || []}
+                        onNavigateTodo={(todoId) => {
+                            setActiveView('todos');
+                        }}
+                        onSaveTodo={handleSaveTodo}
+                        showToast={showToast}
+                    />
+
                     <div style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -575,51 +596,66 @@ function App() {
                         </button>
                     </div>
 
-                    {currentUser && currentUser.role === 'admin' && (
+                    {currentUser && (
                         <>
-                            <button
-                                className="btn btn-primary btn-sm"
-                                onClick={handleFetchLiveDotB}
-                                disabled={isSyncingDotB}
-                                style={{ backgroundColor: '#2563eb', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600, boxShadow: '0 2px 8px rgba(37,99,235,0.3)' }}
-                                title="Actualiser en direct tous les comptes, articles en ligne et commandes depuis DotB Cloud"
-                            >
-                                {isSyncingDotB ? (
-                                    <>
-                                        <i className="fa-solid fa-spinner fa-spin"></i> Sync DotB...
-                                    </>
-                                ) : (
-                                    <>
-                                        <i className="fa-solid fa-arrows-rotate"></i> Actualiser DotB
-                                    </>
-                                )}
-                            </button>
-                            <button className="btn btn-secondary btn-sm" onClick={handleExportJSON} title="Exporter la base de données en JSON">
-                                <i className="fa-solid fa-download"></i> Exporter JSON
-                            </button>
-                            <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }} title="Importer la base de données depuis un fichier JSON">
-                                <i className="fa-solid fa-file-import"></i> Importer JSON
-                                <input type="file" accept=".json" onChange={handleImportJSON} style={{ display: 'none' }} />
-                            </label>
+                            {PermissionManager.can(currentUser, 'sync_dotb') && (
+                                <button
+                                    className="btn btn-primary btn-sm"
+                                    onClick={handleFetchLiveDotB}
+                                    disabled={isSyncingDotB}
+                                    style={{ backgroundColor: '#2563eb', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600, boxShadow: '0 2px 8px rgba(37,99,235,0.3)' }}
+                                    title="Actualiser en direct tous les comptes, articles en ligne et commandes depuis DotB Cloud"
+                                >
+                                    {isSyncingDotB ? (
+                                        <>
+                                            <i className="fa-solid fa-spinner fa-spin"></i> Sync DotB...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fa-solid fa-arrows-rotate"></i> Actualiser DotB
+                                        </>
+                                    )}
+                                </button>
+                            )}
+                            {PermissionManager.can(currentUser, 'export_data') && (
+                                <button className="btn btn-secondary btn-sm" onClick={handleExportJSON} title="Exporter la base de données en JSON">
+                                    <i className="fa-solid fa-download"></i> Exporter JSON
+                                </button>
+                            )}
+                            {PermissionManager.can(currentUser, 'import_data') && (
+                                <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }} title="Importer la base de données depuis un fichier JSON">
+                                    <i className="fa-solid fa-file-import"></i> Importer JSON
+                                    <input type="file" accept=".json" onChange={handleImportJSON} style={{ display: 'none' }} />
+                                </label>
+                            )}
                         </>
                     )}
 
                 </div>
 
-                {activeView === 'dashboard' && (
-                    <DashboardView
-                        appState={appState}
+                {!PermissionManager.can(currentUser, activeView) && (
+                    <div className="card" style={{ textAlign: 'center', padding: '60px 20px', margin: '40px auto', maxWidth: '500px' }}>
+                        <i className="fa-solid fa-lock" style={{ fontSize: '48px', color: '#94a3b8', marginBottom: '16px', display: 'block' }}></i>
+                        <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', color: '#0f172a' }}>Accès Non Autorisé</h3>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                            Vous ne disposez pas des droits d'accès nécessaires pour consulter ce module. Contactez votre superviseur ou administrateur pour personnaliser vos permissions.
+                        </p>
+                    </div>
+                )}
+
+                {activeView === 'todos' && PermissionManager.can(currentUser, 'todos') && (
+                    <TodoView
                         currentUser={currentUser}
-                        selectedTZ={timeZone}
-                        onUpdateRow={handleUpdateRow}
-                        onDeleteRow={handleDeleteRow}
-                        onAddRowClick={handleAddRow}
-                        onBulkUpdateCalendrier={handleBulkUpdateCalendrier}
-                        onBulkDeleteCalendrier={handleBulkDeleteCalendrier}
+                        appState={appState}
+                        onSaveTodo={handleSaveTodo}
+                        onDeleteTodo={handleDeleteTodo}
+                        onBulkUpdateTodos={handleBulkUpdateTodos}
+                        onBulkDeleteTodos={handleBulkDeleteTodos}
+                        showToast={showToast}
                     />
                 )}
 
-                {activeView === 'comptes' && (
+                {activeView === 'comptes' && PermissionManager.can(currentUser, 'comptes') && (
                     <ComptesView
                         currentUser={currentUser}
                         appState={appState}
@@ -631,14 +667,7 @@ function App() {
                     />
                 )}
 
-                {activeView === 'planning' && (
-                    <PlanningView
-                        appState={appState}
-                        onGeneratePlanning={handleGeneratePlanning}
-                    />
-                )}
-
-                {activeView === 'incidents' && (
+                {activeView === 'incidents' && PermissionManager.can(currentUser, 'incidents') && (
                     <IncidentsView
                         appState={appState}
                         onSaveIncident={handleSaveIncident}
@@ -646,20 +675,20 @@ function App() {
                     />
                 )}
 
-                {activeView === 'messagerie' && (
+                {activeView === 'messagerie' && PermissionManager.can(currentUser, 'messagerie') && (
                     <MessagerieView
                         appState={appState}
                     />
                 )}
 
-                {activeView === 'parametres' && (
+                {activeView === 'parametres' && PermissionManager.can(currentUser, 'parametres') && (
                     <ParametresView
                         appState={appState}
                         onSaveParametres={handleSaveParametres}
                     />
                 )}
 
-                {activeView === 'utilisateurs' && (
+                {activeView === 'utilisateurs' && PermissionManager.can(currentUser, 'utilisateurs') && (
                     <UtilisateursView
                         currentUser={currentUser}
                         appState={appState}
@@ -669,7 +698,7 @@ function App() {
                     />
                 )}
 
-                {activeView === 'organisations' && (
+                {activeView === 'organisations' && PermissionManager.can(currentUser, 'organisations') && (
                     <OrganisationsView
                         appState={appState}
                         onSaveOrg={handleSaveOrg}
@@ -677,26 +706,26 @@ function App() {
                     />
                 )}
 
-                {activeView === 'classement' && (
+                {activeView === 'classement' && PermissionManager.can(currentUser, 'classement') && (
                     <ClassementView
                         appState={appState}
                     />
                 )}
 
-                {activeView === 'gagnants' && (
+                {activeView === 'gagnants' && PermissionManager.can(currentUser, 'gagnants') && (
                     <GagnantsView
                         appState={appState}
                         onPublishWinner={handlePublishWinner}
                     />
                 )}
 
-                {activeView === 'journal' && (
+                {activeView === 'journal' && PermissionManager.can(currentUser, 'journal') && (
                     <JournalView
                         appState={appState}
                     />
                 )}
 
-                {activeView === 'corbeille' && (
+                {activeView === 'corbeille' && PermissionManager.can(currentUser, 'corbeille') && (
                     <CorbeilleView
                         corbeille={appState.corbeille || []}
                         onRestoreItem={handleRestoreCorbeilleItem}

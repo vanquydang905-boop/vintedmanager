@@ -116,12 +116,13 @@ app.get('/api/db', async (req, res) => {
         const parametres = await dbService.getParametres(orgId || 'org_default');
         const utilisateurs = await dbService.getUtilisateurs(orgId);
         const comptes = await dbService.getComptes(orgId);
-        const calendrier = await dbService.getCalendrier(orgId);
+        const calendrier = [];
         const incidents = await dbService.getIncidents(orgId);
         const journal = await dbService.getJournal(orgId);
         const corbeille = await dbService.getCorbeille(orgId);
+        const todos = await dbService.getTodos(orgId);
 
-        res.json({ organisations, parametres, utilisateurs, comptes, calendrier, incidents, journal, corbeille });
+        res.json({ organisations, parametres, utilisateurs, comptes, calendrier, incidents, journal, corbeille, todos });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -396,7 +397,7 @@ app.delete('/api/corbeille/:id', async (req, res) => {
 app.post('/api/import', async (req, res) => {
     try {
         const { parametres, organisations, utilisateurs, comptes, calendrier, incidents, journal } = req.body;
-        if (!parametres || !Array.isArray(comptes) || !Array.isArray(calendrier)) {
+        if (!parametres || !Array.isArray(comptes)) {
             return res.status(400).json({ error: "Structure JSON invalide" });
         }
 
@@ -621,60 +622,6 @@ app.post('/api/import-orders-csv', async (req, res) => {
     }
 });
 
-// 2c. Auto Sync Agent Attributions & Date Structuring for Calendar Rows & Orders
-app.post('/api/calendrier/sync-attributions', async (req, res) => {
-    try {
-        const orgId = req.body.organisationId || 'org_default';
-        const [cal, comptes] = await Promise.all([
-            dbService.getCalendrier(orgId),
-            dbService.getComptes(orgId)
-        ]);
-
-        const accountAgentMap = {};
-        (comptes || []).forEach(c => {
-            if (c.pseudo) {
-                const k = c.pseudo.replace('@', '').trim().toLowerCase();
-                const ag = c.agent || c.agentAssigne;
-                if (ag) accountAgentMap[k] = ag;
-            }
-        });
-
-        let updatedCount = 0;
-        for (const l of (cal || [])) {
-            const accKey = (l.comptePseudo || l.compteId || "").replace("@", "").trim().toLowerCase();
-            const mappedAgent = accountAgentMap[accKey];
-            const updates = {};
-
-            if (mappedAgent && (!l.agent || l.agent === "À attribuer" || l.agent === "Non spécifié")) {
-                updates.agent = mappedAgent;
-            }
-            if (l.date && !l.datePublication) {
-                updates.datePublication = l.date;
-            }
-            if (l.datePrevue && !l.dateCommande && (l.transactionId || l.source === 'Import CSV DotB')) {
-                updates.dateCommande = l.datePrevue;
-            }
-
-            if (Object.keys(updates).length > 0) {
-                await dbService.updateCalendrierRow(l.id, updates);
-                updatedCount++;
-            }
-        }
-
-        res.json({
-            success: true,
-            updatedCount,
-            message: `✨ ${updatedCount} ligne(s) synchronisées avec l'attribution exacte des agents et la structuration des dates !`
-        });
-    } catch (err) {
-        console.error("Erreur Sync Attributions:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-
-
-
 // ------------------- ORGANISATIONS -------------------
 app.get('/api/organisations', async (req, res) => {
     try {
@@ -780,7 +727,8 @@ app.post('/api/auth/login', async (req, res) => {
             email: found.email,
             role: found.role,
             organisationId: found.organisationId || 'org_default',
-            agentAssigne: found.agentAssigne || ''
+            agentAssigne: found.agentAssigne || '',
+            permissions: found.permissions || null
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -789,7 +737,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/users', async (req, res) => {
     try {
-        const { nom, email, role, organisationId, agentAssigne, motDePasse } = req.body;
+        const { nom, email, role, organisationId, agentAssigne, motDePasse, contactType, contactNumero, permissions } = req.body;
         const id = "usr_" + Date.now();
         const newUser = {
             id,
@@ -799,6 +747,9 @@ app.post('/api/users', async (req, res) => {
             organisationId: organisationId || 'org_default',
             agentAssigne: agentAssigne || '',
             motDePasse: motDePasse || '123456',
+            contactType: contactType || 'WhatsApp',
+            contactNumero: contactNumero || '',
+            permissions: permissions || null,
             dateCreation: new Date().toISOString().split('T')[0]
         };
         const created = await dbService.createUtilisateur(newUser);
@@ -812,12 +763,27 @@ app.post('/api/users', async (req, res) => {
 app.put('/api/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { nom, email, role, organisationId, agentAssigne, motDePasse } = req.body;
+        const { nom, email, role, organisationId, agentAssigne, motDePasse, contactType, contactNumero, permissions } = req.body;
         const fields = { nom, email, role, organisationId, agentAssigne };
         if (motDePasse) fields.motDePasse = motDePasse;
+        if (contactType !== undefined) fields.contactType = contactType;
+        if (contactNumero !== undefined) fields.contactNumero = contactNumero;
+        if (permissions !== undefined) fields.permissions = permissions;
         
         const updated = await dbService.updateUtilisateur(id, fields);
         await dbService.logAction("Gestion Utilisateur", `Modification de l'utilisateur ${nom}`, "Succès", organisationId || 'org_default');
+        res.json(updated);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/users/:id/permissions', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { permissions } = req.body;
+        const updated = await dbService.updateUtilisateur(id, { permissions });
+        await dbService.logAction("Gestion Utilisateur", `Mise à jour personnalisée des permissions de ${id}`, "Succès");
         res.json(updated);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -890,18 +856,7 @@ app.put('/api/comptes/:id', async (req, res) => {
             numeroCompte, telephone, email, motDePasse, gereParInitiales, dateStatutCompte
         });
 
-        // Cascade automatique : Aligner l'agent sur toutes les lignes du calendrier liées à ce compte
-        if (agent && agent !== 'À attribuer') {
-            const orgId = organisationId || (updated ? updated.organisationId : 'org_default');
-            const allCal = await dbService.getCalendrier(orgId);
-            const matchingRows = allCal.filter(l => l.compteId === id);
-            if (matchingRows.length > 0) {
-                const rowIds = matchingRows.map(l => l.id);
-                await dbService.bulkUpdateCalendrierRows(rowIds, { agent });
-            }
-        }
-
-        await dbService.logAction("Gestion Compte", `Modification du compte ${pseudo || id} (Cascade agent sur calendrier)`, "Succès", organisationId || 'org_default');
+        await dbService.logAction("Gestion Compte", `Modification du compte ${pseudo || id}`, "Succès", organisationId || 'org_default');
         res.json(updated);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -919,647 +874,69 @@ app.delete('/api/comptes/:id', async (req, res) => {
     }
 });
 
-// ------------------- COMPTES MANAGEMENT -------------------
-
-// ------------------- CALENDRIER -------------------
-app.get('/api/calendrier', async (req, res) => {
+// ------------------- TO-DOS & TÂCHES (NOTIFICATIONS & GESTION) -------------------
+app.get('/api/todos', async (req, res) => {
     try {
-        const orgId = req.query.organisationId || null;
-        const rows = await dbService.getCalendrier(orgId);
-        res.json(rows);
+        const orgId = req.query.organisationId || 'org_default';
+        const todos = await dbService.getTodos(orgId);
+        res.json(todos);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/calendrier', async (req, res) => {
+app.post('/api/todos', async (req, res) => {
     try {
         const orgId = req.body.organisationId || 'org_default';
-        const params = await dbService.getParametres(orgId);
-        const comptes = await dbService.getComptes(orgId);
-        const firstCompte = comptes[0] || { id: '', agent: '' };
-
-        const id = "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5);
-        const date = req.body.date || new Date().toISOString().split('T')[0];
-        const dateObj = new Date(date);
-        const jourRaw = dateObj.toLocaleDateString('fr-FR', { weekday: 'long' });
-        const jour = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
-
-        const targetCompte = comptes.find(c => c.id === (req.body.compteId || firstCompte.id));
-        const agentName = (targetCompte && targetCompte.agent && targetCompte.agent !== 'À attribuer')
-            ? targetCompte.agent
-            : (req.body.agent || firstCompte.agent || 'À attribuer');
-
-        const newLine = {
-            id,
-            organisationId: orgId,
-            date,
-            jour,
-            compteId: targetCompte ? targetCompte.id : (req.body.compteId || firstCompte.id),
-            agent: agentName,
-            heurePrevue: req.body.heurePrevue || "12:00",
-            sku: req.body.sku || "",
-            produit: req.body.produit || "",
-            lien: req.body.lien || "",
-            vues: req.body.vues || 0,
-            likes: req.body.likes || 0,
-            favoris: req.body.favoris || 0,
-            messages: req.body.messages || 0,
-            vente: req.body.vente || 0,
-            score: 0,
-            classification: "À retester",
-            statut: req.body.statut || "Non fait",
-            dateStatut: null,
-            heureStatut: null,
-            nbVentesReposts: 0,
-            heuresVentesReposts: [],
-            prochainRepost: null
-        };
-
-        const allCal = await dbService.getCalendrier(orgId);
-        newLine.score = calcScore(newLine, params);
-        newLine.classification = getClassification(newLine, allCal, params);
-
-        const created = await dbService.createCalendrierRow(newLine);
-        await dbService.logAction("Calendrier", `Ajout manuel d'une ligne SKU ${newLine.sku}`, "Succès", orgId);
-        res.json(created);
+        const todo = await dbService.createTodo({ ...req.body, organisationId: orgId });
+        await dbService.logAction("To-Do", `Création de la tâche "${todo.titre}" (Priorité: ${todo.priorite})`, "Succès", orgId);
+        res.json(todo);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.put('/api/calendrier/:id', async (req, res) => {
+app.put('/api/todos/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { field, value } = req.body;
-
-        const current = await dbService.getCalendrierRowById(id);
-        if (!current) return res.status(404).json({ error: "Ligne non trouvée" });
-
-        const orgId = current.organisationId || 'org_default';
-        const params = await dbService.getParametres(orgId);
-        const allCal = await dbService.getCalendrier(orgId);
-        const updated = { ...current };
-
-        if (field === 'compteId') {
-            updated.compteId = value;
-            const comptes = await dbService.getComptes(orgId);
-            const targetCompte = comptes.find(c => c.id === value);
-            if (targetCompte && targetCompte.agent && targetCompte.agent !== 'À attribuer') {
-                updated.agent = targetCompte.agent;
-            }
-        } else if (field === 'agent') {
-            const comptes = await dbService.getComptes(orgId);
-            const targetCompte = comptes.find(c => c.id === updated.compteId);
-            if (targetCompte && targetCompte.agent && targetCompte.agent !== 'À attribuer' && targetCompte.agent !== value) {
-                return res.status(400).json({ error: `Attribution refusée : Le compte "${targetCompte.pseudo}" est officiellement attribué à ${targetCompte.agent} !` });
-            }
-            updated.agent = value;
-        } else if (field === 'statut') {
-            updated.statut = value;
-            if (value === 'Fait') {
-                updated.dateStatut = getLocalDateString();
-                updated.heureStatut = new Date().toTimeString().split(' ')[0].substring(0, 5);
-                await dbService.logAction("Statut Calendrier", `Ligne ${id} marquée comme Faite`, "Succès", orgId);
-            }
-        } else if (field === 'vente') {
-            updated.vente = parseInt(value);
-            if (updated.vente === 1) {
-                updated.nbVentesReposts = (updated.nbVentesReposts || 0) + 1;
-                const now = new Date().toTimeString().split(' ')[0].substring(0, 5);
-                if (!Array.isArray(updated.heuresVentesReposts)) updated.heuresVentesReposts = [];
-                updated.heuresVentesReposts.push(now);
-                const reposDate = new Date();
-                reposDate.setMinutes(reposDate.getMinutes() + (params.delaiProchainRepostMinutes || 30));
-                updated.prochainRepost = reposDate.toTimeString().split(' ')[0].substring(0, 5);
-                await dbService.logAction("Vente détectée", `Vente enregistrée pour la ligne ${id}`, "Succès", orgId);
-            }
-        } else if (field === 'classification') {
-            updated.classification = value;
-            if (value === 'Gagnant' && updated.sku && String(updated.sku).trim() !== '') {
-                const cleanSku = String(updated.sku).trim().toLowerCase();
-                const matchingIds = allCal.filter(l => l.sku && String(l.sku).trim().toLowerCase() === cleanSku).map(l => l.id);
-                if (matchingIds.length > 0) {
-                    await dbService.bulkUpdateCalendrierRows(matchingIds, { classification: 'Gagnant' });
-                }
-            }
-        } else if (field === 'sku' && value && String(value).trim() !== '') {
-            const cleanSku = String(value).trim();
-            updated.sku = cleanSku;
-
-            // Cascade automatique : Tous les articles ayant le même titre (insensible à la casse) reçoivent le MÊME SKU
-            const normTitle = normalizeTitle(current.produit);
-            if (normTitle) {
-                const matchingTitleRows = allCal.filter(l => l.id !== id && l.produit && normalizeTitle(l.produit) === normTitle);
-                if (matchingTitleRows.length > 0) {
-                    const rowIds = matchingTitleRows.map(l => l.id);
-                    await dbService.bulkUpdateCalendrierRows(rowIds, { sku: cleanSku });
-                }
-            }
-        } else if (field === 'produit' && value && String(value).trim() !== '') {
-            updated.produit = value;
-            const normTitle = normalizeTitle(value);
-            // Auto-attribution du même SKU si le titre normalisé est déjà connu
-            const matchWithSku = allCal.find(l => l.produit && normalizeTitle(l.produit) === normTitle && l.sku && String(l.sku).trim() !== '');
-            if (matchWithSku) {
-                updated.sku = String(matchWithSku.sku).trim();
-            }
-        } else {
-            updated[field] = value;
-        }
-
-        updated.score = calcScore(updated, params);
-        if (field !== 'classification' && (!updated.classification || String(updated.classification).trim() === '')) {
-            updated.classification = getClassification(updated, allCal, params);
-        }
-
-        const saved = await dbService.updateCalendrierRow(id, updated);
-
-        // Vérification Anti-Doublon Stricte (Même compte ou Autre compte)
-        let warning = null;
-        if (field === 'sku' && value && String(value).trim() !== '') {
-            const cleanSku = String(value).trim().toLowerCase();
-            const sameAccountDuplicate = allCal.find(row => 
-                row.id !== id && 
-                row.compteId === updated.compteId && 
-                row.sku && 
-                row.sku.trim().toLowerCase() === cleanSku
-            );
-            if (sameAccountDuplicate) {
-                warning = `⚠️ Anti-Doublon : Le SKU "${value}" est déjà attribué à ce compte !`;
-            } else {
-                const otherAccountDuplicate = allCal.find(row => 
-                    row.id !== id && 
-                    row.compteId !== updated.compteId && 
-                    row.sku && 
-                    row.sku.trim().toLowerCase() === cleanSku
-                );
-                if (otherAccountDuplicate && updated.classification !== 'Gagnant') {
-                    warning = `ℹ️ Le SKU "${value}" est déjà publié sur un autre compte.`;
-                }
-            }
-        }
-
-        res.json({ item: saved, warning });
+        const updated = await dbService.updateTodo(id, req.body);
+        res.json(updated);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.delete('/api/calendrier/:id', async (req, res) => {
+app.delete('/api/todos/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        await dbService.deleteCalendrierRow(id);
-        res.json({ success: true });
+        await dbService.deleteTodo(id);
+        res.json({ success: true, id });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// ------------------- BULK CRUD OPERATIONS -------------------
-app.post('/api/calendrier/bulk-update', async (req, res) => {
+app.post('/api/todos/bulk-update', async (req, res) => {
     try {
         const { ids, fields } = req.body;
-        await dbService.bulkUpdateCalendrierRows(ids, fields);
-        res.json({ success: true, count: ids ? ids.length : 0 });
+        await dbService.bulkUpdateTodos(ids, fields);
+        res.json({ success: true, count: (ids || []).length });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/calendrier/bulk-delete', async (req, res) => {
+app.post('/api/todos/bulk-delete', async (req, res) => {
     try {
         const { ids } = req.body;
-        await dbService.bulkDeleteCalendrierRows(ids);
-        res.json({ success: true, count: ids ? ids.length : 0 });
+        await dbService.bulkDeleteTodos(ids);
+        res.json({ success: true, count: (ids || []).length });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/comptes/bulk-update', async (req, res) => {
-    try {
-        const { ids, fields } = req.body;
-        await dbService.bulkUpdateComptes(ids, fields);
-        res.json({ success: true, count: ids ? ids.length : 0 });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
-app.post('/api/comptes/bulk-delete', async (req, res) => {
-    try {
-        const { ids } = req.body;
-        await dbService.bulkDeleteComptes(ids);
-        res.json({ success: true, count: ids ? ids.length : 0 });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/users/bulk-delete', async (req, res) => {
-    try {
-        const { ids } = req.body;
-        await dbService.bulkDeleteUtilisateurs(ids);
-        res.json({ success: true, count: ids ? ids.length : 0 });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/incidents/bulk-delete', async (req, res) => {
-    try {
-        const { ids } = req.body;
-        await dbService.bulkDeleteIncidents(ids);
-        res.json({ success: true, count: ids ? ids.length : 0 });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-function getComptesActifsEtAttribues(comptes = [], selectedAgents = null) {
-    return (comptes || []).filter(c => {
-        const isActif = c && c.statut === 'Actif';
-        const isAttribue = c && c.agent && String(c.agent).trim() !== '' && String(c.agent) !== 'À attribuer';
-        if (!isActif || !isAttribue) return false;
-        if (Array.isArray(selectedAgents) && selectedAgents.length > 0) {
-            return selectedAgents.includes(c.agent);
-        }
-        return true;
-    });
-}
-
-// Génération automatique du planning
-app.post('/api/calendrier/generate', async (req, res) => {
-    try {
-        const orgId = req.body.organisationId || 'org_default';
-        const params = (await dbService.getParametres(orgId)) || {};
-        const comptes = await dbService.getComptes(orgId);
-        const selectedAgents = req.body.selectedAgents;
-        const selectedComptes = req.body.selectedComptes || req.body.selectedAccountIds;
-
-        // Exclusivité stricte : Seuls les comptes au statut Actif ET attribués à un agent réel
-        let activeComptes = getComptesActifsEtAttribues(comptes, selectedAgents);
-        if (Array.isArray(selectedComptes) && selectedComptes.length > 0) {
-            activeComptes = activeComptes.filter(c => selectedComptes.includes(c.id));
-        }
-
-        if (activeComptes.length === 0) {
-            return res.status(400).json({ error: "Aucun compte au statut Actif et attribué à un agent sélectionné trouvé !" });
-        }
-
-        let datesList = [];
-        if (req.body.dateDebut && req.body.dateFin) {
-            let curr = new Date(req.body.dateDebut);
-            let end = new Date(req.body.dateFin);
-            if (!isNaN(curr.getTime()) && !isNaN(end.getTime())) {
-                while (curr <= end) {
-                    datesList.push(new Date(curr));
-                    curr.setDate(curr.getDate() + 1);
-                }
-            }
-        }
-        if (datesList.length === 0) {
-            const nbJours = parseInt(req.body.nbJours) || 7;
-            const today = new Date();
-            for (let i = 0; i < nbJours; i++) {
-                const d = new Date(today);
-                d.setDate(today.getDate() + i);
-                datesList.push(d);
-            }
-        }
-
-        const slotsPerAccount = req.body.creneauxParJour ? parseInt(req.body.creneauxParJour) : (params.creneauxParJour || 6);
-        const margeAleatoireMin = params.margeAleatoireMinutes !== undefined 
-            ? parseInt(params.margeAleatoireMinutes) 
-            : (params.modePlanification === 'aleatoire' ? 10 : 5);
-
-        // Plage horaire globale personnalisable (ex: 07:00 à 22:00)
-        const startHourStr = req.body.heureDebut || "07:00";
-        const endHourStr = req.body.heureFin || "22:00";
-        const [startH, startM] = startHourStr.split(':').map(Number);
-        const [endH, endM] = endHourStr.split(':').map(Number);
-
-        const startHourMin = (isNaN(startH) ? 7 : startH) * 60 + (isNaN(startM) ? 0 : startM);
-        const endHourMin = (isNaN(endH) ? 22 : endH) * 60 + (isNaN(endM) ? 0 : endM);
-        const windowDurationMin = Math.max(60, endHourMin - startHourMin);
-
-        const includeWinnerSKUs = req.body.includeWinnerSKUs !== false;
-
-        // Récupération de l'historique actif (EXCLUSION STRICTE des plannings et lignes supprimés)
-        const existingCal = await dbService.getCalendrier(orgId);
-        const activeCal = (existingCal || []).filter(l => 
-            !l.isDeleted && 
-            !l.supprime && 
-            l.statut !== 'Supprimé' && 
-            l.statut !== 'Corbeille'
-        );
-
-        const winnerSKUsMap = {};
-        const accountPublishedSKUs = {};
-
-        // Charge l'ensemble des SKUs du catalogue DotB et de la base pour garantier un SKU sur 100% des lignes
-        const fastCheckPath = path.join(__dirname, "fast_check_sku_results.json");
-        const allCatalogSKUs = [];
-        if (fs.existsSync(fastCheckPath)) {
-            try {
-                const fcData = JSON.parse(fs.readFileSync(fastCheckPath, "utf8"));
-                fcData.forEach(item => {
-                    if (item.sku && String(item.sku).trim()) {
-                        allCatalogSKUs.push({
-                            sku: item.sku.trim(),
-                            produit: item.title || '',
-                            classification: item.classification || 'Nouveau produit'
-                        });
-                    }
-                });
-            } catch(e) {}
-        }
-
-        activeCal.forEach(l => {
-            if (!l.compteId) return;
-            if (!accountPublishedSKUs[l.compteId]) {
-                accountPublishedSKUs[l.compteId] = new Set();
-            }
-            if (l.sku && String(l.sku).trim() !== '') {
-                accountPublishedSKUs[l.compteId].add(String(l.sku).trim());
-            }
-            if (includeWinnerSKUs && (l.classification === 'Gagnant' || l.vente > 0) && l.sku && String(l.sku).trim() !== '') {
-                const cleanSku = String(l.sku).trim();
-                winnerSKUsMap[cleanSku] = {
-                    sku: cleanSku,
-                    produit: l.produit || '',
-                    classification: 'Gagnant'
-                };
-            }
-        });
-
-        const winnerSKUsList = includeWinnerSKUs ? Object.values(winnerSKUsMap) : [];
-
-        // Suivi local des SKU attribués par compte pendant cette session de génération (anti-doublon)
-        const accountSessionSKUs = {};
-        activeComptes.forEach(c => {
-            accountSessionSKUs[c.id] = new Set(accountPublishedSKUs[c.id] || []);
-        });
-
-        let generated = 0;
-        let winnersAssignedCount = 0;
-
-        for (const dateObj of datesList) {
-            const dateStr = getLocalDateString(dateObj);
-            const jourRaw = dateObj.toLocaleDateString('fr-FR', { weekday: 'long' });
-            const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
-
-            const intervalPerSlot = windowDurationMin / Math.max(1, slotsPerAccount);
-
-            // Suivi des SKU attribués CE JOUR PRÉCIS (Règle Anti-Doublon : 1 SKU par jour au maximum)
-            const skusAssignedToday = new Set();
-
-            for (let c = 0; c < activeComptes.length; c++) {
-                const compte = activeComptes[c];
-                // Décalage de 5 minutes entre comptes pour étaler les publications
-                const accountStaggerMin = (c * 5) % 30;
-
-                // SKU Gagnants non encore attribués à ce compte ET non encore attribués aujourd'hui (Anti-Doublon Stricte Compte & Jour)
-                const availableWinnerSKUs = winnerSKUsList.filter(w => 
-                    !accountSessionSKUs[compte.id].has(w.sku) && 
-                    !skusAssignedToday.has(w.sku)
-                );
-                let winnerIdx = 0;
-
-                for (let s = 0; s < slotsPerAccount; s++) {
-                    // Calcul de l'heure cible
-                    let targetMinutes = startHourMin + Math.round(s * intervalPerSlot) + accountStaggerMin;
-
-                    // Marge aléatoire discrète (± N minutes) pour un rendu naturel
-                    if (margeAleatoireMin > 0) {
-                        const offset = Math.floor(Math.random() * (2 * margeAleatoireMin + 1)) - margeAleatoireMin;
-                        targetMinutes += offset;
-                    }
-
-                    // Bornage entre 06:30 (390 min) et 23:30 (1410 min)
-                    targetMinutes = Math.max(390, Math.min(1410, targetMinutes));
-
-                    const hStr = String(Math.floor(targetMinutes / 60)).padStart(2, '0');
-                    const mStr = String(targetMinutes % 60).padStart(2, '0');
-                    const chosenHour = `${hStr}:${mStr}`;
-
-                    // Auto-assignation d'un SKU Gagnant disponible si présent ou Fallback Catalogue
-                    let assignedSku = "";
-                    let assignedProduit = "";
-                    let assignedClassif = "Nouveau produit";
-
-                    if (winnerIdx < availableWinnerSKUs.length) {
-                        const wObj = availableWinnerSKUs[winnerIdx];
-                        assignedSku = wObj.sku;
-                        assignedProduit = wObj.produit;
-                        assignedClassif = "Gagnant";
-                        accountSessionSKUs[compte.id].add(wObj.sku);
-                        skusAssignedToday.add(wObj.sku);
-                        winnerIdx++;
-                        winnersAssignedCount++;
-                    } else if (allCatalogSKUs.length > 0) {
-                        const fallbackList = allCatalogSKUs.filter(item => !skusAssignedToday.has(item.sku) && !accountSessionSKUs[compte.id].has(item.sku));
-                        const candidate = fallbackList.length > 0 ? fallbackList[Math.floor(Math.random() * fallbackList.length)] : allCatalogSKUs[Math.floor(Math.random() * allCatalogSKUs.length)];
-                        if (candidate) {
-                            assignedSku = candidate.sku;
-                            assignedProduit = candidate.produit;
-                            assignedClassif = candidate.classification || "Nouveau produit";
-                            accountSessionSKUs[compte.id].add(candidate.sku);
-                            skusAssignedToday.add(candidate.sku);
-                        }
-                    }
-
-                    const id = "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5);
-                    await dbService.createCalendrierRow({
-                        id,
-                        organisationId: orgId,
-                        date: dateStr,
-                        jour: jourCap,
-                        compteId: compte.id,
-                        agent: compte.agent,
-                        heurePrevue: chosenHour,
-                        sku: assignedSku,
-                        produit: assignedProduit,
-                        lien: "",
-                        vues: 0,
-                        likes: 0,
-                        favoris: 0,
-                        messages: 0,
-                        vente: 0,
-                        score: 0,
-                        classification: assignedClassif,
-                        statut: "Non fait",
-                        dateStatut: null,
-                        heureStatut: null,
-                        nbVentesReposts: 0,
-                        heuresVentesReposts: [],
-                        prochainRepost: null
-                    });
-                    generated++;
-                }
-            }
-        }
-
-        const dateStartStr = datesList[0].toISOString().split('T')[0];
-        const dateEndStr = datesList[datesList.length - 1].toISOString().split('T')[0];
-
-        await dbService.logAction("Génération planning", `${generated} lignes générées (${winnersAssignedCount} SKU Gagnants répartis sans doublon) pour ${datesList.length} jours et ${activeComptes.length} comptes (${slotsPerAccount} pub/compte/jour, du ${dateStartStr} au ${dateEndStr})`, "Succès", orgId);
-        res.json({ message: `${generated} lignes de planning générées avec succès (${winnersAssignedCount} SKU Gagnants attribués sans aucun doublon par compte) !`, generated, winnersAssignedCount });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Nettoyage rapide : Supprimer toutes les lignes de planning sans SKU
-app.post('/api/calendrier/clean-empty-skus', async (req, res) => {
-    try {
-        const orgId = req.body.organisationId || 'org_default';
-        const allCal = await dbService.getCalendrier(orgId);
-
-        const emptyRows = allCal.filter(l => 
-            !l.sku || 
-            String(l.sku).trim() === '' || 
-            String(l.sku).trim() === '-' || 
-            String(l.sku).trim().toLowerCase() === 'aucun' || 
-            String(l.sku).trim().toLowerCase() === 'n/a'
-        );
-        const emptyIds = emptyRows.map(l => l.id);
-
-        if (emptyIds.length === 0) {
-            return res.json({ success: true, message: "Aucune ligne sans SKU trouvée dans le planning.", deletedCount: 0 });
-        }
-
-        await dbService.bulkDeleteCalendrierRows(emptyIds);
-
-        await dbService.logAction("Nettoyage Planning", `${emptyIds.length} lignes sans SKU supprimées du planning.`, "Succès", orgId);
-        res.json({ success: true, message: `🧹 ${emptyIds.length} ligne(s) sans SKU ont été nettoyées et supprimées du planning avec succès !`, deletedCount: emptyIds.length });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Auto-Remplir les SKUs manquants sur les lignes sans SKU avec des produits du catalogue
-app.post('/api/calendrier/fill-missing-skus', async (req, res) => {
-    try {
-        const fs = require('fs');
-        const path = require('path');
-        const orgId = req.body.organisationId || 'org_default';
-        const allCal = await dbService.getCalendrier(orgId);
-
-
-        const emptyRows = allCal.filter(l => 
-            !l.isDeleted && !l.supprime && l.statut !== 'Supprimé' && l.statut !== 'Corbeille' &&
-            (!l.sku || String(l.sku).trim() === '' || String(l.sku).trim() === '-' || String(l.sku).trim().toLowerCase() === 'aucun')
-        );
-
-        if (emptyRows.length === 0) {
-            return res.json({ success: true, message: "Aucune ligne sans SKU trouvée dans le planning.", filledCount: 0 });
-        }
-
-        const fastCheckPath = path.join(__dirname, "fast_check_sku_results.json");
-        const catalogSKUs = [];
-        if (fs.existsSync(fastCheckPath)) {
-            try {
-                const fcData = JSON.parse(fs.readFileSync(fastCheckPath, "utf8"));
-                fcData.forEach(item => {
-                    if (item.sku && String(item.sku).trim()) {
-                        catalogSKUs.push({
-                            sku: item.sku.trim(),
-                            produit: item.title || '',
-                            classification: item.classification || 'Nouveau produit'
-                        });
-                    }
-                });
-            } catch(e) {}
-        }
-
-        if (catalogSKUs.length === 0) {
-            return res.status(400).json({ error: "Aucun SKU disponible dans le catalogue pour effectuer le remplissage." });
-        }
-
-        let filledCount = 0;
-        for (let i = 0; i < emptyRows.length; i++) {
-            const row = emptyRows[i];
-            const candidate = catalogSKUs[i % catalogSKUs.length];
-            
-            const isDone = row.statut === 'Fait' || row.statut === '✓ Fait' || row.statut === 'Publié';
-            const isSold = row.vente === 1;
-            const pointsPub = isDone ? 5.0 : 0.0;
-            const pointsVente = isSold ? 20.0 : 0.0;
-            const score = pointsPub + pointsVente;
-
-            await dbService.updateCalendrierRow(row.id, {
-                sku: candidate.sku,
-                produit: candidate.produit,
-                classification: candidate.classification,
-                score
-            });
-            filledCount++;
-        }
-
-        await dbService.logAction("Remplissage SKU", `${filledCount} ligne(s) sans SKU ré-attribuée(s) avec des produits du catalogue`, "Succès", orgId);
-        res.json({ success: true, message: `✨ ${filledCount} ligne(s) sans SKU ré-attribuée(s) avec succès !`, filledCount });
-    } catch(err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-
-// Publication produit gagnant sur tous les comptes actifs sans ce SKU
-app.post('/api/calendrier/publish-winner', async (req, res) => {
-    try {
-        const { sku, organisationId } = req.body;
-        const orgId = organisationId || 'org_default';
-        if (!sku) return res.status(400).json({ error: "SKU requis" });
-
-        const comptes = await dbService.getComptes(orgId);
-        const activeComptes = comptes.filter(c => c.statut === 'Actif');
-        const dateStr = new Date().toISOString().split('T')[0];
-        const jourRaw = new Date().toLocaleDateString('fr-FR', { weekday: 'long' });
-        const jourCap = jourRaw.charAt(0).toUpperCase() + jourRaw.slice(1);
-        let added = 0;
-        const allCal = await dbService.getCalendrier(orgId);
-
-        for (const c of activeComptes) {
-            const dejaPublie = allCal.find(row => row.compteId === c.id && row.sku === sku);
-            if (!dejaPublie) {
-                const id = "ligne_" + Date.now() + Math.random().toString(36).substr(2, 5);
-                await dbService.createCalendrierRow({
-                    id,
-                    organisationId: orgId,
-                    date: dateStr,
-                    jour: jourCap,
-                    compteId: c.id,
-                    agent: c.agent,
-                    heurePrevue: "12:00",
-                    sku,
-                    produit: "REPOST GAGNANT",
-                    lien: "",
-                    vues: 0,
-                    likes: 0,
-                    favoris: 0,
-                    messages: 0,
-                    vente: 0,
-                    score: 0,
-                    classification: "À retester",
-                    statut: "Non fait",
-                    dateStatut: null,
-                    heureStatut: null,
-                    nbVentesReposts: 0,
-                    heuresVentesReposts: [],
-                    prochainRepost: null
-                });
-                added++;
-            }
-        }
-
-        await dbService.logAction("Suggestion Gagnant", `SKU ${sku} publié sur ${added} comptes`, "Succès", orgId);
-        res.json({ message: `${added} lignes ajoutées au calendrier pour le SKU ${sku}`, added });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 // Enregistrement / qualification directe d'un SKU avec sa classification (ex: Gagnant)
 app.post('/api/sku/register', async (req, res) => {
@@ -1817,13 +1194,7 @@ app.put('/api/parametres', async (req, res) => {
         const orgId = req.query.organisationId || 'org_default';
         await dbService.saveParametres(newParams, orgId);
 
-        // Recalculer tous les scores et classifications dans la base pour cette organisation
-        const rows = await dbService.getCalendrier(orgId);
-        for (const row of rows) {
-            const score = calcScore(row, newParams);
-            const classification = getClassification(score, row.vente, newParams);
-            await dbService.updateCalendrierRow(row.id, { score, classification });
-        }
+
 
         await dbService.logAction("Paramètres", "Mise à jour des paramètres et recalcul général des scores", "Succès", orgId);
         res.json({ message: "Paramètres mis à jour et scores recalculés", parametres: newParams });

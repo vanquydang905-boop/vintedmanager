@@ -4,6 +4,85 @@
 
 var { useState, useEffect, useMemo, useCallback } = React;
 
+// ============================================================
+// PERMISSION & ROLE MANAGER (GESTION DES ACCÈS PERSONNALISÉS)
+// ============================================================
+var PermissionManager = {
+    MODULES: [
+        { key: 'comptes', label: 'Comptes Vinted', icon: 'fa-store', desc: 'Gestion des comptes, statuts et inventaire' },
+        { key: 'todos', label: 'To-Do & Rappels', icon: 'fa-list-check', desc: 'Gestionnaire de tâches et alertes' },
+        { key: 'classement', label: 'Classement & Scores', icon: 'fa-trophy', desc: 'Leaderboard des ventes et performances' },
+        { key: 'gagnants', label: 'Suggestions & Gagnants', icon: 'fa-lightbulb', desc: 'Articles prometteurs et republications' },
+        { key: 'incidents', label: 'Journal des Incidents', icon: 'fa-triangle-exclamation', desc: 'Litiges, blocages et alertes comptes' },
+        { key: 'messagerie', label: 'Messagerie Vinted', icon: 'fa-comments', desc: 'Messages et échanges avec les acheteurs' },
+        { key: 'organisations', label: 'Organisations', icon: 'fa-sitemap', desc: 'Gestion multi-tenancy des structures' },
+        { key: 'utilisateurs', label: 'Utilisateurs & Membres', icon: 'fa-users-gear', desc: 'Gestion des comptes et droits d\'accès' },
+        { key: 'corbeille', label: 'Corbeille & Restauration', icon: 'fa-trash-can', desc: 'Éléments supprimés et restauration' },
+        { key: 'parametres', label: 'Paramètres Système', icon: 'fa-sliders', desc: 'Configuration des scores et créneaux' },
+        { key: 'journal', label: 'Journal d\'Audit', icon: 'fa-clock-rotate-left', desc: 'Historique des actions système' }
+    ],
+
+    ACTIONS: [
+        { key: 'comptes_create', label: 'Créer des comptes Vinted', icon: 'fa-plus', desc: 'Ajouter de nouveaux comptes Vinted' },
+        { key: 'comptes_edit', label: 'Modifier les comptes Vinted', icon: 'fa-pen', desc: 'Éditer les paramètres, mots de passe et statuts' },
+        { key: 'comptes_delete', label: 'Supprimer des comptes Vinted', icon: 'fa-trash', desc: 'Supprimer ou archiver des comptes' },
+        { key: 'todos_manage', label: 'Gérer la To-Do List', icon: 'fa-list-check', desc: 'Créer, réassigner et modifier les tâches' },
+        { key: 'incidents_manage', label: 'Gérer les incidents', icon: 'fa-circle-exclamation', desc: 'Déclarer et clôturer des litiges' },
+        { key: 'sync_dotb', label: 'Synchronisation DotB Cloud', icon: 'fa-arrows-rotate', desc: 'Actualisation en direct depuis DotB' },
+        { key: 'export_data', label: 'Exporter la base (JSON)', icon: 'fa-download', desc: 'Télécharger les sauvegardes complètes' },
+        { key: 'import_data', label: 'Importer / Restaurer (JSON)', icon: 'fa-file-import', desc: 'Restaurer une sauvegarde JSON' }
+    ],
+
+    PRESETS: {
+        admin: {
+            comptes: true, todos: true, classement: true, gagnants: true, incidents: true, messagerie: true,
+            organisations: true, utilisateurs: true, corbeille: true, parametres: true, journal: true,
+            comptes_create: true, comptes_edit: true, comptes_delete: true, todos_manage: true,
+            incidents_manage: true, sync_dotb: true, export_data: true, import_data: true
+        },
+        cadre: {
+            comptes: true, todos: true, classement: true, gagnants: true, incidents: true, messagerie: true,
+            organisations: false, utilisateurs: true, corbeille: true, parametres: true, journal: true,
+            comptes_create: true, comptes_edit: true, comptes_delete: true, todos_manage: true,
+            incidents_manage: true, sync_dotb: false, export_data: true, import_data: false
+        },
+        agent: {
+            comptes: true, todos: true, classement: true, gagnants: true, incidents: true, messagerie: true,
+            organisations: false, utilisateurs: false, corbeille: false, parametres: false, journal: false,
+            comptes_create: false, comptes_edit: false, comptes_delete: false, todos_manage: true,
+            incidents_manage: true, sync_dotb: false, export_data: false, import_data: false
+        },
+        read_only: {
+            comptes: true, todos: true, classement: true, gagnants: true, incidents: true, messagerie: true,
+            organisations: false, utilisateurs: false, corbeille: false, parametres: false, journal: false,
+            comptes_create: false, comptes_edit: false, comptes_delete: false, todos_manage: false,
+            incidents_manage: false, sync_dotb: false, export_data: false, import_data: false
+        }
+    },
+
+    getPermissions: function(user) {
+        if (!user) return {};
+        const role = user.role || 'agent';
+        const basePreset = this.PRESETS[role] || this.PRESETS.agent;
+        if (!user.permissions || typeof user.permissions !== 'object') {
+            return { ...basePreset };
+        }
+        return {
+            ...basePreset,
+            ...user.permissions
+        };
+    },
+
+    can: function(user, permKey) {
+        if (!user) return false;
+        if (user.role === 'admin' && (!user.permissions || user.permissions[permKey] === undefined)) {
+            return true;
+        }
+        const perms = this.getPermissions(user);
+        return Boolean(perms[permKey]);
+    }
+};
+
 // ------------------- TOAST NOTIFICATION -------------------
 function Toast({ toast }) {
     if (!toast || !toast.visible) return null;
@@ -16,11 +95,11 @@ function Toast({ toast }) {
 }
 
 // ------------------- SIDEBAR NAVIGATION -------------------
-function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0, isOpen = false }) {
+function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0, todoUrgentCount = 0, isOpen = false }) {
     if (!currentUser) return null;
 
     const isAdmin = currentUser.role === 'admin';
-    const isCadre = currentUser.role === 'cadre' || isAdmin;
+    const canAccess = (viewKey) => PermissionManager.can(currentUser, viewKey);
 
     return (
         <aside className={`sidebar ${isOpen ? 'open' : ''}`} id="sidebar">
@@ -39,7 +118,7 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                         background: currentUser.role === 'admin' ? '#9333ea' : (currentUser.role === 'cadre' ? '#0284c7' : '#16a34a'),
                         color: 'white', fontSize: '11px', padding: '2px 8px'
                     }}>
-                        {currentUser.role === 'admin' ? 'Admin' : (currentUser.role === 'cadre' ? 'Admin' : 'Agent')}
+                        {currentUser.role === 'admin' ? 'Admin' : (currentUser.role === 'cadre' ? 'Cadre' : 'Agent')}
                     </span>
                     <button className="btn btn-danger btn-sm" onClick={onLogout} title="Se déconnecter" style={{ padding: '3px 8px', fontSize: '11px' }}>
                         <i className="fa-solid fa-right-from-bracket"></i> Déconnexion
@@ -47,8 +126,8 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                 </div>
             </div>
 
-            {/* Selector Organisation (Seulement pour Admin) */}
-            {isAdmin && (
+            {/* Selector Organisation (Seulement si autorisé) */}
+            {canAccess('organisations') && (
                 <div id="orgSelectorWidget" style={{ padding: '10px 14px', background: 'rgba(9, 177, 186, 0.04)', borderRadius: '8px', margin: '0 12px 14px 12px', border: '1px solid rgba(9, 177, 186, 0.15)' }}>
                     <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>🏢 Organisation Active</label>
                     <select
@@ -62,51 +141,62 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                 </div>
             )}
 
-            {/* Menu Nav Links */}
+            {/* Menu Nav Links avec permissions personnalisées */}
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                <button className={`nav-btn ${activeView === 'dashboard' ? 'active' : ''}`} onClick={() => onSelectView('dashboard')}>
-                    <i className="fa-solid fa-calendar-days"></i> Calendrier
-                </button>
-
-                <button className={`nav-btn ${activeView === 'comptes' ? 'active' : ''}`} onClick={() => onSelectView('comptes')}>
-                    <i className="fa-solid fa-store"></i> Comptes
-                </button>
-
-                {isCadre && (
-                    <button className={`nav-btn ${activeView === 'planning' ? 'active' : ''}`} onClick={() => onSelectView('planning')}>
-                        <i className="fa-solid fa-wand-magic-sparkles"></i> Génération
+                {canAccess('comptes') && (
+                    <button className={`nav-btn ${activeView === 'comptes' ? 'active' : ''}`} onClick={() => onSelectView('comptes')} id="nav-btn-comptes">
+                        <i className="fa-solid fa-store"></i> Comptes
                     </button>
                 )}
 
-                <button className={`nav-btn ${activeView === 'classement' ? 'active' : ''}`} onClick={() => onSelectView('classement')}>
-                    <i className="fa-solid fa-trophy"></i> Classement
-                </button>
+                {canAccess('todos') && (
+                    <button className={`nav-btn ${activeView === 'todos' ? 'active' : ''}`} onClick={() => onSelectView('todos')} id="nav-btn-todos">
+                        <i className="fa-solid fa-list-check"></i> To-Do & Rappels
+                        {todoUrgentCount > 0 && (
+                            <span className="badge badge-urgent-pulse" style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '10.5px', padding: '2px 7px', borderRadius: '10px' }}>
+                                {todoUrgentCount}
+                            </span>
+                        )}
+                    </button>
+                )}
 
-                <button className={`nav-btn ${activeView === 'gagnants' ? 'active' : ''}`} onClick={() => onSelectView('gagnants')}>
-                    <i className="fa-solid fa-lightbulb"></i> Suggestions
-                </button>
+                {canAccess('classement') && (
+                    <button className={`nav-btn ${activeView === 'classement' ? 'active' : ''}`} onClick={() => onSelectView('classement')}>
+                        <i className="fa-solid fa-trophy"></i> Classement
+                    </button>
+                )}
 
-                <button className={`nav-btn ${activeView === 'incidents' ? 'active' : ''}`} onClick={() => onSelectView('incidents')}>
-                    <i className="fa-solid fa-triangle-exclamation"></i> Incidents
-                </button>
+                {canAccess('gagnants') && (
+                    <button className={`nav-btn ${activeView === 'gagnants' ? 'active' : ''}`} onClick={() => onSelectView('gagnants')}>
+                        <i className="fa-solid fa-lightbulb"></i> Suggestions
+                    </button>
+                )}
 
-                <button className={`nav-btn ${activeView === 'messagerie' ? 'active' : ''}`} onClick={() => onSelectView('messagerie')}>
-                    <i className="fa-solid fa-comments"></i> Messagerie Vinted
-                </button>
+                {canAccess('incidents') && (
+                    <button className={`nav-btn ${activeView === 'incidents' ? 'active' : ''}`} onClick={() => onSelectView('incidents')}>
+                        <i className="fa-solid fa-triangle-exclamation"></i> Incidents
+                    </button>
+                )}
 
-                {isAdmin && (
+                {canAccess('messagerie') && (
+                    <button className={`nav-btn ${activeView === 'messagerie' ? 'active' : ''}`} onClick={() => onSelectView('messagerie')}>
+                        <i className="fa-solid fa-comments"></i> Messagerie Vinted
+                    </button>
+                )}
+
+                {canAccess('organisations') && (
                     <button className={`nav-btn ${activeView === 'organisations' ? 'active' : ''}`} onClick={() => onSelectView('organisations')}>
                         <i className="fa-solid fa-sitemap"></i> Organisations
                     </button>
                 )}
 
-                {isCadre && (
+                {canAccess('utilisateurs') && (
                     <button className={`nav-btn ${activeView === 'utilisateurs' ? 'active' : ''}`} onClick={() => onSelectView('utilisateurs')}>
                         <i className="fa-solid fa-users-gear"></i> Utilisateurs
                     </button>
                 )}
 
-                {isCadre && (
+                {canAccess('corbeille') && (
                     <button className={`nav-btn ${activeView === 'corbeille' ? 'active' : ''}`} onClick={() => onSelectView('corbeille')}>
                         <i className="fa-solid fa-trash-can"></i> Corbeille
                         {corbeilleCount > 0 && (
@@ -117,13 +207,13 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                     </button>
                 )}
 
-                {isCadre && (
+                {canAccess('parametres') && (
                     <button className={`nav-btn ${activeView === 'parametres' ? 'active' : ''}`} onClick={() => onSelectView('parametres')}>
                         <i className="fa-solid fa-sliders"></i> Paramètres
                     </button>
                 )}
 
-                {isCadre && (
+                {canAccess('journal') && (
                     <button className={`nav-btn ${activeView === 'journal' ? 'active' : ''}`} onClick={() => onSelectView('journal')}>
                         <i className="fa-solid fa-clock-rotate-left"></i> Journal
                     </button>
@@ -173,1014 +263,9 @@ function convertHHMM(timeStr, dateStr, fromTZ, toTZ) {
     return { time: `${finalH}:${finalM}`, dayShift };
 }
 
-// ------------------- VIEW: DASHBOARD / CALENDRIER -------------------
-function DashboardView({ appState, currentUser, onUpdateRow, onDeleteRow, onAddRowClick, onBulkUpdateCalendrier, onBulkDeleteCalendrier, selectedTZ = 'FR' }) {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterDate, setFilterDate] = useState('');
-    const [filterHeure, setFilterHeure] = useState('');
-    const [filterComptes, setFilterComptes] = useState([]); // multi-select
-    const [showCompteDropdown, setShowCompteDropdown] = useState(false);
-    const [filterAgent, setFilterAgent] = useState((currentUser && currentUser.role === 'agent') ? (currentUser.agentAssigne || '') : '');
-    const [filterStatut, setFilterStatut] = useState('');
-    const [filterClassif, setFilterClassif] = useState('');
-    const [filterOnlyDuplicates, setFilterOnlyDuplicates] = useState(false);
-    const [selectedIds, setSelectedIds] = useState([]);
-    const [copiedSkuId, setCopiedSkuId] = useState(null);
-    const isAgent = currentUser && currentUser.role === 'agent';
-    const myAgentName = useMemo(() => isAgent ? (currentUser.agentAssigne || currentUser.nom || '').trim() : '', [currentUser, isAgent]);
-
-    const resetAllFilters = () => {
-        setSearchTerm('');
-        setFilterDate('');
-        setFilterHeure('');
-        setFilterComptes([]);
-        if (!isAgent) setFilterAgent('');
-        setFilterStatut('');
-        setFilterClassif('');
-        setFilterOnlyDuplicates(false);
-    };
-
-    const isAnyFilterActive = useMemo(() => {
-        return Boolean(searchTerm || filterDate || filterHeure || filterComptes.length > 0 || (!isAgent && filterAgent) || filterStatut || filterClassif || filterOnlyDuplicates);
-    }, [searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, filterOnlyDuplicates, isAgent]);
-
-    // Fermer dropdown Compte si clic en dehors
-    React.useEffect(() => {
-        const close = (e) => {
-            if (!e.target.closest('#compte-multiselect-wrapper')) setShowCompteDropdown(false);
-        };
-        document.addEventListener('mousedown', close);
-        return () => document.removeEventListener('mousedown', close);
-    }, []);
-
-    // Auto-sync arrière-plan toutes les 2 minutes pour rafraîchir automatiquement les vues, likes, ventes, statut 'Fait' et heures DotB
-    useEffect(() => {
-        const autoSyncInterval = setInterval(async () => {
-            try {
-                const params = appState.parametres || {};
-                if (params.dotbApiKey) {
-                    await fetch('/api/dotb/fetch-live', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            token: params.dotbApiKey,
-                            period: '30days',
-                            selectedTypes: ['items_published', 'orders', 'views_likes']
-                        })
-                    });
-                    if (window.loadAppState) await window.loadAppState();
-                }
-            } catch (e) {
-                console.warn('[Auto-Sync DotB]', e.message);
-            }
-        }, 120000); // 2 minutes
-        return () => clearInterval(autoSyncInterval);
-    }, [appState.parametres]);
-
-    const comptesAll = appState.comptes || [];
-    const calendrierAll = appState.calendrier || [];
-
-    const agentsUnique = useMemo(() => {
-        const set = new Set();
-        (appState.utilisateurs || []).forEach(u => {
-            if (u.nom) set.add(u.nom.trim());
-            if (u.agentAssigne) set.add(u.agentAssigne.trim());
-        });
-        (appState.comptes || []).forEach(c => {
-            if (c.agent) set.add(c.agent.trim());
-        });
-        (appState.calendrier || []).forEach(l => {
-            if (l.agent) set.add(l.agent.trim());
-        });
-        return Array.from(set).filter(Boolean).sort();
-    }, [appState]);
-
-    // Pour un agent, restreindre la liste des comptes uniquement à ses comptes délégués
-    const comptes = useMemo(() => {
-        if (isAgent && myAgentName) {
-            return comptesAll.filter(c => c.agent && c.agent.trim().toLowerCase() === myAgentName.toLowerCase());
-        }
-        return comptesAll;
-    }, [comptesAll, isAgent, myAgentName]);
-
-    const myAccountIdentifiers = useMemo(() => {
-        const set = new Set();
-        (comptes || []).forEach(c => {
-            if (c.id) set.add(String(c.id).toLowerCase());
-            if (c.numeroCompte) {
-                set.add(String(c.numeroCompte).toLowerCase());
-                set.add(`compte_${c.numeroCompte}`.toLowerCase());
-            }
-            if (c.pseudo) set.add(String(c.pseudo).toLowerCase());
-        });
-        return set;
-    }, [comptes]);
-
-    // Lignes de base : Pour un Agent, afficher ses lignes attribuées OU les lignes de ses comptes attribués
-    const baseLines = useMemo(() => {
-        if (isAgent && myAgentName) {
-            return calendrierAll.filter(l => {
-                const lineAgent = (l.agent || '').trim().toLowerCase();
-                if (lineAgent && lineAgent === myAgentName.toLowerCase()) return true;
-                const lineCompteId = (l.compteId || '').toString().toLowerCase();
-                if (lineCompteId && myAccountIdentifiers.has(lineCompteId)) return true;
-                return false;
-            });
-        }
-        return calendrierAll;
-    }, [calendrierAll, isAgent, myAgentName, myAccountIdentifiers]);
-
-    const [sortField, setSortField] = useState('dateTime');
-    const [sortAsc, setSortAsc] = useState(true);
-
-    const handleSort = (field) => {
-        if (sortField === field) {
-            setSortAsc(!sortAsc);
-        } else {
-            setSortField(field);
-            setSortAsc(true);
-        }
-    };
-
-    // Détection des doublons SKU sur l'ensemble du calendrier
-    const skuCounts = useMemo(() => {
-        const counts = {};
-        (calendrierAll || []).forEach(l => {
-            const s = (l.sku || '').trim().toLowerCase();
-            if (s) {
-                counts[s] = (counts[s] || 0) + 1;
-            }
-        });
-        return counts;
-    }, [calendrierAll]);
-
-    const duplicateSkuCount = useMemo(() => {
-        const dupes = new Set();
-        Object.entries(skuCounts).forEach(([sku, count]) => {
-            if (count > 1) dupes.add(sku);
-        });
-        return dupes.size;
-    }, [skuCounts]);
-
-    const filteredLines = useMemo(() => {
-        return baseLines.filter(l => {
-            if (filterOnlyDuplicates) {
-                const s = (l.sku || '').trim().toLowerCase();
-                if (!s || (skuCounts[s] || 0) <= 1) return false;
-            }
-            if (filterDate && l.date !== filterDate) return false;
-            if (filterHeure && l.heurePrevue !== filterHeure) return false;
-            if (filterComptes.length > 0) {
-                const lineCompteId = (l.compteId || '').toString().toLowerCase();
-                const matched = filterComptes.some(fc => {
-                    const fcStr = (fc || '').toString().toLowerCase();
-                    return lineCompteId === fcStr || lineCompteId.includes(fcStr) || fcStr.includes(lineCompteId);
-                });
-                if (!matched) return false;
-            }
-            if (filterStatut && l.statut !== filterStatut) return false;
-            if (filterClassif) {
-                const isGagnantFilter = filterClassif.includes('Gagnant');
-                const lineClassif = l.classification || (l.sku && winnerSkusSet.has(String(l.sku).trim().toLowerCase()) ? 'Gagnant' : '');
-                const isMatch = lineClassif.includes(filterClassif) ||
-                                (isGagnantFilter && l.sku && winnerSkusSet.has(String(l.sku).trim().toLowerCase())) ||
-                                (isGagnantFilter && (l.vente > 0 || l.transactionId || l.source === 'Import CSV DotB'));
-                if (!isMatch) return false;
-            }
-
-            if (searchTerm.trim()) {
-                const q = searchTerm.trim().toLowerCase();
-                const cObj = comptesAll.find(c => 
-                    c.id === l.compteId || 
-                    String(c.id).toLowerCase() === String(l.compteId).toLowerCase() ||
-                    String(c.numeroCompte) === String(l.compteId) ||
-                    `compte_${c.numeroCompte}` === String(l.compteId)
-                );
-                const pseudoStr = cObj ? (cObj.pseudo || '').toLowerCase() : '';
-                const numProxyStr = cObj && cObj.numeroCompte ? String(cObj.numeroCompte).toLowerCase() : '';
-                const emailStr = cObj && cObj.email ? (cObj.email || '').toLowerCase() : '';
-                const telStr = cObj && cObj.telephone ? String(cObj.telephone).toLowerCase() : '';
-
-                const skuStr = (l.sku || '').toLowerCase();
-                const agentStr = (l.agent || '').toLowerCase();
-                const statutStr = (l.statut || '').toLowerCase();
-                const classifStr = (l.classification || '').toLowerCase();
-                const dateStr = (l.date || '').toLowerCase();
-                const heureStr = (l.heurePrevue || '').toLowerCase();
-                const jourStr = (l.jour || '').toLowerCase();
-
-                let dateFrStr = '';
-                if (l.date && l.date.includes('-')) {
-                    const parts = l.date.split('-');
-                    if (parts.length === 3) {
-                        dateFrStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                    }
-                }
-
-                const matches = (
-                    skuStr.includes(q) ||
-                    pseudoStr.includes(q) ||
-                    numProxyStr.includes(q) ||
-                    emailStr.includes(q) ||
-                    telStr.includes(q) ||
-                    agentStr.includes(q) ||
-                    statutStr.includes(q) ||
-                    classifStr.includes(q) ||
-                    dateStr.includes(q) ||
-                    dateFrStr.includes(q) ||
-                    heureStr.includes(q) ||
-                    jourStr.includes(q)
-                );
-
-                if (!matches) return false;
-            }
-            return true;
-        }).sort((a, b) => {
-            const parseDateAndMinutes = (dateStr, timeStr) => {
-                const d = dateStr || '1970-01-01';
-                let [h, m] = (timeStr || '00:00').split(':').map(n => parseInt(n) || 0);
-                const hPad = String(h).padStart(2, '0');
-                const mPad = String(m).padStart(2, '0');
-                return `${d} ${hPad}:${mPad}`;
-            };
-
-            let res = 0;
-            if (sortField === 'dateTime') {
-                const keyA = parseDateAndMinutes(a.date, a.heurePrevue);
-                const keyB = parseDateAndMinutes(b.date, b.heurePrevue);
-                res = keyA.localeCompare(keyB);
-            } else if (sortField === 'date') {
-                res = (a.date || '').localeCompare(b.date || '');
-            } else if (sortField === 'heure') {
-                res = (a.heurePrevue || '').localeCompare(b.heurePrevue || '');
-            } else if (sortField === 'score') {
-                res = (a.score || 0) - (b.score || 0);
-            } else if (sortField === 'sku') {
-                res = (a.sku || '').localeCompare(b.sku || '');
-            } else {
-                const keyA = parseDateAndMinutes(a.date, a.heurePrevue);
-                const keyB = parseDateAndMinutes(b.date, b.heurePrevue);
-                res = keyA.localeCompare(keyB);
-            }
-
-            return sortAsc ? res : -res;
-        });
-    }, [baseLines, searchTerm, filterDate, filterHeure, filterComptes, filterAgent, filterStatut, filterClassif, filterOnlyDuplicates, skuCounts, comptesAll, sortField, sortAsc]);
-
-    const isAllSelected = useMemo(() => {
-        return filteredLines.length > 0 && filteredLines.every(l => selectedIds.includes(l.id));
-    }, [filteredLines, selectedIds]);
-
-    const toggleSelectAll = () => {
-        if (isAllSelected) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(filteredLines.map(l => l.id));
-        }
-    };
-
-    const toggleSelectRow = (id) => {
-        setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
-    };
-
-    const handleBulkStatut = async (newStatut) => {
-        if (selectedIds.length === 0 || !onBulkUpdateCalendrier) return;
-        await onBulkUpdateCalendrier(selectedIds, { statut: newStatut });
-        setSelectedIds([]);
-    };
-
-    const handleBulkAgent = async (newAgent) => {
-        if (selectedIds.length === 0 || !newAgent || !onBulkUpdateCalendrier) return;
-        await onBulkUpdateCalendrier(selectedIds, { agent: newAgent });
-        setSelectedIds([]);
-    };
-
-    const handleBulkHeure = async (newHeure) => {
-        if (selectedIds.length === 0 || !newHeure || !onBulkUpdateCalendrier) return;
-        await onBulkUpdateCalendrier(selectedIds, { heurePrevue: newHeure });
-        setSelectedIds([]);
-    };
-
-    const handleBulkDelete = async () => {
-        if (selectedIds.length === 0 || !onBulkDeleteCalendrier) return;
-        if (window.confirm(`Voulez-vous vraiment supprimer ces ${selectedIds.length} lignes sélectionnées ?`)) {
-            await onBulkDeleteCalendrier(selectedIds);
-            setSelectedIds([]);
-        }
-    };
-
-    // Fetch consolidated SKU summary to identify all Winning SKUs (Produits Gagnants)
-    const [apiSkuSummary, setApiSkuSummary] = useState([]);
-
-    useEffect(() => {
-        let isMounted = true;
-        fetch('/api/sku/summary')
-            .then(res => res.json())
-            .then(data => {
-                if (isMounted && Array.isArray(data)) {
-                    setApiSkuSummary(data);
-                }
-            })
-            .catch(err => console.warn("Err fetching SKU summary in Calendrier:", err));
-        return () => { isMounted = false; };
-    }, [calendrierAll]);
-
-    // Set of all SKUs classified as Gagnants across the organization & DotB Cloud
-    const winnerSkusSet = useMemo(() => {
-        const set = new Set();
-        (apiSkuSummary || []).forEach(s => {
-            if (s.sku && s.classification && s.classification.includes('Gagnant')) {
-                set.add(String(s.sku).trim().toLowerCase());
-            }
-        });
-        (calendrierAll || []).forEach(l => {
-            if (l.sku && (l.classification === 'Gagnant' || l.vente > 0 || l.transactionId || l.source === 'Import CSV DotB')) {
-                set.add(String(l.sku).trim().toLowerCase());
-            }
-        });
-        return set;
-    }, [apiSkuSummary, calendrierAll]);
-
-    // KPI Métriques calculées
-    const totalVentes = useMemo(() => baseLines.reduce((sum, l) => sum + (l.vente || 0), 0), [baseLines]);
-    const pubsFaite = useMemo(() => baseLines.filter(l => l.statut === 'Fait').length, [baseLines]);
-    const totalPubs = baseLines.length;
-    const avgScore = useMemo(() => totalPubs > 0 ? (baseLines.reduce((sum, l) => sum + (l.score || 0), 0) / totalPubs).toFixed(1) : "0.0", [baseLines, totalPubs]);
-    
-    // Total Produits Gagnants dans toute l'organisation & DotB Cloud
-    const winnersCount = useMemo(() => {
-        if (apiSkuSummary && apiSkuSummary.length > 0) {
-            return apiSkuSummary.filter(s => (s.classification || '').includes('Gagnant')).length;
-        }
-        return winnerSkusSet.size;
-    }, [apiSkuSummary, winnerSkusSet]);
-
-
-    // Nombre de ventes par SKU sur toute l'organisation
-    const skuVentesMap = useMemo(() => {
-        const map = {};
-        calendrierAll.forEach(l => {
-            if (l.sku && l.vente === 1) {
-                map[l.sku] = (map[l.sku] || 0) + 1;
-            }
-        });
-        return map;
-    }, [calendrierAll]);
-
-    const handleCleanEmptySKUs = async () => {
-        if (!confirm("Voulez-vous vraiment supprimer toutes les lignes de planning sans SKU ?")) return;
-        try {
-            const orgId = (currentUser && currentUser.organisationId) || 'org_default';
-            const res = await fetch('/api/calendrier/clean-empty-skus', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ organisationId: orgId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                if (window.showToast) window.showToast(data.message);
-                if (window.loadAppState) await window.loadAppState();
-            } else {
-                if (window.showToast) window.showToast(`❌ ${data.error}`, true);
-            }
-        } catch (err) {
-            console.error("Erreur nettoyage SKU:", err);
-        }
-    };
-
-    const handleFillMissingSKUs = async () => {
-        try {
-            const orgId = (currentUser && currentUser.organisationId) || 'org_default';
-            const res = await fetch('/api/calendrier/fill-missing-skus', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ organisationId: orgId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                if (window.showToast) window.showToast(data.message);
-                if (window.loadAppState) await window.loadAppState();
-            } else {
-                if (window.showToast) window.showToast(`❌ ${data.error}`, true);
-            }
-        } catch (err) {
-            console.error("Erreur remplissage SKU:", err);
-        }
-    };
-
-    return (
-        <section className="view">
-            <div className="header-actions">
-                <div>
-                    <h2 className="page-title">Tableau de Bord & Calendrier</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Suivi temps réel des publications, scores et réinterventions</p>
-                </div>
-                {(currentUser && currentUser.role !== 'agent') && (
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <button type="button" className="btn btn-secondary" onClick={async () => { if (window.loadAppState) await window.loadAppState(); if (window.showToast) window.showToast("Données rafraîchies !"); }} title="Rafraîchir les données">
-                            <i className="fa-solid fa-rotate-right"></i> Rafraîchir
-                        </button>
-                        <button type="button" className="btn btn-secondary" onClick={handleFillMissingSKUs} style={{ color: '#059669', borderColor: '#a7f3d0' }} title="Ré-attribuer automatiquement des SKUs du catalogue sur les lignes sans SKU">
-                            <i className="fa-solid fa-wand-magic-sparkles"></i> Auto-Remplir SKUs
-                        </button>
-                        <button type="button" className="btn btn-secondary" onClick={handleCleanEmptySKUs} style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} title="Supprimer toutes les lignes sans SKU">
-                            <i className="fa-solid fa-broom"></i> Nettoyer (sans SKU)
-                        </button>
-                        <button className="btn btn-primary" onClick={onAddRowClick}>
-                            <i className="fa-solid fa-plus"></i> Ajouter une ligne
-                        </button>
-                    </div>
-                )}
-            </div>
-
-
-            {/* FILTRES & KPI METRIQUES */}
-            <div className="metrics-grid">
-                <div className="metric-card">
-                    <div className="metric-icon teal"><i className="fa-solid fa-calendar-check"></i></div>
-                    <div className="metric-info">
-                        <h4>PUBLICATIONS FAITES</h4>
-                        <div className="value">{pubsFaite} / {totalPubs}</div>
-                    </div>
-                </div>
-                <div className="metric-card">
-                    <div className="metric-icon green"><i className="fa-solid fa-bag-shopping"></i></div>
-                    <div className="metric-info">
-                        <h4>VENTES TOTALES</h4>
-                        <div className="value">{totalVentes}</div>
-                    </div>
-                </div>
-                <div className="metric-card">
-                    <div className="metric-icon blue"><i className="fa-solid fa-star"></i></div>
-                    <div className="metric-info">
-                        <h4>SCORE MOYEN</h4>
-                        <div className="value">{avgScore}</div>
-                    </div>
-                </div>
-                <div className="metric-card">
-                    <div className="metric-icon purple"><i className="fa-solid fa-trophy"></i></div>
-                    <div className="metric-info">
-                        <h4>PRODUITS GAGNANTS</h4>
-                        <div className="value">{winnersCount}</div>
-                    </div>
-                </div>
-            </div>
-
-            {/* BANNIÈRE VOS COMPTES VINTED ATTRIBUÉS (POUR LES AGENTS) */}
-            {isAgent && (
-                <div className="card" style={{ marginBottom: '20px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#ffffff', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ backgroundColor: '#09b1ba', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '16px' }}>
-                                <i className="fa-solid fa-user-check"></i>
-                            </div>
-                            <div>
-                                <h4 style={{ margin: 0, fontSize: '15px', color: '#ffffff', fontWeight: 700 }}>Vos Comptes Vinted Attribués ({comptes.length})</h4>
-                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>Agent connecté : <b style={{ color: '#38bdf8' }}>{currentUser.nom || myAgentName}</b></span>
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                            {comptes.length > 0 ? (
-                                comptes.map(c => (
-                                    <div key={c.id} style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', padding: '6px 14px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.18)', display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-                                        <span style={{ color: '#38bdf8', fontWeight: 700 }}>N°{c.numeroCompte || '?'}</span>
-                                        <b style={{ color: '#ffffff' }}>{c.pseudo}</b>
-                                        <span className={`badge ${c.statut === 'Actif' ? 'badge-actif' : (c.statut === 'Pause' ? 'badge-pause' : (c.statut === 'Banni' ? 'badge-banni' : 'badge-limite'))}`} style={{ fontSize: '10.5px', padding: '2px 7px' }}>
-                                            {c.statut}
-                                        </span>
-                                    </div>
-                                ))
-                            ) : (
-                                <span style={{ fontSize: '13px', color: '#cbd5e1', fontStyle: 'italic' }}>Aucun compte actuellement attribué.</span>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* FILTRES */}
-            <div className="card" style={{ marginBottom: '24px' }}>
-                {/* BARRE DE RECHERCHE GLOBALE INSTANTANÉE */}
-                <div style={{ marginBottom: '16px', position: 'relative', width: '100%' }}>
-                    <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)', fontSize: '15px' }}></i>
-                    <input
-                        type="text"
-                        className="input"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="🔍 Recherche avancée instantanée (SKU, Pseudo compte, N° Proxy, Agent, Statut, Date, Heure...)"
-                        style={{ paddingLeft: '42px', paddingRight: '36px', height: '44px', fontSize: '14px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', border: searchTerm ? '2px solid var(--primary)' : '1px solid var(--border)' }}
-                    />
-                    {searchTerm && (
-                        <button type="button" onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px' }}>
-                            ✕
-                        </button>
-                    )}
-                </div>
-
-                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {/* FILTRE COMPTE — MULTI-SELECT CHECKBOXES */}
-                    <div id="compte-multiselect-wrapper" style={{ minWidth: '180px', flex: 1, position: 'relative' }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Compte</label>
-                        <button
-                            type="button"
-                            onClick={() => setShowCompteDropdown(v => !v)}
-                            style={{
-                                width: '100%', textAlign: 'left', padding: '9px 12px',
-                                border: `1px solid ${filterComptes.length > 0 ? 'var(--primary)' : 'var(--border)'}`,
-                                borderRadius: 'var(--radius-sm)', background: 'var(--bg-card)',
-                                color: filterComptes.length > 0 ? 'var(--primary)' : 'var(--text-main)',
-                                fontWeight: filterComptes.length > 0 ? 700 : 400,
-                                cursor: 'pointer', fontSize: '13.5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                            }}
-                        >
-                            <span>
-                                {filterComptes.length === 0
-                                    ? `Tous les comptes (${comptes.length})`
-                                    : filterComptes.length === 1
-                                        ? comptes.find(c => c.id === filterComptes[0])?.pseudo || '1 compte'
-                                        : `${filterComptes.length} comptes sélectionnés`
-                                }
-                            </span>
-                            <i className={`fa-solid fa-chevron-${showCompteDropdown ? 'up' : 'down'}`} style={{ fontSize: '11px', marginLeft: '8px' }}></i>
-                        </button>
-
-                        {showCompteDropdown && (
-                            <div style={{
-                                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-                                background: 'var(--bg-card)', border: '1px solid var(--border)',
-                                borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                zIndex: 999, maxHeight: '260px', overflowY: 'auto', padding: '6px 0'
-                            }}>
-                                {/* Tout sélectionner / Tout désélectionner */}
-                                <div
-                                    style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}
-                                    onClick={() => setFilterComptes(filterComptes.length === comptes.length ? [] : comptes.map(c => c.id))}
-                                >
-                                    <input type="checkbox" readOnly checked={filterComptes.length === comptes.length} style={{ width: '14px', height: '14px' }} />
-                                    {filterComptes.length === comptes.length ? 'Tout désélectionner' : 'Tout sélectionner'}
-                                </div>
-                                {comptes.map(c => (
-                                    <div
-                                        key={c.id}
-                                        style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: filterComptes.includes(c.id) ? 'rgba(9,177,186,0.07)' : 'transparent', transition: 'background 0.1s' }}
-                                        onClick={() => setFilterComptes(prev => prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id])}
-                                    >
-                                        <input type="checkbox" readOnly checked={filterComptes.includes(c.id)} style={{ width: '14px', height: '14px', accentColor: 'var(--primary)' }} />
-                                        <span style={{ fontWeight: filterComptes.includes(c.id) ? 600 : 400, color: filterComptes.includes(c.id) ? 'var(--primary)' : 'var(--text-main)', fontSize: '13px' }}>
-                                            {c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`)}
-                                        </span>
-                                        {c.numeroCompte && <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>N°{c.numeroCompte}</span>}
-                                    </div>
-                                ))}
-                                {filterComptes.length > 0 && (
-                                    <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)' }}>
-                                        <button type="button" style={{ fontSize: '12px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
-                                            onClick={() => { setFilterComptes([]); setShowCompteDropdown(false); }}>
-                                            ✕ Effacer la sélection
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    {/* FILTRE DATE */}
-                    <div style={{ minWidth: '140px', flex: 1 }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Date</label>
-                        <input
-                            type="date"
-                            className="input"
-                            value={filterDate}
-                            onChange={(e) => setFilterDate(e.target.value)}
-                            style={{ border: filterDate ? '1px solid var(--primary)' : '1px solid var(--border)', fontWeight: filterDate ? 700 : 400 }}
-                        />
-                    </div>
-
-                    {/* FILTRE HEURE */}
-                    <div style={{ minWidth: '120px', flex: 1 }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Heure</label>
-                        <input
-                            type="time"
-                            className="input"
-                            value={filterHeure}
-                            onChange={(e) => setFilterHeure(e.target.value)}
-                            style={{ border: filterHeure ? '1px solid var(--primary)' : '1px solid var(--border)', fontWeight: filterHeure ? 700 : 400 }}
-                        />
-                    </div>
-
-                    <div style={{ minWidth: '160px', flex: 1 }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Agent</label>
-                        <select className="input" value={filterAgent} onChange={(e) => setFilterAgent(e.target.value)} disabled={currentUser && currentUser.role === 'agent'}>
-                            <option value="">Tous les agents</option>
-                            {agentsUnique.map(a => (
-                                <option key={a} value={a}>{a}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div style={{ minWidth: '130px', flex: 1 }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Statut</label>
-                        <select className="input" value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)}>
-                            <option value="">Tous les statuts</option>
-                            <option value="Non fait">Non fait</option>
-                            <option value="Fait">Fait</option>
-                        </select>
-                    </div>
-                    <div style={{ minWidth: '140px', flex: 1 }}>
-                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Classification</label>
-                        <select className="input" value={filterClassif} onChange={(e) => setFilterClassif(e.target.value)}>
-                            <option value="">Toutes</option>
-                            <option value="Nouveau produit">🆕 Nouveau produit</option>
-                            <option value="À retester">🔄 À retester</option>
-                            <option value="Gagnant">🏆 Gagnant</option>
-                            <option value="Écarté">❌ Écarté</option>
-                        </select>
-                    </div>
-
-                    {duplicateSkuCount > 0 && (
-                        <div style={{ marginTop: '20px' }}>
-                            <button
-                                type="button"
-                                className="btn btn-sm"
-                                onClick={() => setFilterOnlyDuplicates(!filterOnlyDuplicates)}
-                                style={{
-                                    height: '36px',
-                                    padding: '0 12px',
-                                    fontSize: '12px',
-                                    fontWeight: 700,
-                                    borderRadius: '8px',
-                                    border: '1px solid #f97316',
-                                    color: filterOnlyDuplicates ? '#ffffff' : '#c2410c',
-                                    backgroundColor: filterOnlyDuplicates ? '#ea580c' : '#fff7ed',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.2s ease'
-                                }}
-                                title="Cliquer pour afficher uniquement les lignes avec un SKU en doublon"
-                            >
-                                <i className="fa-solid fa-clone" style={{ color: filterOnlyDuplicates ? '#fff' : '#ea580c' }}></i>
-                                <span>{filterOnlyDuplicates ? '✓ Doublons SKU Filtrés' : `⚠️ ${duplicateSkuCount} SKU${duplicateSkuCount > 1 ? 's' : ''} en doublon`}</span>
-                            </button>
-                        </div>
-                    )}
-
-                    {isAnyFilterActive && (
-                        <div style={{ marginTop: '20px' }}>
-                            <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                onClick={resetAllFilters}
-                                style={{ color: 'var(--danger)', borderColor: '#fca5a5', backgroundColor: '#fef2f2', fontWeight: 600, height: '36px' }}
-                                title="Réinitialiser tous les filtres actifs"
-                            >
-                                <i className="fa-solid fa-rotate-left"></i> Réinitialiser
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* FLOATING BULK ACTIONS BAR */}
-            {selectedIds.length > 0 && (
-                <div style={{
-                    position: 'sticky',
-                    top: '10px',
-                    zIndex: 1000,
-                    backgroundColor: '#0f172a',
-                    color: '#ffffff',
-                    padding: '12px 18px',
-                    borderRadius: '12px',
-                    marginBottom: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
-                    flexWrap: 'wrap',
-                    gap: '12px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600, fontSize: '13.5px' }}>
-                        <span style={{ backgroundColor: '#09b1ba', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', color: '#fff' }}>
-                            ✓ {selectedIds.length} sélectionné{selectedIds.length > 1 ? 's' : ''}
-                        </span>
-                        <span>Actions en masse :</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <button type="button" className="btn btn-sm" style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkStatut('Fait')}>
-                            ✓ Marquer Fait
-                        </button>
-                        <button type="button" className="btn btn-sm" style={{ backgroundColor: '#f59e0b', color: '#fff', border: 'none', padding: '6px 12px', fontSize: '12px' }} onClick={() => handleBulkStatut('Non fait')}>
-                            ⌛ Marquer Non fait
-                        </button>
-
-                        {agentsUnique.length > 0 && (
-                            <select
-                                className="input-table"
-                                style={{ width: 'auto', backgroundColor: '#334155', color: '#fff', border: '1px solid #475569', padding: '5px 10px', fontSize: '12px' }}
-                                onChange={(e) => {
-                                    if (e.target.value) {
-                                        handleBulkAgent(e.target.value);
-                                        e.target.value = '';
-                                    }
-                                }}
-                            >
-                                <option value="">👤 Affecter Agent...</option>
-                                {agentsUnique.map(a => (
-                                    <option key={a} value={a}>{a}</option>
-                                ))}
-                            </select>
-                        )}
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="Modifier l'heure prévisionnelle en masse">
-                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>🕐 Heure:</span>
-                            <input
-                                type="time"
-                                className="input-table"
-                                style={{ width: 'auto', backgroundColor: '#334155', color: '#fff', border: '1px solid #475569', padding: '4px 8px', fontSize: '12px' }}
-                                onChange={(e) => {
-                                    if (e.target.value) {
-                                        handleBulkHeure(e.target.value);
-                                        e.target.value = '';
-                                    }
-                                }}
-                            />
-                        </div>
-
-                        {(currentUser && currentUser.role !== 'agent') && (
-                            <button type="button" className="btn btn-sm btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleBulkDelete}>
-                                <i className="fa-solid fa-trash" style={{ marginRight: '4px' }}></i> Supprimer ({selectedIds.length})
-                            </button>
-                        )}
-
-                        <button type="button" className="btn btn-sm btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setSelectedIds([])}>
-                            Annuler
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* TABLEAU CALENDRIER */}
-            <div className="card">
-                <div className="table-container" style={{ overflowX: 'auto' }}>
-                    <table style={{ minWidth: '1325px', width: '100%', tableLayout: 'fixed' }}>
-                        <colgroup>
-                            <col style={{ width: '40px' }} />
-                            <col style={{ width: '100px' }} />
-                            <col style={{ width: '150px' }} />
-                            <col style={{ width: '120px' }} />
-                            <col style={{ width: '180px' }} />
-                            <col style={{ width: '130px' }} />
-                            <col style={{ width: '130px' }} />
-                            <col style={{ width: '110px' }} />
-                            <col style={{ width: '80px' }} />
-                            <col style={{ width: '70px' }} />
-                            <col style={{ width: '70px' }} />
-                            <col style={{ width: '70px' }} />
-                            <col style={{ width: '75px' }} />
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th style={{ width: '40px', textAlign: 'center' }}>
-                                    <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} style={{ width: '16px', height: '16px', cursor: 'pointer' }} title="Tout sélectionner / Tout désélectionner" />
-                                </th>
-                                <th style={{ fontWeight: 700, cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('dateTime')} title="Cliquer pour trier par Date & Heure">
-                                     Date {sortField === 'dateTime' ? (sortAsc ? '▲' : '▼') : (sortField === 'date' ? (sortAsc ? '▲' : '▼') : '')}
-                                </th>
-                                <th style={{ fontWeight: 700, color: 'var(--accent)' }}>Compte</th>
-                                <th style={{ fontWeight: 700, color: 'var(--accent)' }}>Agent</th>
-                                <th style={{ fontWeight: 700, cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('heure')} title="Cliquer pour trier par Heure">
-                                     Heure ({selectedTZ === 'MADA' ? 'Mada UTC+3' : 'FR UTC+2'}) {sortField === 'heure' && (sortAsc ? '▲' : '▼')}
-                                </th>
-                                <th style={{ fontWeight: 700 }}>SKU</th>
-                                <th style={{ fontWeight: 700 }}>Classif.</th>
-                                <th style={{ fontWeight: 700 }}>Statut</th>
-                                <th style={{ fontWeight: 700, color: 'var(--success)' }}>Vente</th>
-                                <th>Score</th>
-                                {(currentUser && currentUser.role !== 'agent') && <th>Actions</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredLines.length > 0 ? (
-                                filteredLines.map(l => (
-                                    <tr key={l.id} style={{ opacity: l.statut === 'Fait' ? 0.85 : 1, backgroundColor: selectedIds.includes(l.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <input type="checkbox" checked={selectedIds.includes(l.id)} onChange={() => toggleSelectRow(l.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="date"
-                                                className="input-table"
-                                                value={l.date || ''}
-                                                disabled={currentUser && currentUser.role === 'agent'}
-                                                onChange={(e) => onUpdateRow(l.id, { date: e.target.value })}
-                                                style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '12.5px', padding: '2px 4px', width: '100%' }}
-                                                title="Modifier la date de publication"
-                                            />
-                                        </td>
-                                        <td>
-                                            <select className="input-table" style={{ width: '100%', minWidth: '130px', fontWeight: 600, color: 'var(--text-primary)' }} value={l.compteId || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => {
-                                                const selCompte = comptesAll.find(c => c.id === e.target.value);
-                                                const targetAgent = selCompte && selCompte.agent && selCompte.agent !== 'À attribuer' ? selCompte.agent : l.agent;
-                                                onUpdateRow(l.id, { compteId: e.target.value, agent: targetAgent });
-                                            }}>
-                                                <option value="">(aucun compte)</option>
-                                                {comptesAll.map(c => (
-                                                    <option key={c.id} value={c.id}>{c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`)}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <select className="input-table" style={{ width: '100%', minWidth: '110px', fontWeight: 600, color: 'var(--accent)' }} value={l.agent || ''} disabled={currentUser && currentUser.role === 'agent'} onChange={(e) => {
-                                                const newAgent = e.target.value;
-                                                const currentCompte = comptes.find(c => c.id === l.compteId);
-                                                if (currentCompte && currentCompte.agent && currentCompte.agent !== 'À attribuer' && currentCompte.agent !== newAgent) {
-                                                    if (window.showToast) window.showToast(`Attribution refusée : Le compte "${currentCompte.pseudo}" est officiellement attribué à ${currentCompte.agent}`, true);
-                                                    return;
-                                                }
-                                                onUpdateRow(l.id, { agent: newAgent });
-                                            }}>
-                                                <option value="">Sélectionner...</option>
-                                                {agentsUnique.map(a => (
-                                                    <option key={a} value={a}>{a}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td>
-                                            {(() => {
-                                                const convMada = convertHHMM(l.heurePrevue, l.date, 'FR', 'MADA');
-                                                const displayedTime = selectedTZ === 'MADA' ? (convMada.time || l.heurePrevue) : (l.heurePrevue || '');
-                                                const otherFlag = selectedTZ === 'MADA' ? '🇫🇷' : '🇲🇬';
-                                                const otherTime = selectedTZ === 'MADA' ? (l.heurePrevue || '') : convMada.time;
-                                                const shiftTag = selectedTZ === 'MADA' 
-                                                    ? (convMada.dayShift === 1 ? '-1j' : (convMada.dayShift === -1 ? '+1j' : ''))
-                                                    : (convMada.dayShift === 1 ? '+1j' : (convMada.dayShift === -1 ? '-1j' : ''));
-
-                                                const handleTimeChange = (e) => {
-                                                    const val = e.target.value;
-                                                    if (selectedTZ === 'MADA') {
-                                                        const convFR = convertHHMM(val, l.date, 'MADA', 'FR');
-                                                        onUpdateRow(l.id, { heurePrevue: convFR.time });
-                                                    } else {
-                                                        onUpdateRow(l.id, { heurePrevue: val });
-                                                    }
-                                                };
-
-                                                return (
-                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                        <input
-                                                            type="time"
-                                                            className="input-table"
-                                                            disabled={currentUser && currentUser.role === 'agent'}
-                                                            style={{ fontWeight: 700, width: '92px', fontSize: '13px', padding: '2px 4px' }}
-                                                            value={displayedTime || ''}
-                                                            onChange={handleTimeChange}
-                                                            title={`Modifier l'heure en ${selectedTZ === 'MADA' ? 'Madagascar' : 'France'}`}
-                                                        />
-                                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', whiteSpace: 'nowrap' }} title={`Heure équivalente (${selectedTZ === 'MADA' ? 'France' : 'Madagascar'})`}>
-                                                            {otherFlag} {otherTime}
-                                                            {shiftTag && <span style={{ color: '#d97706', fontWeight: 700, marginLeft: '3px' }}>{shiftTag}</span>}
-                                                        </span>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td>
-                                            {(() => {
-                                                const sKey = (l.sku || '').trim().toLowerCase();
-                                                const countSku = skuCounts[sKey] || 0;
-                                                const isDuplicate = countSku > 1 && l.classification !== 'Gagnant';
-
-                                                return (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
-                                                        <input
-                                                            type="text"
-                                                            className="input-table"
-                                                            value={l.sku || ''}
-                                                            placeholder="SKU"
-                                                            disabled={currentUser && currentUser.role === 'agent'}
-                                                            onChange={(e) => onUpdateRow(l.id, { sku: e.target.value })}
-                                                            style={{
-                                                                flex: 1,
-                                                                minWidth: '70px',
-                                                                borderColor: isDuplicate ? '#f97316' : '',
-                                                                backgroundColor: isDuplicate ? '#fff7ed' : '',
-                                                                fontWeight: isDuplicate ? 700 : 400
-                                                            }}
-                                                            title={isDuplicate ? `⚠️ ATTENTION : SKU en doublon présent ${countSku} fois dans le planning !` : 'SKU Produit'}
-                                                        />
-                                                        {isDuplicate && (
-                                                            <span
-                                                                style={{
-                                                                    fontSize: '10px',
-                                                                    fontWeight: 700,
-                                                                    backgroundColor: '#ea580c',
-                                                                    color: '#ffffff',
-                                                                    padding: '2px 5px',
-                                                                    borderRadius: '4px',
-                                                                    whiteSpace: 'nowrap',
-                                                                    cursor: 'pointer'
-                                                                }}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSearchTerm(l.sku);
-                                                                }}
-                                                                title={`Cliquer pour isoler les ${countSku} occurrences de ce SKU (${l.sku})`}
-                                                            >
-                                                                ⚠️ x{countSku}
-                                                            </span>
-                                                        )}
-                                                        {l.sku && (
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-secondary btn-sm"
-                                                                style={{ padding: '3px 7px', fontSize: '11px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
-                                                                title="Copier rapidement le SKU"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                                                                        navigator.clipboard.writeText(l.sku);
-                                                                    } else {
-                                                                        const el = document.createElement('textarea');
-                                                                        el.value = l.sku;
-                                                                        document.body.appendChild(el);
-                                                                        el.select();
-                                                                        document.execCommand('copy');
-                                                                        document.body.removeChild(el);
-                                                                    }
-                                                                    setCopiedSkuId(l.id);
-                                                                    setTimeout(() => setCopiedSkuId(null), 1500);
-                                                                }}>
-                                                                <i className={`fa-solid ${copiedSkuId === l.id ? 'fa-check' : 'fa-copy'}`} style={{ color: copiedSkuId === l.id ? '#059669' : 'inherit' }}></i>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td>
-                                            {l.sku && String(l.sku).trim() !== '' ? (() => {
-                                                const isWinner = winnerSkusSet.has(String(l.sku).trim().toLowerCase()) || l.vente > 0 || l.transactionId;
-                                                const classif = isWinner ? 'Gagnant' : (l.classification || 'Nouveau produit');
-                                                return (
-                                                    <span className={`badge ${
-                                                        classif === 'Gagnant' || classif.includes('Gagnant') ? 'badge-gagnant' :
-                                                        classif === 'Écarté' ? 'badge-ecarte' :
-                                                        classif === 'Nouveau produit' ? 'badge-nouveau' :
-                                                        'badge-retester'
-                                                    }`}>
-                                                        {classif === 'Gagnant' || classif.includes('Gagnant') ? '🏆 Gagnant' : classif}
-                                                    </span>
-                                                );
-                                            })() : (
-                                                <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>-</span>
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            <button className={`btn btn-sm ${l.statut === 'Fait' ? 'btn-success' : 'btn-danger'}`}
-                                                onClick={() => onUpdateRow(l.id, { statut: l.statut === 'Fait' ? 'Non fait' : 'Fait' })}>
-                                                {l.statut === 'Fait' ? '✓ Fait' : '⌛ Non fait'}
-                                            </button>
-                                        </td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                                                <button className={`btn btn-sm ${l.vente === 1 ? 'btn-success' : 'btn-secondary'}`}
-                                                    onClick={() => onUpdateRow(l.id, { vente: l.vente === 1 ? 0 : 1 })}>
-                                                    {l.vente === 1 ? '💰 Oui' : 'Non'}
-                                                </button>
-                                                {l.sku && skuVentesMap[l.sku] > 0 && (
-                                                    <span style={{ fontSize: '10px', color: skuVentesMap[l.sku] >= 3 ? '#059669' : 'var(--text-muted)', fontWeight: 700, background: skuVentesMap[l.sku] >= 3 ? 'rgba(5,150,105,0.1)' : '#f1f5f9', borderRadius: '4px', padding: '1px 5px', whiteSpace: 'nowrap' }}
-                                                        title={`Ce SKU a été vendu ${skuVentesMap[l.sku]}x dans l'organisation`}>
-                                                        {skuVentesMap[l.sku]}x ce SKU
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td><b>{(!l.sku || !String(l.sku).trim() || String(l.sku).trim() === '-') ? '0.0' : (l.score || 0).toFixed(1)}</b></td>
-                                        {(currentUser && currentUser.role !== 'agent') && (
-                                            <td>
-                                                <button className="btn btn-danger btn-sm" title="Supprimer" onClick={() => onDeleteRow(l.id)}>
-                                                    <i className="fa-solid fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        )}
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="13" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                                        Aucune ligne de calendrier trouvée pour ces filtres.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-    );
+// ------------------- VIEW: DASHBOARD / CALENDRIER (SUPPRIMÉ) -------------------
+function DashboardView() {
+    return null;
 }
 
 // ------------------- VIEW: COMPTES -------------------
@@ -1966,505 +1051,9 @@ function getLocalDateString(d = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
-// Helper pour filtrer exclusivement les comptes au statut Actif ET attribués à un agent réel
-function getComptesActifsEtAttribues(comptes = [], selectedAgents = null) {
-    return (comptes || []).filter(c => {
-        const isActif = c && c.statut === 'Actif';
-        const isAttribue = c && c.agent && String(c.agent).trim() !== '' && String(c.agent) !== 'À attribuer';
-        if (!isActif || !isAttribue) return false;
-        if (Array.isArray(selectedAgents) && selectedAgents.length > 0) {
-            return selectedAgents.includes(c.agent);
-        }
-        return true;
-    });
-}
-
-// ------------------- VIEW: PLANNING GENERATION -------------------
-function PlanningView({ appState, onGeneratePlanning }) {
-    const todayStr = useMemo(() => getLocalDateString(), []);
-    const defaultEndStr = useMemo(() => {
-        const d = new Date();
-        d.setDate(d.getDate() + 6);
-        return getLocalDateString(d);
-    }, []);
-
-    const [dateDebut, setDateDebut] = useState(todayStr);
-    const [dateFin, setDateFin] = useState(defaultEndStr);
-    const [creneauxParJour, setCreneauxParJour] = useState((appState.parametres && appState.parametres.creneauxParJour) || 6);
-    const [heureDebut, setHeureDebut] = useState("07:00");
-    const [heureFin, setHeureFin] = useState("22:00");
-    const [includeWinnerSKUs, setIncludeWinnerSKUs] = useState(true);
-    const [loading, setLoading] = useState(false);
-
-    const comptes = appState.comptes || [];
-    // Exclusivité stricte : Seuls les comptes au statut Actif ET attribués à un agent réel
-    const activeComptes = useMemo(() => getComptesActifsEtAttribues(comptes), [comptes]);
-
-    // Liste unique des agents attribués ayant au moins un compte actif
-    const availableAgents = useMemo(() => {
-        const set = new Set();
-        activeComptes.forEach(c => {
-            if (c.agent && String(c.agent).trim() !== '' && String(c.agent) !== 'À attribuer') {
-                set.add(c.agent);
-            }
-        });
-        return Array.from(set);
-    }, [activeComptes]);
-
-    const [selectedAgents, setSelectedAgents] = useState([]);
-    const [initializedAgents, setInitializedAgents] = useState(false);
-
-    // Par défaut : Tous les agents sont sélectionnés
-    useEffect(() => {
-        if (availableAgents.length > 0 && (!initializedAgents || selectedAgents.length === 0)) {
-            setSelectedAgents(availableAgents);
-            setInitializedAgents(true);
-        }
-    }, [availableAgents, initializedAgents]);
-
-    const toggleAgent = (agentName) => {
-        setSelectedAgents(prev => {
-            if (prev.includes(agentName)) {
-                return prev.filter(a => a !== agentName);
-            } else {
-                return [...prev, agentName];
-            }
-        });
-    };
-
-    const selectAllAgents = () => setSelectedAgents([...availableAgents]);
-    const deselectAllAgents = () => setSelectedAgents([]);
-
-    const [excludedAccountIds, setExcludedAccountIds] = useState([]);
-
-    const toggleAccount = (id) => {
-        setExcludedAccountIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-    };
-
-    const includeAllAccounts = () => setExcludedAccountIds([]);
-    const excludeAllAccounts = () => {
-        const base = getComptesActifsEtAttribues(comptes, selectedAgents);
-        setExcludedAccountIds(base.map(c => c.id));
-    };
-
-    // Comptes actifs filtrés par la sélection d'agents ET la sélection individuelle de comptes
-    const filteredActiveComptes = useMemo(() => {
-        const base = getComptesActifsEtAttribues(comptes, selectedAgents);
-        return base.filter(c => !excludedAccountIds.includes(c.id));
-    }, [comptes, selectedAgents, excludedAccountIds]);
-
-    const totalDays = useMemo(() => {
-        if (!dateDebut || !dateFin) return 0;
-        const start = new Date(dateDebut);
-        const end = new Date(dateFin);
-        const diffTime = end.getTime() - start.getTime();
-        if (diffTime < 0) return 0;
-        return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    }, [dateDebut, dateFin]);
-
-    const totalEstimatedSlots = useMemo(() => {
-        return totalDays * filteredActiveComptes.length * creneauxParJour;
-    }, [totalDays, filteredActiveComptes.length, creneauxParJour]);
-
-    const setPreset = (days) => {
-        const start = new Date();
-        const end = new Date();
-        end.setDate(start.getDate() + (days - 1));
-        setDateDebut(getLocalDateString(start));
-        setDateFin(getLocalDateString(end));
-    };
-
-    const handleGenerate = async () => {
-        if (filteredActiveComptes.length === 0) return;
-        if (!dateDebut || !dateFin || totalDays <= 0) return;
-        setLoading(true);
-        try {
-            const selectedAccountIds = filteredActiveComptes.map(c => c.id);
-            await onGeneratePlanning(dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents, includeWinnerSKUs, selectedAccountIds);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCleanEmptySKUs = async () => {
-        if (!confirm("Voulez-vous vraiment supprimer toutes les lignes de planning sans SKU ?")) return;
-        setLoading(true);
-        try {
-            const orgId = (appState.currentUser && appState.currentUser.organisationId) || 'org_default';
-            const res = await fetch('/api/calendrier/clean-empty-skus', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ organisationId: orgId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                if (window.showToast) window.showToast(data.message);
-                if (window.loadAppState) await window.loadAppState();
-            } else {
-                if (window.showToast) window.showToast(`❌ ${data.error}`, true);
-            }
-        } catch (err) {
-            console.error("Erreur nettoyage SKU:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <section className="view">
-            <h2 className="page-title" style={{ marginBottom: '20px' }}>Générateur Automatique de Planning</h2>
-
-            <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 className="card-title">
-                    <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--primary)', marginRight: '8px' }}></i>
-                    Génération Anti-Collision Multi-Comptes & Multi-Agents
-                </h3>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
-                    Le moteur calcule automatiquement la répartition optimale des créneaux horaires pour l'ensemble des <b>{filteredActiveComptes.length} comptes au statut Actif et attribués à un agent</b>, en appliquant les règles d'espacement et la marge d'intervalle aléatoire.
-                </p>
-
-                {/* SÉLECTION DES AGENTS CONCERNÉS (PAUSE / CONGÉ) */}
-                <div style={{
-                    background: 'rgba(9, 177, 186, 0.04)',
-                    border: '1px solid rgba(9, 177, 186, 0.2)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    marginBottom: '20px'
-                }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-                        <div>
-                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
-                                <i className="fa-solid fa-users-gear" style={{ color: 'var(--primary)' }}></i>
-                                Agents Concernés (Gestion Pause / Congé)
-                            </h4>
-                            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                                Décocher un agent le passe en <b>Pause / Congé</b> pour exclure ses comptes de cette génération de planning. Par défaut, tous les agents sont sélectionnés.
-                            </p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={selectAllAgents} style={{ fontSize: '11px', padding: '4px 8px' }}>
-                                <i className="fa-solid fa-check-double" style={{ marginRight: '4px' }}></i> Tout sélectionner
-                            </button>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={deselectAllAgents} style={{ fontSize: '11px', padding: '4px 8px' }}>
-                                <i className="fa-solid fa-xmark" style={{ marginRight: '4px' }}></i> Tout décocher
-                            </button>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                        {availableAgents.length === 0 ? (
-                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Aucun agent actif trouvé.</span>
-                        ) : availableAgents.map(agentName => {
-                            const isSelected = selectedAgents.includes(agentName);
-                            const agentComptesCount = activeComptes.filter(c => (c.agent || 'À attribuer') === agentName).length;
-                            return (
-                                <label
-                                    key={agentName}
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '8px 14px',
-                                        borderRadius: '20px',
-                                        border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}`,
-                                        background: isSelected ? 'rgba(9, 177, 186, 0.1)' : 'var(--bg-card)',
-                                        color: isSelected ? 'var(--primary-dark)' : 'var(--text-muted)',
-                                        fontWeight: isSelected ? 600 : 400,
-                                        fontSize: '13px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        userSelect: 'none'
-                                    }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() => toggleAgent(agentName)}
-                                        style={{ accentColor: 'var(--primary)', cursor: 'pointer', width: '16px', height: '16px' }}
-                                    />
-                                    <span>{agentName}</span>
-                                    <span className="badge" style={{
-                                        background: isSelected ? 'var(--primary)' : '#94a3b8',
-                                        color: '#fff',
-                                        fontSize: '11px',
-                                        padding: '1px 6px',
-                                        borderRadius: '10px'
-                                    }}>
-                                        {agentComptesCount} compte{agentComptesCount > 1 ? 's' : ''}
-                                    </span>
-                                    {!isSelected && (
-                                        <span style={{ fontSize: '11px', fontStyle: 'italic', color: '#ef4444', fontWeight: 600 }}>
-                                            (Pause / Congé)
-                                        </span>
-                                    )}
-                                </label>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* SÉLECTION / EXCLUSION DES COMPTES CONCERNÉS */}
-                <div style={{
-                    background: 'rgba(99, 102, 241, 0.04)',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    marginBottom: '20px'
-                }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-                        <div>
-                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
-                                <i className="fa-solid fa-address-book" style={{ color: '#6366f1' }}></i>
-                                Comptes Concernés ({filteredActiveComptes.length} / {activeComptes.length} comptes inclus)
-                            </h4>
-                            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                                Cochez ou décochez individuellement les comptes Vinted à inclure ou exclure de la génération du planning.
-                            </p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={includeAllAccounts} style={{ fontSize: '11px', padding: '4px 8px' }}>
-                                <i className="fa-solid fa-check-double" style={{ marginRight: '4px' }}></i> Tout inclure
-                            </button>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={excludeAllAccounts} style={{ fontSize: '11px', padding: '4px 8px' }}>
-                                <i className="fa-solid fa-xmark" style={{ marginRight: '4px' }}></i> Tout exclure
-                            </button>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                        {activeComptes.length === 0 ? (
-                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Aucun compte actif disponible.</span>
-                        ) : activeComptes.map(c => {
-                            const isIncluded = !excludedAccountIds.includes(c.id);
-                            return (
-                                <label
-                                    key={c.id}
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '8px 14px',
-                                        borderRadius: '20px',
-                                        border: `1.5px solid ${isIncluded ? '#6366f1' : 'var(--border-color)'}`,
-                                        background: isIncluded ? 'rgba(99, 102, 241, 0.08)' : 'var(--bg-card)',
-                                        color: isIncluded ? '#4338ca' : 'var(--text-muted)',
-                                        fontWeight: isIncluded ? 600 : 400,
-                                        fontSize: '13px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        userSelect: 'none'
-                                    }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={isIncluded}
-                                        onChange={() => toggleAccount(c.id)}
-                                        style={{ accentColor: '#6366f1', cursor: 'pointer', width: '16px', height: '16px' }}
-                                    />
-                                    <span><b>N°{c.numeroCompte || '?'}</b> - {c.pseudo}</span>
-                                    <span className="badge badge-agent" style={{ fontSize: '10.5px', padding: '1px 6px' }}>
-                                        {c.agent}
-                                    </span>
-                                    {!isIncluded && (
-                                        <span style={{ fontSize: '11px', fontStyle: 'italic', color: '#ef4444', fontWeight: 600 }}>
-                                            (Exclu)
-                                        </span>
-                                    )}
-                                </label>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div className="grid-3" style={{ marginBottom: '18px' }}>
-                    <div className="form-group">
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <i className="fa-solid fa-calendar-day" style={{ color: 'var(--primary)' }}></i>
-                            Date de Début
-                        </label>
-                        <input
-                            type="date"
-                            value={dateDebut}
-                            onChange={(e) => setDateDebut(e.target.value)}
-                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <i className="fa-solid fa-calendar-check" style={{ color: 'var(--primary)' }}></i>
-                            Date de Fin
-                        </label>
-                        <input
-                            type="date"
-                            value={dateFin}
-                            min={dateDebut}
-                            onChange={(e) => setDateFin(e.target.value)}
-                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <i className="fa-solid fa-bullhorn" style={{ color: 'var(--primary)' }}></i>
-                            Publications / Compte / Jour
-                        </label>
-                        <input
-                            type="number"
-                            min="1"
-                            max="30"
-                            value={creneauxParJour}
-                            onChange={(e) => setCreneauxParJour(parseInt(e.target.value) || 1)}
-                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
-                            placeholder="ex: 6"
-                        />
-                    </div>
-                </div>
-
-                <div className="grid-2" style={{ marginBottom: '18px' }}>
-                    <div className="form-group">
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <i className="fa-solid fa-clock" style={{ color: 'var(--primary)' }}></i>
-                            Heure de Début des Créneaux
-                        </label>
-                        <input
-                            type="time"
-                            value={heureDebut}
-                            onChange={(e) => setHeureDebut(e.target.value)}
-                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <i className="fa-solid fa-moon" style={{ color: 'var(--primary)' }}></i>
-                            Heure de Fin des Créneaux
-                        </label>
-                        <input
-                            type="time"
-                            value={heureFin}
-                            onChange={(e) => setHeureFin(e.target.value)}
-                            style={{ padding: '12px', fontSize: '14px', borderRadius: '8px' }}
-                        />
-                    </div>
-                </div>
-
-                {/* OPTION ATTRIBUTION AUTOMATIQUE SKU GAGNANTS */}
-                <div style={{
-                    background: includeWinnerSKUs ? 'rgba(16, 185, 129, 0.05)' : '#f8fafc',
-                    border: `1px solid ${includeWinnerSKUs ? '#a7f3d0' : '#cbd5e1'}`,
-                    borderRadius: '12px',
-                    padding: '14px 18px',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '12px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <input
-                            type="checkbox"
-                            id="includeWinnerSKUsCheck"
-                            checked={includeWinnerSKUs}
-                            onChange={(e) => setIncludeWinnerSKUs(e.target.checked)}
-                            style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#10b981' }}
-                        />
-                        <label htmlFor="includeWinnerSKUsCheck" style={{ cursor: 'pointer', userSelect: 'none', margin: 0 }}>
-                            <b style={{ fontSize: '14px', color: includeWinnerSKUs ? '#047857' : 'var(--text-main)', display: 'block' }}>
-                                🏆 Répartir automatiquement les SKU Gagnants (Anti-doublon : 1 SKU par jour max)
-                            </b>
-                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                {includeWinnerSKUs 
-                                    ? "Activé : Chaque SKU Gagnant est attribué au maximum une fois par jour et sans aucun doublon par compte."
-                                    : "Désactivé : Le planning sera généré avec des lignes neutres/vierges sans pré-remplissage des SKU Gagnants."
-                                }
-                            </span>
-                        </label>
-                    </div>
-                    <span className={`badge ${includeWinnerSKUs ? 'badge-actif' : 'badge-secondary'}`} style={{ padding: '4px 10px', fontSize: '12px' }}>
-                        {includeWinnerSKUs ? '✓ SKU Gagnants Inclus' : 'Sans SKU Gagnant'}
-                    </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPreset(1)}>Aujourd'hui (1 jour)</button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPreset(7)}>7 Jours à venir</button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPreset(14)}>14 Jours à venir</button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPreset(30)}>30 Jours à venir</button>
-                </div>
-
-                {totalDays > 0 ? (
-                    <div style={{
-                        backgroundColor: '#f0fdf4',
-                        border: '1px solid #bbf7d0',
-                        color: '#15803d',
-                        padding: '12px 16px',
-                        borderRadius: '8px',
-                        marginBottom: '20px',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <i className="fa-solid fa-calendar-days" style={{ fontSize: '16px' }}></i>
-                        <span>
-                            Période : du <b>{dateDebut}</b> au <b>{dateFin}</b> ({totalDays} jour{totalDays > 1 ? 's' : ''}) — 
-                            <b> {creneauxParJour} pub{creneauxParJour > 1 ? 's' : ''}/compte/jour</b> pour {filteredActiveComptes.length} compte(s) au statut Actif et attribué(s) à un agent ({selectedAgents.length} agent(s) sélectionné(s)) 
-                            (soit <b>{totalEstimatedSlots} publication{totalEstimatedSlots > 1 ? 's' : ''} au total</b>)
-                        </span>
-                    </div>
-                ) : (
-                    <div style={{
-                        backgroundColor: '#fef2f2',
-                        border: '1px solid #fca5a5',
-                        color: '#b91c1c',
-                        padding: '12px 16px',
-                        borderRadius: '8px',
-                        marginBottom: '20px',
-                        fontSize: '13px',
-                        fontWeight: 600
-                    }}>
-                        ⚠️ La date de fin doit être égale ou supérieure à la date de début.
-                    </div>
-                )}
-
-                {filteredActiveComptes.length === 0 && (
-                    <div style={{
-                        backgroundColor: '#fffbebf',
-                        border: '1px solid #fde68a',
-                        color: '#b45309',
-                        padding: '12px 16px',
-                        borderRadius: '8px',
-                        marginBottom: '20px',
-                        fontSize: '13px',
-                        fontWeight: 600
-                    }}>
-                        ⚠️ Aucun compte actif disponible pour la sélection d'agents courante (tous les agents sont décochés ou en pause/congé).
-                    </div>
-                )}
-
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleGenerate}
-                        disabled={loading || totalDays <= 0 || filteredActiveComptes.length === 0}
-                        style={{ padding: '12px 24px', fontSize: '15px' }}
-                    >
-                        {loading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> : <i className="fa-solid fa-bolt" style={{ marginRight: '8px' }}></i>}
-                        {loading ? 'Génération en cours...' : `Générer le Planning (${totalEstimatedSlots} pub${totalEstimatedSlots > 1 ? 's' : ''})`}
-                    </button>
-                    
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={handleCleanEmptySKUs}
-                        disabled={loading}
-                        style={{ padding: '12px 18px', fontSize: '14px', color: 'var(--danger)', borderColor: '#fca5a5', backgroundColor: '#fef2f2', fontWeight: 600 }}
-                        title="Supprimer du planning toutes les lignes qui n'ont pas de SKU attribué"
-                    >
-                        <i className="fa-solid fa-broom" style={{ marginRight: '6px' }}></i> Nettoyer les lignes sans SKU
-                    </button>
-                </div>
-            </div>
-        </section>
-    );
+// ------------------- VIEW: PLANNING GENERATION (SUPPRIMÉ) -------------------
+function PlanningView() {
+    return null;
 }
 
 // ------------------- VIEW: INCIDENTS -------------------
@@ -3178,7 +1767,7 @@ function LoginView({ onLoginSubmit, loginError }) {
     );
 }
 
-// ------------------- VIEW: UTILISATEURS -------------------
+// ------------------- VIEW: UTILISATEURS AVEC ACCÈS PERSONNALISABLES -------------------
 function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onBulkDeleteUsers }) {
     const isAdmin = currentUser && currentUser.role === 'admin';
     const userOrgId = (currentUser && currentUser.organisationId) || 'org_default';
@@ -3193,6 +1782,13 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
     const [contactType, setContactType] = useState('WhatsApp');
     const [contactNumero, setContactNumero] = useState('');
     const [selectedUserIds, setSelectedUserIds] = useState([]);
+
+    // État des permissions personnalisées pour le formulaire
+    const [permissions, setPermissions] = useState(() => PermissionManager.PRESETS.agent);
+
+    // État de la modal de réglage rapide des permissions
+    const [permModalUser, setPermModalUser] = useState(null);
+    const [modalPermissions, setModalPermissions] = useState({});
 
     const utilisateurs = appState.utilisateurs || [];
     const organisations = appState.organisations || [];
@@ -3223,6 +1819,33 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
         }
     };
 
+    const handleRoleChange = (newRole) => {
+        setRole(newRole);
+        if (newRole === 'admin') setPermissions({ ...PermissionManager.PRESETS.admin });
+        else if (newRole === 'cadre') setPermissions({ ...PermissionManager.PRESETS.cadre });
+        else setPermissions({ ...PermissionManager.PRESETS.agent });
+    };
+
+    const handleTogglePermission = (key) => {
+        setPermissions(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const handleApplyPreset = (presetKey) => {
+        if (presetKey === 'all') {
+            const allTrue = {};
+            PermissionManager.MODULES.forEach(m => allTrue[m.key] = true);
+            PermissionManager.ACTIONS.forEach(a => allTrue[a.key] = true);
+            setPermissions(allTrue);
+        } else if (presetKey === 'none') {
+            const allFalse = {};
+            PermissionManager.MODULES.forEach(m => allFalse[m.key] = false);
+            PermissionManager.ACTIONS.forEach(a => allFalse[a.key] = false);
+            setPermissions(allFalse);
+        } else if (PermissionManager.PRESETS[presetKey]) {
+            setPermissions({ ...PermissionManager.PRESETS[presetKey] });
+        }
+    };
+
     const handleEdit = (u) => {
         setUserId(u.id);
         setNom(u.nom);
@@ -3233,6 +1856,7 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
         setMotDePasse(u.motDePasse || '');
         setContactType(u.contactType || 'WhatsApp');
         setContactNumero(u.contactNumero || '');
+        setPermissions(PermissionManager.getPermissions(u));
     };
 
     const handleReset = () => {
@@ -3245,6 +1869,7 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
         setMotDePasse('123456');
         setContactType('WhatsApp');
         setContactNumero('');
+        setPermissions({ ...PermissionManager.PRESETS.agent });
     };
 
     const handleSubmit = (e) => {
@@ -3258,44 +1883,95 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
             agentAssigne: agentAssigne || nom,
             motDePasse,
             contactType,
-            contactNumero
+            contactNumero,
+            permissions
         });
         handleReset();
     };
 
+    // Quick Modal Actions
+    const openPermModal = (u) => {
+        setPermModalUser(u);
+        setModalPermissions(PermissionManager.getPermissions(u));
+    };
+
+    const handleSaveModalPermissions = async () => {
+        if (!permModalUser) return;
+        await onSaveUser({
+            ...permModalUser,
+            permissions: modalPermissions
+        });
+        setPermModalUser(null);
+    };
+
+    const handleToggleModalPerm = (key) => {
+        setModalPermissions(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const handleApplyModalPreset = (presetKey) => {
+        if (presetKey === 'all') {
+            const allTrue = {};
+            PermissionManager.MODULES.forEach(m => allTrue[m.key] = true);
+            PermissionManager.ACTIONS.forEach(a => allTrue[a.key] = true);
+            setModalPermissions(allTrue);
+        } else if (presetKey === 'none') {
+            const allFalse = {};
+            PermissionManager.MODULES.forEach(m => allFalse[m.key] = false);
+            PermissionManager.ACTIONS.forEach(a => allFalse[a.key] = false);
+            setModalPermissions(allFalse);
+        } else if (PermissionManager.PRESETS[presetKey]) {
+            setModalPermissions({ ...PermissionManager.PRESETS[presetKey] });
+        }
+    };
+
     return (
         <section className="view">
-            <h2 className="page-title" style={{ marginBottom: '20px' }}>Gestion des Utilisateurs & Agents</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                    <h2 className="page-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <i className="fa-solid fa-users-gear" style={{ color: 'var(--primary-color)' }}></i>
+                        Gestion des Utilisateurs & Droits d'Accès
+                    </h2>
+                    <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '13px' }}>
+                        Personnalisez de façon granulaire les modules visibles et les actions autorisées pour chaque collaborateur.
+                    </p>
+                </div>
+            </div>
 
             {/* FORMULAIRE UTILISATEUR */}
             <div className="card" style={{ marginBottom: '24px' }}>
-                <h3 className="card-title">{userId ? 'Modifier l\'agent' : 'Ajouter un nouveau profil Agent'}</h3>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <i className="fa-solid fa-user-pen" style={{ color: 'var(--primary-color)' }}></i>
+                    {userId ? 'Modifier le profil & les accès du membre' : 'Ajouter un nouveau membre avec accès personnalisables'}
+                </h3>
+
                 {!isAdmin && (
                     <p style={{ fontSize: '12px', color: 'var(--info)', marginBottom: '16px', background: '#eff6ff', padding: '8px 12px', borderRadius: '6px' }}>
-                        <i className="fa-solid fa-circle-info"></i> En tant qu'<strong>Admin</strong>, vous pouvez créer uniquement des profils <strong>Agent de publication</strong> pour votre organisation.
+                        <i className="fa-solid fa-circle-info"></i> En tant que Cadre/Superviseur, vous pouvez gérer les accès des collaborateurs de votre organisation.
                     </p>
                 )}
+
                 <form onSubmit={handleSubmit}>
-                    <div className="grid-3">
+                    <div className="grid-3" style={{ marginBottom: '12px' }}>
                         <div className="form-group">
-                            <label>Nom complet</label>
+                            <label>Nom complet <span style={{ color: '#ef4444' }}>*</span></label>
                             <input type="text" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="ex: Van Quy Dang" required />
                         </div>
                         <div className="form-group">
-                            <label>Adresse Email</label>
+                            <label>Adresse Email <span style={{ color: '#ef4444' }}>*</span></label>
                             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ex: vanquydang905@gmail.com" required />
                         </div>
                         <div className="form-group">
-                            <label>Rôle</label>
-                            <select value={isAdmin ? role : 'agent'} onChange={(e) => setRole(e.target.value)} disabled={!isAdmin}>
+                            <label>Rôle Principal</label>
+                            <select value={isAdmin ? role : 'agent'} onChange={(e) => handleRoleChange(e.target.value)} disabled={!isAdmin}>
                                 {isAdmin && <option value="admin">Admin (Global)</option>}
-                                {isAdmin && <option value="cadre">Admin (Organisation)</option>}
+                                {isAdmin && <option value="cadre">Cadre (Superviseur)</option>}
                                 <option value="agent">Agent de publication</option>
                             </select>
                         </div>
                     </div>
 
-                    <div className="grid-3">
+                    <div className="grid-3" style={{ marginBottom: '12px' }}>
                         <div className="form-group">
                             <label>Organisation</label>
                             <select value={isAdmin ? organisationId : userOrgId} onChange={(e) => setOrganisationId(e.target.value)} disabled={!isAdmin}>
@@ -3314,7 +1990,7 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
                         </div>
                     </div>
 
-                    <div className="grid-2">
+                    <div className="grid-2" style={{ marginBottom: '16px' }}>
                         <div className="form-group">
                             <label>Canal de Contact Direct</label>
                             <select value={contactType} onChange={(e) => setContactType(e.target.value)}>
@@ -3329,9 +2005,118 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
                         </div>
                     </div>
 
+                    {/* SECTION: PERMISSIONS PERSONNALISABLES */}
+                    <div style={{
+                        marginTop: '16px',
+                        marginBottom: '20px',
+                        padding: '16px 18px',
+                        background: '#f8fafc',
+                        borderRadius: '10px',
+                        border: '1px solid #e2e8f0'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                            <div>
+                                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <i className="fa-solid fa-shield-halved" style={{ color: 'var(--primary-color)' }}></i>
+                                    Droits d'Accès Personnalisés pour ce Membre
+                                </h4>
+                                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
+                                    Cochez les modules du menu et les actions opérationnelles accordés à cet utilisateur.
+                                </div>
+                            </div>
+
+                            {/* Preset Buttons */}
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                <button type="button" className="perm-preset-btn" onClick={() => handleApplyPreset('admin')}>
+                                    👑 Tout Accorder
+                                </button>
+                                <button type="button" className="perm-preset-btn" onClick={() => handleApplyPreset('cadre')}>
+                                    👔 Cadre
+                                </button>
+                                <button type="button" className="perm-preset-btn" onClick={() => handleApplyPreset('agent')}>
+                                    👤 Agent Standard
+                                </button>
+                                <button type="button" className="perm-preset-btn" onClick={() => handleApplyPreset('none')}>
+                                    🔒 Tout Refuser
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* SOUS-GROUPE 1: VUES & MODULES DU MENU */}
+                        <div style={{ marginBottom: '14px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                📑 Modules & Vues Autorisés
+                            </div>
+                            <div className="perm-card-grid">
+                                {PermissionManager.MODULES.map(m => {
+                                    const active = Boolean(permissions[m.key]);
+                                    return (
+                                        <div
+                                            key={m.key}
+                                            className={`perm-item-card ${active ? 'active' : ''}`}
+                                            onClick={() => handleTogglePermission(m.key)}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                <div className="perm-item-icon">
+                                                    <i className={`fa-solid ${m.icon}`}></i>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#0f172a' }}>{m.label}</div>
+                                                    <div style={{ fontSize: '10.5px', color: '#64748b' }}>{m.desc}</div>
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={active}
+                                                onChange={() => {}} // handled by parent card onClick
+                                                style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)' }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* SOUS-GROUPE 2: DROITS D'ACTIONS & OPÉRATIONS */}
+                        <div>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                ⚡ Privilèges & Actions Opérationnelles
+                            </div>
+                            <div className="perm-card-grid">
+                                {PermissionManager.ACTIONS.map(a => {
+                                    const active = Boolean(permissions[a.key]);
+                                    return (
+                                        <div
+                                            key={a.key}
+                                            className={`perm-item-card ${active ? 'active' : ''}`}
+                                            onClick={() => handleTogglePermission(a.key)}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                <div className="perm-item-icon">
+                                                    <i className={`fa-solid ${a.icon}`}></i>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#0f172a' }}>{a.label}</div>
+                                                    <div style={{ fontSize: '10.5px', color: '#64748b' }}>{a.desc}</div>
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={active}
+                                                onChange={() => {}} // handled by parent card onClick
+                                                style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)' }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
                     <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                        <button type="submit" className="btn btn-primary">
-                            <i className="fa-solid fa-user-plus"></i> Enregistrer l'agent
+                        <button type="submit" className="btn btn-primary" style={{ fontWeight: 600 }}>
+                            <i className="fa-solid fa-user-check" style={{ marginRight: '6px' }}></i>
+                            {userId ? 'Mettre à jour l\'utilisateur' : 'Enregistrer le nouveau membre'}
                         </button>
                         {userId && (
                             <button type="button" className="btn btn-secondary" onClick={handleReset}>Annuler</button>
@@ -3379,7 +2164,7 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
 
             {/* TABLEAU DES UTILISATEURS */}
             <div className="card">
-                <h3 className="card-title">Liste des Utilisateurs / Agents ({visibleUsers.length})</h3>
+                <h3 className="card-title">Liste des Collaborateurs & Droits d'Accès ({visibleUsers.length})</h3>
                 <div className="table-container">
                     <table>
                         <thead>
@@ -3391,80 +2176,107 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
                                 <th>Email</th>
                                 <th>Rôle</th>
                                 <th>Organisation</th>
+                                <th>Accès & Permissions</th>
                                 <th>Contact Direct</th>
                                 <th>Agent Assigné</th>
-                                <th>Date Création</th>
-                                <th>Actions</th>
+                                <th style={{ textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {visibleUsers.length > 0 ? (
-                                visibleUsers.map(u => (
-                                    <tr key={u.id} style={{ backgroundColor: selectedUserIds.includes(u.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <input type="checkbox" checked={selectedUserIds.includes(u.id)} onChange={() => toggleSelectUser(u.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                                        </td>
-                                        <td><b>{u.nom}</b></td>
-                                        <td>{u.email}</td>
-                                        <td>
-                                            <span className="badge" style={{
-                                                background: u.role === 'admin' ? '#9333ea' : (u.role === 'cadre' ? '#0284c7' : '#16a34a'),
-                                                color: 'white'
-                                            }}>
-                                                {u.role === 'admin' ? 'Admin' : (u.role === 'cadre' ? 'Admin' : 'Agent')}
-                                            </span>
-                                        </td>
-                                        <td><span className="badge badge-compte">{((organisations.find(o => o.id === u.organisationId) || {}).nom) || u.organisationId || 'Par défaut'}</span></td>
-                                        <td>
-                                            {u.contactNumero ? (
-                                                <a
-                                                    href={
-                                                        u.contactType === 'Telegram'
-                                                            ? (u.contactNumero.startsWith('@') ? `https://t.me/${u.contactNumero.replace('@', '')}` : `https://t.me/${u.contactNumero.replace(/\s+/g, '')}`)
-                                                            : (u.contactType === 'WhatsApp' ? `https://wa.me/${u.contactNumero.replace(/[^0-9]/g, '')}` : `tel:${u.contactNumero}`)
-                                                    }
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="badge"
-                                                    style={{
-                                                        background: u.contactType === 'WhatsApp' ? '#25d366' : (u.contactType === 'Telegram' ? '#0088cc' : '#3a76f0'),
-                                                        color: 'white',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '5px',
-                                                        textDecoration: 'none',
-                                                        fontWeight: 600,
-                                                        fontSize: '11px',
-                                                        padding: '3px 8px'
-                                                    }}
-                                                    title={`Ouvrir dans ${u.contactType || 'WhatsApp'}`}
-                                                >
-                                                    <i className={
-                                                        u.contactType === 'WhatsApp' ? 'fa-brands fa-whatsapp' : (u.contactType === 'Telegram' ? 'fa-brands fa-telegram' : 'fa-solid fa-comment-dots')
-                                                    }></i>
-                                                    {u.contactNumero}
-                                                </a>
-                                            ) : (
-                                                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
-                                            )}
-                                        </td>
-                                        <td>{u.agentAssigne || u.nom}</td>
-                                        <td>{u.dateCreation || '-'}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '6px' }}>
-                                                <button className="btn btn-primary btn-sm" onClick={() => handleEdit(u)} title="Éditer">
-                                                    <i className="fa-solid fa-pen"></i>
-                                                </button>
-                                                <button className="btn btn-danger btn-sm" onClick={() => onDeleteUser(u.id)} title="Supprimer">
-                                                    <i className="fa-solid fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                visibleUsers.map(u => {
+                                    const uPerms = PermissionManager.getPermissions(u);
+                                    const allowedModulesCount = PermissionManager.MODULES.filter(m => uPerms[m.key]).length;
+                                    const allowedActionsCount = PermissionManager.ACTIONS.filter(a => uPerms[a.key]).length;
+
+                                    return (
+                                        <tr key={u.id} style={{ backgroundColor: selectedUserIds.includes(u.id) ? 'rgba(9, 177, 186, 0.08)' : 'transparent' }}>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <input type="checkbox" checked={selectedUserIds.includes(u.id)} onChange={() => toggleSelectUser(u.id)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                                            </td>
+                                            <td><b>{u.nom}</b></td>
+                                            <td>{u.email}</td>
+                                            <td>
+                                                <span className="badge" style={{
+                                                    background: u.role === 'admin' ? '#9333ea' : (u.role === 'cadre' ? '#0284c7' : '#16a34a'),
+                                                    color: 'white'
+                                                }}>
+                                                    {u.role === 'admin' ? 'Admin' : (u.role === 'cadre' ? 'Cadre' : 'Agent')}
+                                                </span>
+                                            </td>
+                                            <td><span className="badge badge-compte">{((organisations.find(o => o.id === u.organisationId) || {}).nom) || u.organisationId || 'Par défaut'}</span></td>
+                                            
+                                            {/* Colonne Permissions & Accès personnalisables */}
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                                    <span className={`badge ${allowedModulesCount >= 10 ? 'badge-primary' : (allowedModulesCount >= 6 ? 'badge-secondary' : 'badge-danger')}`} style={{ fontSize: '11px', padding: '2px 7px' }}>
+                                                        {allowedModulesCount}/11 modules
+                                                    </span>
+                                                    <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '2px 5px' }} title={`${allowedActionsCount} actions opérationnelles autorisées`}>
+                                                        ⚡ {allowedActionsCount} actions
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-xs"
+                                                        onClick={() => openPermModal(u)}
+                                                        title="Modifier directement les accès de ce membre"
+                                                        style={{ fontSize: '10.5px', padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                                    >
+                                                        <i className="fa-solid fa-sliders" style={{ color: 'var(--primary-color)' }}></i> Régler
+                                                    </button>
+                                                </div>
+                                            </td>
+
+                                            <td>
+                                                {u.contactNumero ? (
+                                                    <a
+                                                        href={
+                                                            u.contactType === 'Telegram'
+                                                                ? (u.contactNumero.startsWith('@') ? `https://t.me/${u.contactNumero.replace('@', '')}` : `https://t.me/${u.contactNumero.replace(/\s+/g, '')}`)
+                                                                : (u.contactType === 'WhatsApp' ? `https://wa.me/${u.contactNumero.replace(/[^0-9]/g, '')}` : `tel:${u.contactNumero}`)
+                                                        }
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="badge"
+                                                        style={{
+                                                            background: u.contactType === 'WhatsApp' ? '#25d366' : (u.contactType === 'Telegram' ? '#0088cc' : '#3a76f0'),
+                                                            color: 'white',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '5px',
+                                                            textDecoration: 'none',
+                                                            fontWeight: 600,
+                                                            fontSize: '11px',
+                                                            padding: '3px 8px'
+                                                        }}
+                                                        title={`Ouvrir dans ${u.contactType || 'WhatsApp'}`}
+                                                    >
+                                                        <i className={
+                                                            u.contactType === 'WhatsApp' ? 'fa-brands fa-whatsapp' : (u.contactType === 'Telegram' ? 'fa-brands fa-telegram' : 'fa-solid fa-comment-dots')
+                                                        }></i>
+                                                        {u.contactNumero}
+                                                    </a>
+                                                ) : (
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
+                                                )}
+                                            </td>
+                                            <td>{u.agentAssigne || u.nom}</td>
+                                            <td style={{ textAlign: 'right' }}>
+                                                <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                                    <button className="btn btn-primary btn-sm" onClick={() => handleEdit(u)} title="Éditer le profil et les accès">
+                                                        <i className="fa-solid fa-pen"></i>
+                                                    </button>
+                                                    <button className="btn btn-danger btn-sm" onClick={() => onDeleteUser(u.id)} title="Supprimer">
+                                                        <i className="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
-                                    <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                                         Aucun utilisateur trouvé.
                                     </td>
                                 </tr>
@@ -3473,6 +2285,130 @@ function UtilisateursView({ currentUser, appState, onSaveUser, onDeleteUser, onB
                     </table>
                 </div>
             </div>
+
+            {/* MODAL RAPIDE DE GESTION DES PERMISSIONS */}
+            {permModalUser && (
+                <div className="modal-backdrop" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div className="modal-content card" style={{ maxWidth: '750px', width: '100%', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#fff', borderRadius: '12px', padding: '24px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+                            <div>
+                                <h3 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <i className="fa-solid fa-shield-halved" style={{ color: 'var(--primary-color)' }}></i>
+                                    Permissions & Accès : {permModalUser.nom}
+                                </h3>
+                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                    Rôle : <strong>{permModalUser.role}</strong> | Email : {permModalUser.email}
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setPermModalUser(null)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#94a3b8' }}
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        {/* Presets in Modal */}
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#475569', alignSelf: 'center', marginRight: '4px' }}>Préréglages :</span>
+                            <button type="button" className="perm-preset-btn" onClick={() => handleApplyModalPreset('admin')}>
+                                👑 Tout Accorder
+                            </button>
+                            <button type="button" className="perm-preset-btn" onClick={() => handleApplyModalPreset('cadre')}>
+                                👔 Cadre
+                            </button>
+                            <button type="button" className="perm-preset-btn" onClick={() => handleApplyModalPreset('agent')}>
+                                👤 Agent Standard
+                            </button>
+                            <button type="button" className="perm-preset-btn" onClick={() => handleApplyModalPreset('none')}>
+                                🔒 Tout Refuser
+                            </button>
+                        </div>
+
+                        {/* Modules Grid */}
+                        <div style={{ marginBottom: '18px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                📑 Modules & Vues Autorisés
+                            </div>
+                            <div className="perm-card-grid">
+                                {PermissionManager.MODULES.map(m => {
+                                    const active = Boolean(modalPermissions[m.key]);
+                                    return (
+                                        <div
+                                            key={m.key}
+                                            className={`perm-item-card ${active ? 'active' : ''}`}
+                                            onClick={() => handleToggleModalPerm(m.key)}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                <div className="perm-item-icon">
+                                                    <i className={`fa-solid ${m.icon}`}></i>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#0f172a' }}>{m.label}</div>
+                                                    <div style={{ fontSize: '10.5px', color: '#64748b' }}>{m.desc}</div>
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={active}
+                                                onChange={() => {}}
+                                                style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)' }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Actions Grid */}
+                        <div style={{ marginBottom: '20px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                ⚡ Privilèges & Actions Opérationnelles
+                            </div>
+                            <div className="perm-card-grid">
+                                {PermissionManager.ACTIONS.map(a => {
+                                    const active = Boolean(modalPermissions[a.key]);
+                                    return (
+                                        <div
+                                            key={a.key}
+                                            className={`perm-item-card ${active ? 'active' : ''}`}
+                                            onClick={() => handleToggleModalPerm(a.key)}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                <div className="perm-item-icon">
+                                                    <i className={`fa-solid ${a.icon}`}></i>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#0f172a' }}>{a.label}</div>
+                                                    <div style={{ fontSize: '10.5px', color: '#64748b' }}>{a.desc}</div>
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={active}
+                                                onChange={() => {}}
+                                                style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)' }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Footer buttons */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                            <button type="button" className="btn btn-secondary" onClick={() => setPermModalUser(null)}>
+                                Annuler
+                            </button>
+                            <button type="button" className="btn btn-primary" onClick={handleSaveModalPermissions} style={{ fontWeight: 600 }}>
+                                <i className="fa-solid fa-check" style={{ marginRight: '6px' }}></i>
+                                Enregistrer les Accès
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </section>
     );
 }
@@ -5537,8 +4473,1525 @@ function MessagerieView({ appState }) {
     );
 }
 
+// ============================================================
+// AUDIO SYNTHESIZER & NOTIFICATION ENGINE (Web Audio API)
+// ============================================================
+var SoundEngine = {
+    ctx: null,
+    isMuted: function() {
+        try {
+            return localStorage.getItem('vinted_notif_sound_muted') === 'true';
+        } catch(e) {
+            return false;
+        }
+    },
+    setMuted: function(muted) {
+        try {
+            localStorage.setItem('vinted_notif_sound_muted', muted ? 'true' : 'false');
+        } catch(e) {}
+    },
+    getContext: function() {
+        if (!this.ctx && (window.AudioContext || window.webkitAudioContext)) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+        return this.ctx;
+    },
+    playTone: function(freq, type, duration, delay, gain) {
+        delay = delay || 0;
+        gain = gain || 0.2;
+        if (this.isMuted()) return;
+        try {
+            const ctx = this.getContext();
+            if (!ctx) return;
+            const now = ctx.currentTime + delay;
+            const osc = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            osc.type = type || 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            gainNode.gain.setValueAtTime(gain, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration);
+        } catch(e) {
+            console.warn('Audio tone error', e);
+        }
+    },
+    playUrgentAlert: function() {
+        // High attention urgent alert (double siren pulse + harmonic octave)
+        this.playTone(880, 'triangle', 0.14, 0, 0.25);
+        this.playTone(1174.66, 'triangle', 0.16, 0.11, 0.25);
+        this.playTone(880, 'triangle', 0.14, 0.24, 0.25);
+        this.playTone(1760, 'triangle', 0.30, 0.36, 0.28);
+    },
+    playWarningAlert: function() {
+        // 2-step attention chime
+        this.playTone(587.33, 'sine', 0.18, 0, 0.2);
+        this.playTone(880, 'sine', 0.28, 0.15, 0.22);
+    },
+    playSuccess: function() {
+        // Melodic ascending chord C5 -> E5 -> G5 -> C6
+        this.playTone(523.25, 'sine', 0.11, 0, 0.2);
+        this.playTone(659.25, 'sine', 0.11, 0.09, 0.2);
+        this.playTone(783.99, 'sine', 0.13, 0.18, 0.22);
+        this.playTone(1046.50, 'sine', 0.28, 0.29, 0.25);
+    },
+    playSnooze: function() {
+        this.playTone(659.25, 'sine', 0.14, 0, 0.18);
+        this.playTone(440, 'sine', 0.20, 0.11, 0.15);
+    },
+    playCheck: function() {
+        this.playTone(587.33, 'triangle', 0.07, 0, 0.15);
+        this.playTone(880, 'triangle', 0.10, 0.06, 0.18);
+    }
+};
+
+var SystemNotifications = {
+    isSupported: function() {
+        return typeof window !== 'undefined' && 'Notification' in window;
+    },
+    getPermission: function() {
+        if (!this.isSupported()) return 'unsupported';
+        return Notification.permission;
+    },
+    requestPermission: async function() {
+        if (!this.isSupported()) return 'unsupported';
+        try {
+            const p = await Notification.requestPermission();
+            return p;
+        } catch(e) {
+            return 'denied';
+        }
+    },
+    notify: function(title, body, options) {
+        options = options || {};
+        if (!this.isSupported() || Notification.permission !== 'granted') return null;
+        try {
+            const notif = new Notification(title, {
+                body: body || '',
+                icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                tag: options.tag || 'vinted-reminder',
+                requireInteraction: options.urgent || false,
+                ...options
+            });
+            notif.onclick = function() {
+                window.focus();
+                if (options.onClick) options.onClick();
+                notif.close();
+            };
+            return notif;
+        } catch(e) {
+            console.warn('System push error', e);
+            return null;
+        }
+    }
+};
+
+var TodoUtils = {
+    parseDeadline: function(todo) {
+        if (!todo || !todo.dateEcheance) return null;
+        let datePart = String(todo.dateEcheance).trim();
+        if (datePart.includes('/')) {
+            const p = datePart.split('/');
+            if (p.length === 3) datePart = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+        }
+        const timePart = todo.heureEcheance ? String(todo.heureEcheance).trim() : '23:59';
+        const d = new Date(`${datePart}T${timePart}:00`);
+        return isNaN(d.getTime()) ? null : d;
+    },
+    getStatusInfo: function(todo) {
+        if (todo.statut === 'terminee') {
+            return { isDone: true, isOverdue: false, isImminent: false, label: 'Terminée', diffHours: 0 };
+        }
+        const d = this.parseDeadline(todo);
+        if (!d) {
+            return { isDone: false, isOverdue: false, isImminent: false, label: 'Sans échéance', diffHours: 9999 };
+        }
+        const now = Date.now();
+        const diffMs = d.getTime() - now;
+        const diffMinutes = Math.round(diffMs / 60000);
+        const diffHours = Math.round(diffMs / 3600000);
+
+        if (diffMs < 0) {
+            const overdueMin = Math.abs(diffMinutes);
+            let text = '';
+            if (overdueMin < 60) text = `En retard de ${overdueMin}m`;
+            else if (overdueMin < 1440) text = `En retard de ${Math.round(overdueMin/60)}h`;
+            else text = `En retard de ${Math.round(overdueMin/1440)}j`;
+            return { isDone: false, isOverdue: true, isImminent: false, label: text, diffMinutes, diffHours };
+        }
+
+        const reminderMin = Number(todo.rappelMinutes) >= 0 ? Number(todo.rappelMinutes) : 30;
+        const isImminent = diffMinutes <= reminderMin;
+
+        let text = '';
+        if (diffMinutes <= 60) {
+            text = `Dans ${diffMinutes} min`;
+        } else if (diffMinutes < 1440) {
+            text = `Aujourd'hui à ${todo.heureEcheance || '23:59'}`;
+        } else if (diffMinutes < 2880) {
+            text = `Demain à ${todo.heureEcheance || '23:59'}`;
+        } else {
+            text = `${todo.dateEcheance} ${todo.heureEcheance || ''}`.trim();
+        }
+
+        return { isDone: false, isOverdue: false, isImminent, label: text, diffMinutes, diffHours };
+    }
+};
+
+// ============================================================
+// NOTIFICATION BELL CENTER (HEADER COMPONENT)
+// ============================================================
+function NotificationBellCenter({ todos = [], onNavigateTodo, onSaveTodo, showToast }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [soundMuted, setSoundMuted] = useState(() => SoundEngine.isMuted());
+    const [pushPerm, setPushPerm] = useState(() => SystemNotifications.getPermission());
+    const [tabFilter, setTabFilter] = useState('urgents'); // 'urgents' | 'all' | 'today'
+
+    // Real-time calculated alerts
+    const alerts = useMemo(() => {
+        return (todos || []).map(t => {
+            const info = TodoUtils.getStatusInfo(t);
+            return { todo: t, info };
+        }).filter(item => !item.info.isDone);
+    }, [todos]);
+
+    const urgentOverdueAlerts = useMemo(() => {
+        return alerts.filter(a => a.info.isOverdue || a.todo.priorite === 'urgente' || a.info.isImminent);
+    }, [alerts]);
+
+    const activeList = useMemo(() => {
+        if (tabFilter === 'urgents') return urgentOverdueAlerts;
+        if (tabFilter === 'today') {
+            return alerts.filter(a => a.info.isOverdue || (a.info.diffMinutes >= 0 && a.info.diffMinutes < 1440));
+        }
+        return alerts;
+    }, [tabFilter, alerts, urgentOverdueAlerts]);
+
+    const hasUrgent = urgentOverdueAlerts.length > 0;
+    const badgeCount = urgentOverdueAlerts.length;
+
+    // Toggle sound
+    const handleToggleSound = (e) => {
+        e.stopPropagation();
+        const next = !soundMuted;
+        setSoundMuted(next);
+        SoundEngine.setMuted(next);
+        if (showToast) showToast(next ? '🔇 Alertes sonores désactivées' : '🔊 Alertes sonores activées');
+        if (!next) SoundEngine.playCheck();
+    };
+
+    // Test audio
+    const handleTestSound = (e) => {
+        e.stopPropagation();
+        SoundEngine.playUrgentAlert();
+        if (showToast) showToast('🔔 Démonstration alerte sonore ultra-haute priorité !');
+    };
+
+    // Request push
+    const handleRequestPush = async (e) => {
+        e.stopPropagation();
+        const p = await SystemNotifications.requestPermission();
+        setPushPerm(p);
+        if (p === 'granted') {
+            SystemNotifications.notify('Vinted Manager', 'Notifications bureau activées avec succès ! 🎉');
+            if (showToast) showToast('✅ Notifications système autorisées');
+        } else {
+            if (showToast) showToast('⚠️ Les notifications sont désactivées sur ce navigateur', true);
+        }
+    };
+
+    // Quick complete
+    const handleQuickDone = async (todo, e) => {
+        e.stopPropagation();
+        SoundEngine.playSuccess();
+        if (onSaveTodo) {
+            await onSaveTodo({ ...todo, statut: 'terminee' });
+        }
+        if (showToast) showToast(`✅ Tâche "${todo.titre}" terminée !`);
+    };
+
+    // Quick snooze (+1 hour or +1 day)
+    const handleSnooze = async (todo, hours, e) => {
+        e.stopPropagation();
+        SoundEngine.playSnooze();
+        const d = TodoUtils.parseDeadline(todo) || new Date();
+        const newD = new Date(d.getTime() + hours * 3600000);
+        const yyyy = newD.getFullYear();
+        const mm = String(newD.getMonth() + 1).padStart(2, '0');
+        const dd = String(newD.getDate()).padStart(2, '0');
+        const hh = String(newD.getHours()).padStart(2, '0');
+        const min = String(newD.getMinutes()).padStart(2, '0');
+
+        if (onSaveTodo) {
+            await onSaveTodo({
+                ...todo,
+                dateEcheance: `${yyyy}-${mm}-${dd}`,
+                heureEcheance: `${hh}:${min}`
+            });
+        }
+        if (showToast) showToast(`⏰ Reporté de +${hours}h (${hh}:${min})`);
+    };
+
+    return (
+        <div className="notif-dropdown-wrapper" style={{ position: 'relative' }}>
+            <button
+                type="button"
+                className={`notif-bell-btn ${hasUrgent ? 'has-urgent' : ''}`}
+                onClick={() => setIsOpen(!isOpen)}
+                title="Notifications & Rappels Tâches"
+                aria-label="Centre de notifications"
+            >
+                <i className={`fa-solid ${hasUrgent ? 'fa-bell fa-bounce' : 'fa-bell'}`} style={{ fontSize: '15px' }}></i>
+                {badgeCount > 0 && (
+                    <span className={`notif-badge-counter ${hasUrgent ? 'pulse' : ''}`}>
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                )}
+            </button>
+
+            {isOpen && (
+                <>
+                    <div
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }}
+                        onClick={() => setIsOpen(false)}
+                    />
+                    <div className="notif-popover">
+                        {/* Header */}
+                        <div className="notif-popover-header">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className="fa-solid fa-bell" style={{ color: 'var(--primary-color)' }}></i>
+                                <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-main)' }}>Notifications & Alertes</span>
+                                <span className={`badge ${badgeCount > 0 ? 'badge-danger' : 'badge-secondary'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>
+                                    {alerts.length}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                    type="button"
+                                    onClick={handleToggleSound}
+                                    title={soundMuted ? 'Activer le son' : 'Couper le son'}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: soundMuted ? '#ef4444' : '#22c55e', fontSize: '14px' }}
+                                >
+                                    <i className={`fa-solid ${soundMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`}></i>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleTestSound}
+                                    title="Tester l'alerte sonore"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '13px' }}
+                                >
+                                    <i className="fa-solid fa-play"></i>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOpen(false)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '14px' }}
+                                >
+                                    <i className="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Push Permission Alert Banner */}
+                        {pushPerm !== 'granted' && (
+                            <div style={{
+                                padding: '8px 12px',
+                                background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(147,51,234,0.08))',
+                                borderBottom: '1px solid #e2e8f0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                fontSize: '11.5px'
+                            }}>
+                                <span style={{ color: '#1e293b' }}>
+                                    <i className="fa-solid fa-desktop" style={{ marginRight: '6px', color: '#2563eb' }}></i>
+                                    Activer les alertes sur votre bureau ?
+                                </span>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary btn-xs"
+                                    onClick={handleRequestPush}
+                                    style={{ fontSize: '11px', padding: '2px 8px' }}
+                                >
+                                    Activer
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Quick Filter Tabs */}
+                        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '4px 8px', gap: '4px' }}>
+                            <button
+                                type="button"
+                                onClick={() => setTabFilter('urgents')}
+                                style={{
+                                    flex: 1,
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '5px 4px',
+                                    fontSize: '11px',
+                                    fontWeight: tabFilter === 'urgents' ? 700 : 500,
+                                    background: tabFilter === 'urgents' ? '#fee2e2' : 'transparent',
+                                    color: tabFilter === 'urgents' ? '#b91c1c' : '#64748b',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                🚨 Urgents ({urgentOverdueAlerts.length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTabFilter('today')}
+                                style={{
+                                    flex: 1,
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '5px 4px',
+                                    fontSize: '11px',
+                                    fontWeight: tabFilter === 'today' ? 700 : 500,
+                                    background: tabFilter === 'today' ? '#e0e7ff' : 'transparent',
+                                    color: tabFilter === 'today' ? '#4338ca' : '#64748b',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                📅 Aujourd'hui
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTabFilter('all')}
+                                style={{
+                                    flex: 1,
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '5px 4px',
+                                    fontSize: '11px',
+                                    fontWeight: tabFilter === 'all' ? 700 : 500,
+                                    background: tabFilter === 'all' ? '#e2e8f0' : 'transparent',
+                                    color: tabFilter === 'all' ? '#0f172a' : '#64748b',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Tout ({alerts.length})
+                            </button>
+                        </div>
+
+                        {/* Notifications List */}
+                        <div className="notif-popover-body">
+                            {activeList.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '30px 16px', color: '#94a3b8' }}>
+                                    <i className="fa-solid fa-circle-check" style={{ fontSize: '32px', color: '#10b981', marginBottom: '8px', display: 'block' }}></i>
+                                    <div style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b' }}>Aucune alerte en attente !</div>
+                                    <div style={{ fontSize: '11.5px', marginTop: '4px' }}>Toutes vos tâches sont à jour et sous contrôle.</div>
+                                </div>
+                            ) : (
+                                activeList.map(({ todo, info }) => {
+                                    const subtasksCount = (todo.sousTaches || []).length;
+                                    const subtasksDone = (todo.sousTaches || []).filter(s => s.fait).length;
+                                    return (
+                                        <div
+                                            key={todo.id}
+                                            className={`notif-item ${info.isOverdue ? 'overdue' : (todo.priorite === 'urgente' ? 'urgent' : '')}`}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                                                        <span className={`badge-priority badge-priority-${todo.priorite || 'moyenne'}`}>
+                                                            {todo.priorite === 'urgente' ? '🚨 URGENTE' : (todo.priorite || 'Moyenne')}
+                                                        </span>
+                                                        {todo.categorie && (
+                                                            <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '1px 5px' }}>
+                                                                {todo.categorie}
+                                                            </span>
+                                                        )}
+                                                        {todo.compteNom && (
+                                                            <span className="badge badge-primary" style={{ fontSize: '10px', padding: '1px 5px' }}>
+                                                                @{todo.compteNom}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a', marginBottom: '3px' }}>
+                                                        {todo.titre}
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: info.isOverdue ? '#dc2626' : (info.isImminent ? '#ea580c' : '#64748b'), fontWeight: info.isOverdue || info.isImminent ? 600 : 400 }}>
+                                                        <i className={`fa-solid ${info.isOverdue ? 'fa-triangle-exclamation' : 'fa-clock'}`}></i>
+                                                        <span>{info.label}</span>
+                                                        {subtasksCount > 0 && (
+                                                            <span style={{ color: '#64748b', marginLeft: 'auto' }}>
+                                                                <i className="fa-solid fa-list-check" style={{ marginRight: '3px' }}></i>
+                                                                {subtasksDone}/{subtasksCount}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Quick Actions */}
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', marginTop: '8px', paddingTop: '6px', borderTop: '1px dashed #f1f5f9' }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-success"
+                                                    onClick={(e) => handleQuickDone(todo, e)}
+                                                    title="Marquer comme terminée"
+                                                    style={{ fontSize: '10.5px', padding: '2px 7px' }}
+                                                >
+                                                    <i className="fa-solid fa-check"></i> Fait
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-secondary"
+                                                    onClick={(e) => handleSnooze(todo, 1, e)}
+                                                    title="Reporter de 1 heure"
+                                                    style={{ fontSize: '10.5px', padding: '2px 7px' }}
+                                                >
+                                                    +1h
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-secondary"
+                                                    onClick={(e) => handleSnooze(todo, 24, e)}
+                                                    title="Reporter de 1 jour"
+                                                    style={{ fontSize: '10.5px', padding: '2px 7px' }}
+                                                >
+                                                    +1j
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-primary"
+                                                    onClick={() => {
+                                                        setIsOpen(false);
+                                                        if (onNavigateTodo) onNavigateTodo(todo.id);
+                                                    }}
+                                                    title="Voir dans le gestionnaire"
+                                                    style={{ fontSize: '10.5px', padding: '2px 7px' }}
+                                                >
+                                                    <i className="fa-solid fa-arrow-right"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="notif-popover-footer">
+                            <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                style={{ width: '100%', justifyContent: 'center' }}
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    if (onNavigateTodo) onNavigateTodo();
+                                }}
+                            >
+                                <i className="fa-solid fa-list-check" style={{ marginRight: '6px' }}></i>
+                                Ouvrir le Gestionnaire To-Do
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+// ============================================================
+// MAIN TODO VIEW (PAGE TO-DO & GESTIONNAIRE AVANCÉ)
+// ============================================================
+function TodoView({
+    currentUser,
+    appState,
+    onSaveTodo,
+    onDeleteTodo,
+    onBulkUpdateTodos,
+    onBulkDeleteTodos,
+    showToast
+}) {
+    const todos = appState.todos || [];
+    const comptes = appState.comptes || [];
+    const utilisateurs = appState.utilisateurs || [];
+
+    // Filters & Search
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // all, a_faire, en_cours, terminee
+    const [priorityFilter, setPriorityFilter] = useState('all'); // all, urgente, haute, moyenne, basse
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [agentFilter, setAgentFilter] = useState('all');
+    const [compteFilter, setCompteFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('echeance_asc'); // echeance_asc, echeance_desc, priorite_desc, date_desc, titre_asc
+
+    // Selection
+    const [selectedIds, setSelectedIds] = useState([]);
+
+    // Modal Add / Edit
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingTodo, setEditingTodo] = useState(null);
+
+    // Form state
+    const [titre, setTitre] = useState('');
+    const [description, setDescription] = useState('');
+    const [priorite, setPriorite] = useState('moyenne');
+    const [statut, setStatut] = useState('a_faire');
+    const [categorie, setCategorie] = useState('Expédition');
+    const [compteId, setCompteId] = useState('');
+    const [agentAssigne, setAgentAssigne] = useState('');
+    const [dateEcheance, setDateEcheance] = useState(() => {
+        const today = new Date();
+        return `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    });
+    const [heureEcheance, setHeureEcheance] = useState('18:00');
+    const [rappelMinutes, setRappelMinutes] = useState(30);
+    const [alerteSonore, setAlerteSonore] = useState(true);
+    const [sousTaches, setSousTaches] = useState([]);
+    const [newSubtaskText, setNewSubtaskText] = useState('');
+
+    // Pre-fill categories list
+    const predefinedCategories = ['Expédition', 'Litige & SAV', 'Annonce & Photos', 'Boost & Promos', 'Comptabilité', 'Inventaire', 'Autre'];
+
+    // Stats calculations
+    const stats = useMemo(() => {
+        let total = todos.length;
+        let urgentes = 0;
+        let enRetard = 0;
+        let enCours = 0;
+        let terminees = 0;
+
+        todos.forEach(t => {
+            const info = TodoUtils.getStatusInfo(t);
+            if (t.statut === 'terminee') {
+                terminees++;
+            } else {
+                if (t.statut === 'en_cours') enCours++;
+                if (t.priorite === 'urgente') urgentes++;
+                if (info.isOverdue) enRetard++;
+            }
+        });
+
+        const percentDone = total > 0 ? Math.round((terminees / total) * 100) : 0;
+        return { total, urgentes, enRetard, enCours, terminees, percentDone };
+    }, [todos]);
+
+    // Filtered & Sorted list
+    const filteredTodos = useMemo(() => {
+        return todos.filter(t => {
+            if (statusFilter !== 'all' && t.statut !== statusFilter) return false;
+            if (priorityFilter !== 'all' && t.priorite !== priorityFilter) return false;
+            if (categoryFilter !== 'all' && t.categorie !== categoryFilter) return false;
+            if (agentFilter !== 'all' && t.agentAssigne !== agentFilter) return false;
+            if (compteFilter !== 'all' && t.compteId !== compteFilter) return false;
+
+            if (searchTerm.trim()) {
+                const q = searchTerm.toLowerCase();
+                const matchTitle = (t.titre || '').toLowerCase().includes(q);
+                const matchDesc = (t.description || '').toLowerCase().includes(q);
+                const matchCat = (t.categorie || '').toLowerCase().includes(q);
+                const matchCompte = (t.compteNom || '').toLowerCase().includes(q);
+                const matchAgent = (t.agentAssigne || '').toLowerCase().includes(q);
+                if (!matchTitle && !matchDesc && !matchCat && !matchCompte && !matchAgent) return false;
+            }
+            return true;
+        }).sort((a, b) => {
+            if (sortBy === 'echeance_asc') {
+                const da = TodoUtils.parseDeadline(a) || new Date('2099-12-31');
+                const db = TodoUtils.parseDeadline(b) || new Date('2099-12-31');
+                return da - db;
+            }
+            if (sortBy === 'echeance_desc') {
+                const da = TodoUtils.parseDeadline(a) || new Date('1970-01-01');
+                const db = TodoUtils.parseDeadline(b) || new Date('1970-01-01');
+                return db - da;
+            }
+            if (sortBy === 'priorite_desc') {
+                const weights = { urgente: 4, haute: 3, moyenne: 2, basse: 1 };
+                return (weights[b.priorite] || 0) - (weights[a.priorite] || 0);
+            }
+            if (sortBy === 'titre_asc') {
+                return (a.titre || '').localeCompare(b.titre || '');
+            }
+            if (sortBy === 'date_desc') {
+                return new Date(b.dateCreation || 0) - new Date(a.dateCreation || 0);
+            }
+            return 0;
+        });
+    }, [todos, statusFilter, priorityFilter, categoryFilter, agentFilter, compteFilter, searchTerm, sortBy]);
+
+    // Open Add Modal
+    const handleOpenAdd = () => {
+        setEditingTodo(null);
+        setTitre('');
+        setDescription('');
+        setPriorite('moyenne');
+        setStatut('a_faire');
+        setCategorie('Expédition');
+        setCompteId(comptes[0] ? comptes[0].id : '');
+        setAgentAssigne(currentUser ? (currentUser.agentAssigne || currentUser.nom) : '');
+        const today = new Date();
+        setDateEcheance(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`);
+        setHeureEcheance('18:00');
+        setRappelMinutes(30);
+        setAlerteSonore(true);
+        setSousTaches([]);
+        setNewSubtaskText('');
+        setIsModalOpen(true);
+    };
+
+    // Open Edit Modal
+    const handleOpenEdit = (todo) => {
+        setEditingTodo(todo);
+        setTitre(todo.titre || '');
+        setDescription(todo.description || '');
+        setPriorite(todo.priorite || 'moyenne');
+        setStatut(todo.statut || 'a_faire');
+        setCategorie(todo.categorie || 'Expédition');
+        setCompteId(todo.compteId || '');
+        setAgentAssigne(todo.agentAssigne || '');
+        setDateEcheance(todo.dateEcheance || '');
+        setHeureEcheance(todo.heureEcheance || '18:00');
+        setRappelMinutes(todo.rappelMinutes !== undefined ? todo.rappelMinutes : 30);
+        setAlerteSonore(todo.alerteSonore !== false);
+        setSousTaches(Array.isArray(todo.sousTaches) ? [...todo.sousTaches] : []);
+        setNewSubtaskText('');
+        setIsModalOpen(true);
+    };
+
+    // Save Todo
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!titre.trim()) {
+            if (showToast) showToast('Veuillez renseigner un titre de tâche', true);
+            return;
+        }
+
+        const selectedCompte = comptes.find(c => c.id === compteId);
+        const compteNom = selectedCompte ? (selectedCompte.nomCompte || selectedCompte.nom || selectedCompte.pseudo) : '';
+
+        const payload = {
+            id: editingTodo ? editingTodo.id : undefined,
+            titre: titre.trim(),
+            description: description.trim(),
+            priorite,
+            statut,
+            categorie,
+            compteId,
+            compteNom,
+            agentAssigne,
+            dateEcheance,
+            heureEcheance,
+            rappelMinutes: Number(rappelMinutes),
+            alerteSonore,
+            sousTaches
+        };
+
+        try {
+            await onSaveTodo(payload);
+            setIsModalOpen(false);
+            if (payload.priorite === 'urgente') {
+                SoundEngine.playUrgentAlert();
+            } else {
+                SoundEngine.playCheck();
+            }
+        } catch(err) {
+            console.error(err);
+        }
+    };
+
+    // Toggle direct complete / status cycle
+    const handleToggleDone = async (todo) => {
+        const isCurrentlyDone = todo.statut === 'terminee';
+        const nextStatut = isCurrentlyDone ? 'a_faire' : 'terminee';
+        if (!isCurrentlyDone) {
+            SoundEngine.playSuccess();
+        } else {
+            SoundEngine.playCheck();
+        }
+        await onSaveTodo({ ...todo, statut: nextStatut });
+    };
+
+    // Toggle Subtask
+    const handleToggleSubtask = async (todo, subIndex) => {
+        SoundEngine.playCheck();
+        const updatedSubs = (todo.sousTaches || []).map((s, idx) => {
+            if (idx === subIndex) return { ...s, fait: !s.fait };
+            return s;
+        });
+
+        // If all subtasks are done, offer auto-completion
+        const allDone = updatedSubs.length > 0 && updatedSubs.every(s => s.fait);
+        const updatedTodo = {
+            ...todo,
+            sousTaches: updatedSubs,
+            statut: allDone ? 'terminee' : todo.statut
+        };
+
+        if (allDone && todo.statut !== 'terminee') {
+            SoundEngine.playSuccess();
+            if (showToast) showToast(`🎉 Toutes les sous-tâches sont complétées !`);
+        }
+
+        await onSaveTodo(updatedTodo);
+    };
+
+    // Quick Snooze +1h or +1j
+    const handleQuickSnooze = async (todo, hours) => {
+        SoundEngine.playSnooze();
+        const d = TodoUtils.parseDeadline(todo) || new Date();
+        const newD = new Date(d.getTime() + hours * 3600000);
+        const yyyy = newD.getFullYear();
+        const mm = String(newD.getMonth() + 1).padStart(2, '0');
+        const dd = String(newD.getDate()).padStart(2, '0');
+        const hh = String(newD.getHours()).padStart(2, '0');
+        const min = String(newD.getMinutes()).padStart(2, '0');
+
+        await onSaveTodo({
+            ...todo,
+            dateEcheance: `${yyyy}-${mm}-${dd}`,
+            heureEcheance: `${hh}:${min}`
+        });
+        if (showToast) showToast(`⏰ Échéance repoussée de +${hours}h`);
+    };
+
+    // Add subtask inside modal
+    const handleAddSubtaskInModal = () => {
+        if (!newSubtaskText.trim()) return;
+        setSousTaches([...sousTaches, { id: Date.now(), texte: newSubtaskText.trim(), fait: false }]);
+        setNewSubtaskText('');
+    };
+
+    const handleRemoveSubtaskInModal = (index) => {
+        setSousTaches(sousTaches.filter((_, i) => i !== index));
+    };
+
+    // Bulk selection handlers
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedIds(filteredTodos.map(t => t.id));
+        } else {
+            setSelectedIds([]);
+        }
+    };
+
+    const handleSelectOne = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const handleBulkMarkDone = async () => {
+        if (selectedIds.length === 0) return;
+        SoundEngine.playSuccess();
+        await onBulkUpdateTodos(selectedIds, { statut: 'terminee' });
+        setSelectedIds([]);
+        if (showToast) showToast(`${selectedIds.length} tâche(s) marquée(s) comme terminée(s)`);
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        if (!confirm(`Supprimer définitivement ${selectedIds.length} tâche(s) ?`)) return;
+        await onBulkDeleteTodos(selectedIds);
+        setSelectedIds([]);
+        if (showToast) showToast(`${selectedIds.length} tâche(s) supprimée(s)`);
+    };
+
+    return (
+        <div className="todo-view-container">
+            {/* View Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                    <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <i className="fa-solid fa-list-check" style={{ color: 'var(--primary-color)' }}></i>
+                        To-Do List & Rappels Intelligents
+                    </h2>
+                    <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '13px' }}>
+                        Suivi en temps réel des actions, alertes sonores instantanées et synchronisation d'équipe.
+                    </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                            SoundEngine.playUrgentAlert();
+                            if (showToast) showToast('🔊 Test alerte sonore effectué');
+                        }}
+                        title="Tester le son du synthétiseur Web Audio"
+                    >
+                        <i className="fa-solid fa-volume-high"></i> Tester Alerte
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleOpenAdd}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}
+                    >
+                        <i className="fa-solid fa-plus"></i> Nouvelle Tâche
+                    </button>
+                </div>
+            </div>
+
+            {/* Stats Overview Banner */}
+            <div className="dashboard-grid" style={{ marginBottom: '24px', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                <div className="stat-card" style={{ borderLeft: '4px solid var(--primary-color)' }}>
+                    <div className="stat-card-header">
+                        <span className="stat-card-title">Total Tâches</span>
+                        <div className="stat-card-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary-color)' }}>
+                            <i className="fa-solid fa-clipboard-list"></i>
+                        </div>
+                    </div>
+                    <div className="stat-card-value">{stats.total}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Taux d'achèvement : <strong>{stats.percentDone}%</strong>
+                    </div>
+                </div>
+
+                <div className="stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
+                    <div className="stat-card-header">
+                        <span className="stat-card-title">🚨 Urgentes & Critiques</span>
+                        <div className="stat-card-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
+                            <i className="fa-solid fa-fire-flame-curved"></i>
+                        </div>
+                    </div>
+                    <div className="stat-card-value" style={{ color: stats.urgentes > 0 ? '#ef4444' : 'inherit' }}>
+                        {stats.urgentes}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', fontWeight: 600 }}>
+                        {stats.urgentes > 0 ? 'Priorité immédiate requise' : 'Aucune urgence en attente'}
+                    </div>
+                </div>
+
+                <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+                    <div className="stat-card-header">
+                        <span className="stat-card-title">⚠️ En Retard</span>
+                        <div className="stat-card-icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
+                            <i className="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                    </div>
+                    <div className="stat-card-value" style={{ color: stats.enRetard > 0 ? '#f59e0b' : 'inherit' }}>
+                        {stats.enRetard}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Échéances dépassées
+                    </div>
+                </div>
+
+                <div className="stat-card" style={{ borderLeft: '4px solid #0284c7' }}>
+                    <div className="stat-card-header">
+                        <span className="stat-card-title">⏳ En Cours</span>
+                        <div className="stat-card-icon" style={{ background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7' }}>
+                            <i className="fa-solid fa-spinner"></i>
+                        </div>
+                    </div>
+                    <div className="stat-card-value">{stats.enCours}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Tâches en traitement actif
+                    </div>
+                </div>
+
+                <div className="stat-card" style={{ borderLeft: '4px solid #10b981' }}>
+                    <div className="stat-card-header">
+                        <span className="stat-card-title">✅ Terminées</span>
+                        <div className="stat-card-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                            <i className="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+                    <div className="stat-card-value" style={{ color: '#10b981' }}>{stats.terminees}</div>
+                    <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px', fontWeight: 600 }}>
+                        {stats.percentDone}% accompli
+                    </div>
+                </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="table-card" style={{ padding: '16px', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+                    {/* Search */}
+                    <div style={{ gridColumn: 'span 2' }}>
+                        <label style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                            Recherche
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                            <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }}></i>
+                            <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Rechercher par titre, description, compte, agent..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={{ paddingLeft: '32px' }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Statut */}
+                    <div>
+                        <label style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                            Statut
+                        </label>
+                        <select className="form-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                            <option value="all">Tous les statuts</option>
+                            <option value="a_faire">À faire</option>
+                            <option value="en_cours">En cours</option>
+                            <option value="terminee">Terminées</option>
+                        </select>
+                    </div>
+
+                    {/* Priorité */}
+                    <div>
+                        <label style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                            Priorité
+                        </label>
+                        <select className="form-control" value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+                            <option value="all">Toutes priorités</option>
+                            <option value="urgente">🚨 Urgente</option>
+                            <option value="haute">Haute</option>
+                            <option value="moyenne">Moyenne</option>
+                            <option value="basse">Basse</option>
+                        </select>
+                    </div>
+
+                    {/* Catégorie */}
+                    <div>
+                        <label style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                            Catégorie
+                        </label>
+                        <select className="form-control" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                            <option value="all">Toutes catégories</option>
+                            {predefinedCategories.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Compte Vinted */}
+                    <div>
+                        <label style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                            Compte Vinted
+                        </label>
+                        <select className="form-control" value={compteFilter} onChange={(e) => setCompteFilter(e.target.value)}>
+                            <option value="all">Tous les comptes</option>
+                            {comptes.map(c => (
+                                <option key={c.id} value={c.id}>@{c.nomCompte || c.nom || c.pseudo}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Tri */}
+                    <div>
+                        <label style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
+                            Trier par
+                        </label>
+                        <select className="form-control" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                            <option value="echeance_asc">Échéance (Plus proche)</option>
+                            <option value="echeance_desc">Échéance (Plus lointaine)</option>
+                            <option value="priorite_desc">Priorité (Haute en premier)</option>
+                            <option value="date_desc">Date de création (Récent)</option>
+                            <option value="titre_asc">Titre (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Bulk Actions Banner */}
+                {selectedIds.length > 0 && (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1))',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '8px',
+                        marginTop: '10px'
+                    }}>
+                        <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--primary-color)' }}>
+                            <i className="fa-solid fa-check-double" style={{ marginRight: '6px' }}></i>
+                            {selectedIds.length} tâche(s) sélectionnée(s)
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button type="button" className="btn btn-success btn-sm" onClick={handleBulkMarkDone}>
+                                <i className="fa-solid fa-check"></i> Marquer Terminées
+                            </button>
+                            <button type="button" className="btn btn-danger btn-sm" onClick={handleBulkDelete}>
+                                <i className="fa-solid fa-trash"></i> Supprimer
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Todo List Table */}
+            <div className="table-card">
+                <div className="table-responsive">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: '40px', textAlign: 'center' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={filteredTodos.length > 0 && selectedIds.length === filteredTodos.length}
+                                        onChange={handleSelectAll}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                </th>
+                                <th style={{ width: '50px', textAlign: 'center' }}>Statut</th>
+                                <th>Tâche & Détails</th>
+                                <th style={{ width: '130px' }}>Priorité</th>
+                                <th style={{ width: '140px' }}>Compte / Agent</th>
+                                <th style={{ width: '170px' }}>Échéance & Alerte</th>
+                                <th style={{ width: '150px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredTodos.length === 0 ? (
+                                <tr>
+                                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
+                                        <i className="fa-solid fa-list-check" style={{ fontSize: '36px', color: '#cbd5e1', marginBottom: '10px', display: 'block' }}></i>
+                                        <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-main)' }}>Aucune tâche trouvée</div>
+                                        <div style={{ fontSize: '12px', marginTop: '4px' }}>Modifiez vos filtres ou créez une nouvelle tâche To-Do.</div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredTodos.map(todo => {
+                                    const isDone = todo.statut === 'terminee';
+                                    const info = TodoUtils.getStatusInfo(todo);
+                                    const isSelected = selectedIds.includes(todo.id);
+                                    const subtasks = Array.isArray(todo.sousTaches) ? todo.sousTaches : [];
+                                    const subtasksDone = subtasks.filter(s => s.fait).length;
+                                    const subtasksPercent = subtasks.length > 0 ? Math.round((subtasksDone / subtasks.length) * 100) : 0;
+
+                                    return (
+                                        <tr
+                                            key={todo.id}
+                                            className={`todo-row ${isDone ? 'done' : ''} ${info.isOverdue ? 'overdue' : ''} ${todo.priorite === 'urgente' && !isDone ? 'urgent-glow' : ''}`}
+                                            style={{ backgroundColor: isSelected ? 'rgba(99, 102, 241, 0.05)' : undefined }}
+                                        >
+                                            {/* Selection Checkbox */}
+                                            <td style={{ textAlign: 'center' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => handleSelectOne(todo.id)}
+                                                    style={{ cursor: 'pointer' }}
+                                                />
+                                            </td>
+
+                                            {/* Done Checkbox */}
+                                            <td style={{ textAlign: 'center' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleDone(todo)}
+                                                    title={isDone ? 'Marquer comme non terminée' : 'Marquer comme terminée'}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        fontSize: '18px',
+                                                        color: isDone ? '#10b981' : '#94a3b8'
+                                                    }}
+                                                >
+                                                    <i className={`fa-regular ${isDone ? 'fa-circle-check fa-solid' : 'fa-circle'}`}></i>
+                                                </button>
+                                            </td>
+
+                                            {/* Task Details & Subtasks */}
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                                    <span style={{
+                                                        fontWeight: 700,
+                                                        fontSize: '14px',
+                                                        color: isDone ? 'var(--text-muted)' : 'var(--text-main)',
+                                                        textDecoration: isDone ? 'line-through' : 'none'
+                                                    }}>
+                                                        {todo.titre}
+                                                    </span>
+                                                    {todo.categorie && (
+                                                        <span className="badge badge-secondary" style={{ fontSize: '11px', padding: '1px 6px' }}>
+                                                            {todo.categorie}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {todo.description && (
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', whiteSpace: 'pre-line' }}>
+                                                        {todo.description}
+                                                    </div>
+                                                )}
+
+                                                {/* Checklist Subtasks */}
+                                                {subtasks.length > 0 && (
+                                                    <div style={{ marginTop: '8px', padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', maxWidth: '500px' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
+                                                            <span>
+                                                                <i className="fa-solid fa-list-check" style={{ marginRight: '5px' }}></i>
+                                                                Sous-tâches : {subtasksDone}/{subtasks.length} ({subtasksPercent}%)
+                                                            </span>
+                                                        </div>
+                                                        <div className="subtask-progress-bar" style={{ marginBottom: '8px' }}>
+                                                            <div className="subtask-progress-fill" style={{ width: `${subtasksPercent}%` }} />
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            {subtasks.map((st, sIdx) => (
+                                                                <label
+                                                                    key={st.id || sIdx}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '8px',
+                                                                        fontSize: '11.5px',
+                                                                        color: st.fait ? '#94a3b8' : '#334155',
+                                                                        textDecoration: st.fait ? 'line-through' : 'none',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={Boolean(st.fait)}
+                                                                        onChange={() => handleToggleSubtask(todo, sIdx)}
+                                                                        style={{ cursor: 'pointer' }}
+                                                                    />
+                                                                    <span>{st.texte}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* Priority */}
+                                            <td>
+                                                <span className={`badge-priority badge-priority-${todo.priorite || 'moyenne'}`}>
+                                                    {todo.priorite === 'urgente' && (
+                                                        <span className="urgent-ping" style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '5px' }} />
+                                                    )}
+                                                    {todo.priorite === 'urgente' ? '🚨 URGENTE' : (todo.priorite || 'Moyenne').toUpperCase()}
+                                                </span>
+                                            </td>
+
+                                            {/* Compte & Agent */}
+                                            <td>
+                                                {todo.compteNom ? (
+                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary-color)', marginBottom: '2px' }}>
+                                                        <i className="fa-solid fa-store" style={{ marginRight: '4px', fontSize: '11px' }}></i>
+                                                        @{todo.compteNom}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>-</div>
+                                                )}
+                                                {todo.agentAssigne && (
+                                                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                                                        <i className="fa-solid fa-user" style={{ marginRight: '4px', fontSize: '10px' }}></i>
+                                                        {todo.agentAssigne}
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* Échéance & Countdown */}
+                                            <td>
+                                                <div style={{
+                                                    fontSize: '12px',
+                                                    fontWeight: info.isOverdue ? 700 : (info.isImminent ? 600 : 500),
+                                                    color: info.isOverdue ? '#dc2626' : (info.isImminent ? '#ea580c' : '#334155'),
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}>
+                                                    <i className={`fa-solid ${info.isOverdue ? 'fa-triangle-exclamation' : 'fa-calendar-day'}`}></i>
+                                                    <span>{info.label}</span>
+                                                </div>
+                                                {todo.heureEcheance && (
+                                                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                                                        Heure : {todo.heureEcheance}
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td style={{ textAlign: 'right' }}>
+                                                <div style={{ display: 'inline-flex', gap: '4px' }}>
+                                                    {!isDone && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary btn-xs"
+                                                            onClick={() => handleQuickSnooze(todo, 1)}
+                                                            title="Reporter de 1 heure"
+                                                        >
+                                                            +1h
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-xs"
+                                                        onClick={() => handleOpenEdit(todo)}
+                                                        title="Modifier la tâche"
+                                                    >
+                                                        <i className="fa-solid fa-pen"></i>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-danger btn-xs"
+                                                        onClick={() => {
+                                                            if (confirm(`Supprimer la tâche "${todo.titre}" ?`)) {
+                                                                onDeleteTodo(todo.id);
+                                                            }
+                                                        }}
+                                                        title="Supprimer la tâche"
+                                                    >
+                                                        <i className="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* MODAL AJOUT / ÉDITION */}
+            {isModalOpen && (
+                <div className="modal-overlay" style={{ display: 'flex' }}>
+                    <div className="modal-container" style={{ maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
+                        <div className="modal-header">
+                            <h3 style={{ margin: 0, fontWeight: 700, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className="fa-solid fa-list-check" style={{ color: 'var(--primary-color)' }}></i>
+                                {editingTodo ? 'Modifier la Tâche' : 'Créer une Nouvelle Tâche To-Do'}
+                            </h3>
+                            <button
+                                type="button"
+                                className="modal-close-btn"
+                                onClick={() => setIsModalOpen(false)}
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmit}>
+                            <div className="modal-body" style={{ padding: '20px' }}>
+                                {/* Titre */}
+                                <div className="form-group" style={{ marginBottom: '14px' }}>
+                                    <label style={{ fontWeight: 600, fontSize: '13px', marginBottom: '6px', display: 'block' }}>
+                                        Titre de la Tâche <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="ex: Expédier commande #4920 Mondial Relay"
+                                        value={titre}
+                                        onChange={(e) => setTitre(e.target.value)}
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {/* Priorité, Statut & Catégorie */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Priorité
+                                        </label>
+                                        <select className="form-control" value={priorite} onChange={(e) => setPriorite(e.target.value)}>
+                                            <option value="urgente">🚨 Urgente (Alerte Sonore)</option>
+                                            <option value="haute">Haute</option>
+                                            <option value="moyenne">Moyenne</option>
+                                            <option value="basse">Basse</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Statut
+                                        </label>
+                                        <select className="form-control" value={statut} onChange={(e) => setStatut(e.target.value)}>
+                                            <option value="a_faire">À faire</option>
+                                            <option value="en_cours">En cours</option>
+                                            <option value="terminee">Terminée</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Catégorie
+                                        </label>
+                                        <select className="form-control" value={categorie} onChange={(e) => setCategorie(e.target.value)}>
+                                            {predefinedCategories.map(c => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Compte Vinted & Agent */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Compte Vinted Associé
+                                        </label>
+                                        <select className="form-control" value={compteId} onChange={(e) => setCompteId(e.target.value)}>
+                                            <option value="">Aucun compte associé</option>
+                                            {comptes.map(c => (
+                                                <option key={c.id} value={c.id}>@{c.nomCompte || c.nom || c.pseudo}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Agent Assigné
+                                        </label>
+                                        <select className="form-control" value={agentAssigne} onChange={(e) => setAgentAssigne(e.target.value)}>
+                                            <option value="">Non assigné</option>
+                                            {utilisateurs.map(u => (
+                                                <option key={u.id} value={u.agentAssigne || u.nom}>{u.nom} ({u.agentAssigne || u.role})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Échéance, Heure & Rappel */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '12px', marginBottom: '14px' }}>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Date d'échéance
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="form-control"
+                                            value={dateEcheance}
+                                            onChange={(e) => setDateEcheance(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Heure
+                                        </label>
+                                        <input
+                                            type="time"
+                                            className="form-control"
+                                            value={heureEcheance}
+                                            onChange={(e) => setHeureEcheance(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                            Alerte & Rappel
+                                        </label>
+                                        <select className="form-control" value={rappelMinutes} onChange={(e) => setRappelMinutes(e.target.value)}>
+                                            <option value="0">À l'heure exacte</option>
+                                            <option value="15">15 minutes avant</option>
+                                            <option value="30">30 minutes avant</option>
+                                            <option value="60">1 heure avant</option>
+                                            <option value="120">2 heures avant</option>
+                                            <option value="1440">1 jour avant</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Alerte sonore checkbox */}
+                                <div style={{ marginBottom: '14px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px', color: '#1e293b' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={alerteSonore}
+                                            onChange={(e) => setAlerteSonore(e.target.checked)}
+                                        />
+                                        <span>🔔 Activer la sonnerie d'alerte lors du rappel ou en cas de retard</span>
+                                    </label>
+                                </div>
+
+                                {/* Description */}
+                                <div className="form-group" style={{ marginBottom: '14px' }}>
+                                    <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                        Description & Notes
+                                    </label>
+                                    <textarea
+                                        className="form-control"
+                                        rows="2"
+                                        placeholder="Informations supplémentaires, consignes..."
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Checklist / Sous-tâches */}
+                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    <label style={{ fontWeight: 700, fontSize: '12px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                                        <i className="fa-solid fa-list-check" style={{ color: 'var(--primary-color)' }}></i>
+                                        Checklist / Sous-tâches
+                                    </label>
+
+                                    {/* Subtasks list */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                                        {sousTaches.map((st, idx) => (
+                                            <div key={st.id || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', background: '#fff', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                                <span style={{ fontSize: '12px', color: '#334155' }}>
+                                                    {idx + 1}. {st.texte}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveSubtaskInModal(idx)}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '12px' }}
+                                                    title="Supprimer la sous-tâche"
+                                                >
+                                                    <i className="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Add subtask row */}
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="+ Ajouter une étape (ex: Imprimer bordereau)..."
+                                            value={newSubtaskText}
+                                            onChange={(e) => setNewSubtaskText(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleAddSubtaskInModal();
+                                                }
+                                            }}
+                                            style={{ fontSize: '12px' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={handleAddSubtaskInModal}
+                                            style={{ whiteSpace: 'nowrap' }}
+                                        >
+                                            + Ajouter
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '16px 20px', borderTop: '1px solid #e2e8f0' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
+                                    Annuler
+                                </button>
+                                <button type="submit" className="btn btn-primary" style={{ fontWeight: 600 }}>
+                                    <i className="fa-solid fa-floppy-disk" style={{ marginRight: '6px' }}></i>
+                                    {editingTodo ? 'Mettre à jour' : 'Enregistrer la tâche'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+
 // Export global React components
 window.ReactComponents = {
+    PermissionManager,
     Toast,
     Sidebar,
     DashboardView,
@@ -5553,6 +6006,10 @@ window.ReactComponents = {
     GagnantsView,
     JournalView,
     CorbeilleView,
-    LoginView
+    LoginView,
+    SoundEngine,
+    SystemNotifications,
+    TodoUtils,
+    NotificationBellCenter,
+    TodoView
 };
-

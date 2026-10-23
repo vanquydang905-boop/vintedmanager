@@ -86,6 +86,14 @@ const API = {
     },
     async updateUtilisateur(id, data) { return this.updateUser(id, data); },
 
+    async updateUserPermissions(id, permissions) {
+        return this.fetchJSON(`/api/users/${id}/permissions`, {
+            method: 'PUT',
+            body: JSON.stringify({ permissions })
+        });
+    },
+    async updateUtilisateurPermissions(id, permissions) { return this.updateUserPermissions(id, permissions); },
+
     async deleteUser(id) {
         return this.fetchJSON(`/api/users/${id}`, {
             method: 'DELETE'
@@ -119,62 +127,6 @@ const API = {
         });
     },
 
-    // Calendrier
-    async getCalendrier(organisationId = null) {
-        const query = organisationId ? `?organisationId=${encodeURIComponent(organisationId)}` : '';
-        return this.fetchJSON(`/api/calendrier${query}`);
-    },
-
-    async createCalendrierLine(lineData = {}) {
-        return this.fetchJSON('/api/calendrier', {
-            method: 'POST',
-            body: JSON.stringify(lineData)
-        });
-    },
-    async createCalendrierRow(lineData = {}) { return this.createCalendrierLine(lineData); },
-
-    async updateCalendrierField(id, field, value) {
-        return this.fetchJSON(`/api/calendrier/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ field, value })
-        });
-    },
-
-    async updateCalendrierRow(id, fields) {
-        for (const [field, value] of Object.entries(fields)) {
-            await this.updateCalendrierField(id, field, value);
-        }
-        return { success: true };
-    },
-
-    async deleteCalendrierLine(id) {
-        return this.fetchJSON(`/api/calendrier/${id}`, {
-            method: 'DELETE'
-        });
-    },
-    async deleteCalendrierRow(id) { return this.deleteCalendrierLine(id); },
-
-    async generatePlanning(dateDebut, dateFin, creneauxParJour = null, heureDebut = "07:00", heureFin = "22:00", selectedAgents = null, includeWinnerSKUs = true, selectedComptes = null, organisationId = null) {
-        let payload = {};
-        if (typeof dateDebut === 'object') {
-            payload = dateDebut;
-        } else if (dateDebut && !dateFin && typeof dateDebut === 'number') {
-            payload = { nbJours: dateDebut, creneauxParJour, heureDebut, heureFin, selectedAgents, includeWinnerSKUs, selectedComptes, organisationId };
-        } else {
-            payload = { dateDebut, dateFin, creneauxParJour, heureDebut, heureFin, selectedAgents, includeWinnerSKUs, selectedComptes, organisationId };
-        }
-        return this.fetchJSON('/api/calendrier/generate', {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-    },
-
-    async publishWinner(sku, organisationId = null) {
-        return this.fetchJSON('/api/calendrier/publish-winner', {
-            method: 'POST',
-            body: JSON.stringify({ sku, organisationId })
-        });
-    },
 
     // Incidents
     async getIncidents(organisationId = null) {
@@ -217,12 +169,7 @@ const API = {
     },
 
     // BULK CRUD
-    async bulkUpdateCalendrier(ids, fields) {
-        return this.fetchJSON('/api/calendrier/bulk-update', { method: 'POST', body: JSON.stringify({ ids, fields }) });
-    },
-    async bulkDeleteCalendrier(ids) {
-        return this.fetchJSON('/api/calendrier/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
-    },
+
     async bulkUpdateComptes(ids, fields) {
         return this.fetchJSON('/api/comptes/bulk-update', { method: 'POST', body: JSON.stringify({ ids, fields }) });
     },
@@ -234,6 +181,41 @@ const API = {
     },
     async bulkDeleteIncidents(ids) {
         return this.fetchJSON('/api/incidents/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+    },
+
+    // To-Do & Tâches
+    async getTodos(organisationId = null) {
+        const query = organisationId ? `?organisationId=${encodeURIComponent(organisationId)}` : '';
+        return this.fetchJSON(`/api/todos${query}`);
+    },
+    async createTodo(data) {
+        return this.fetchJSON('/api/todos', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+    async updateTodo(id, data) {
+        return this.fetchJSON(`/api/todos/${encodeURIComponent(id)}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+    async deleteTodo(id) {
+        return this.fetchJSON(`/api/todos/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+        });
+    },
+    async bulkUpdateTodos(ids, fields) {
+        return this.fetchJSON('/api/todos/bulk-update', {
+            method: 'POST',
+            body: JSON.stringify({ ids, fields })
+        });
+    },
+    async bulkDeleteTodos(ids) {
+        return this.fetchJSON('/api/todos/bulk-delete', {
+            method: 'POST',
+            body: JSON.stringify({ ids })
+        });
     },
 
     // Corbeille (Recycle Bin / Trash)

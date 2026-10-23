@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.SUPABASE_URL || 'https://kdtmpgcsfawbsiiscazu.supabase.co';
 const supabaseKey = process.env.SUPABASE_KEY || 'sb_publishable_EStL78lhwgNnP2RVOTmRTw_6XYeSTKJ';
 
+if (!global.WebSocket) global.WebSocket = class {};
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helpers de conversion CamelCase <-> Lowercase pour Supabase PostgreSQL
@@ -40,7 +41,13 @@ const camelMap = {
     identite: 'idEntite',
     nomelement: 'nomElement',
     donneeschiffrees: 'donneesChiffrees',
-    dateaction: 'dateAction'
+    dateaction: 'dateAction',
+    permissions: 'permissions',
+    soustaches: 'sousTaches',
+    dateecheance: 'dateEcheance',
+    heureecheance: 'heureEcheance',
+    rappelminutes: 'rappelMinutes',
+    alertesonore: 'alerteSonore'
 };
 
 function toDbFormat(obj) {
@@ -49,8 +56,8 @@ function toDbFormat(obj) {
     for (const key of Object.keys(obj)) {
         const lowerKey = key.toLowerCase();
         let value = obj[key];
-        if (['heuresventesreposts', 'heurespubs24h', 'detailventes'].includes(lowerKey)) {
-            if (Array.isArray(value) || typeof value === 'object') {
+        if (['heuresventesreposts', 'heurespubs24h', 'detailventes', 'permissions', 'soustaches'].includes(lowerKey)) {
+            if (Array.isArray(value) || (value && typeof value === 'object')) {
                 value = JSON.stringify(value);
             }
         }
@@ -65,9 +72,9 @@ function fromDbFormat(dbObj) {
     for (const key of Object.keys(dbObj)) {
         const camelKey = camelMap[key.toLowerCase()] || key;
         let value = dbObj[key];
-        if (['heuresVentesReposts', 'heuresPubs24h', 'detailVentes'].includes(camelKey)) {
+        if (['heuresVentesReposts', 'heuresPubs24h', 'detailVentes', 'permissions', 'sousTaches'].includes(camelKey)) {
             if (typeof value === 'string') {
-                try { value = JSON.parse(value); } catch (e) { value = []; }
+                try { value = JSON.parse(value); } catch (e) { value = camelKey === 'permissions' ? {} : []; }
             }
         }
         res[camelKey] = value;
@@ -203,6 +210,9 @@ function getNomElement(typeEntite, data) {
         const prodPart = data.produit ? `${data.produit}` : '';
         return (skuPart && prodPart ? `${skuPart} - ${prodPart}` : skuPart || prodPart) || `Créneau ID ${data.id}`;
     }
+    if (typeEntite === 'todos') {
+        return data.titre ? `Tâche "${data.titre}"` : `Tâche ID ${data.id}`;
+    }
     if (typeEntite === 'comptes') {
         return data.pseudo ? `Compte @${data.pseudo}` : `Compte ID ${data.id}`;
     }
@@ -225,6 +235,46 @@ let DEFAULT_CALENDRIER = [];
 let DEFAULT_INCIDENTS = [];
 let DEFAULT_JOURNAL = [];
 let DEFAULT_CORBEILLE = [];
+let DEFAULT_TODOS = [
+    {
+        id: "todo_1",
+        organisationId: "org_default",
+        titre: "Vérifier les alertes de limitation et comptes sensibles",
+        description: "Contrôler les comptes ayant reçu des avertissements récents sur Vinted et ajuster les fréquences.",
+        priorite: "urgente",
+        statut: "a_faire",
+        agent: "Tous",
+        comptePseudo: "",
+        categorie: "Incident",
+        dateEcheance: new Date().toISOString().split('T')[0],
+        heureEcheance: "18:00",
+        rappelMinutes: 30,
+        sousTaches: [
+            { id: "sub_1", texte: "Vérifier le module Incidents", fait: true },
+            { id: "sub_2", texte: "Isoler les comptes signalés", fait: false }
+        ],
+        dateCreation: new Date().toISOString()
+    },
+    {
+        id: "todo_2",
+        organisationId: "org_default",
+        titre: "Synchroniser les ventes DotB Cloud",
+        description: "Lancer la synchronisation en direct pour actualiser les articles et commandes de la journée.",
+        priorite: "haute",
+        statut: "en_cours",
+        agent: "Tous",
+        comptePseudo: "",
+        categorie: "Publication",
+        dateEcheance: new Date().toISOString().split('T')[0],
+        heureEcheance: "20:00",
+        rappelMinutes: 15,
+        sousTaches: [
+            { id: "sub_3", texte: "Cliquer sur Actualiser DotB", fait: true },
+            { id: "sub_4", texte: "Vérifier les scores calculés", fait: false }
+        ],
+        dateCreation: new Date().toISOString()
+    }
+];
 
 const dbService = {
     supabase,
@@ -242,6 +292,7 @@ const dbService = {
     DEFAULT_INCIDENTS,
     DEFAULT_JOURNAL,
     DEFAULT_CORBEILLE,
+    DEFAULT_TODOS,
 
     // ------------------- CORBEILLE (SAUVEGARDE & CHIFFREMENT) -------------------
     async saveToCorbeille(typeEntite, idEntite, action, originalData, customNomElement = null, organisationId = null, auteur = 'Système') {
@@ -327,6 +378,8 @@ const dbService = {
             await this.createCalendrierRow(originalData);
         } else if (typeEntite === 'incidents') {
             await this.createIncident(originalData);
+        } else if (typeEntite === 'todos') {
+            await this.createTodo(originalData);
         } else {
             throw new Error(`Type d'entité non pris en charge pour la restauration: ${typeEntite}`);
         }
@@ -695,11 +748,6 @@ const dbService = {
                 await supabase.from('comptes').update(dbFields).eq('id', id).select();
             } catch (err) {}
         }
-        if (fields.agent) {
-            DEFAULT_CALENDRIER.forEach(l => {
-                if (l.compteId === id) l.agent = fields.agent;
-            });
-        }
         return updatedCompte;
     },
 
@@ -709,23 +757,21 @@ const dbService = {
             await this.saveToCorbeille('comptes', id, 'DELETE', targetCompte, targetCompte.pseudo ? `@${targetCompte.pseudo}` : id);
         }
         DEFAULT_COMPTES = DEFAULT_COMPTES.filter(c => c.id !== id);
-        DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.filter(l => l.compteId !== id);
 
         if (supabaseUrl && supabaseKey) {
             try {
                 await supabase.from('comptes').delete().eq('id', id);
-                await supabase.from('calendrier').delete().eq('compteid', id);
             } catch (err) {}
         }
         return targetCompte || { id, pseudo: id };
     },
 
-    // ------------------- CALENDRIER -------------------
-    async getCalendrier(organisationId = null) {
-        let list = [...DEFAULT_CALENDRIER];
+    // ------------------- TO-DOS & TÂCHES -------------------
+    async getTodos(organisationId = null) {
+        let list = [...DEFAULT_TODOS];
         if (supabaseUrl && supabaseKey) {
             try {
-                let query = supabase.from('calendrier').select('*');
+                let query = supabase.from('todos').select('*');
                 if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
                 const { data, error } = await query;
                 if (!error && Array.isArray(data)) {
@@ -738,103 +784,121 @@ const dbService = {
             } catch (e) {}
         }
         if (organisationId) {
-            return list.filter(l => l.organisationId === organisationId);
+            return list.filter(t => !t.organisationId || t.organisationId === organisationId);
         }
         return list;
     },
 
-    async getCalendrierRowById(id) {
-        const row = DEFAULT_CALENDRIER.find(l => l.id === id);
-        if (row) return row;
-        if (supabaseUrl && supabaseKey) {
-            try {
-                const { data, error } = await supabase.from('calendrier').select('*').eq('id', id).maybeSingle();
-                if (!error && data) return fromDbFormat(data);
-            } catch (e) {}
-        }
-        return null;
-    },
-
-    async createCalendrierRow(row) {
+    async createTodo(todo) {
         const payload = {
-            organisationId: 'org_default',
-            ...row,
-            heuresVentesReposts: Array.isArray(row.heuresVentesReposts) ? row.heuresVentesReposts : []
+            id: todo.id || ("todo_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4)),
+            organisationId: todo.organisationId || 'org_default',
+            titre: todo.titre || 'Nouvelle tâche',
+            description: todo.description || '',
+            priorite: todo.priorite || 'moyenne',
+            statut: todo.statut || 'a_faire',
+            agent: todo.agent || 'Tous',
+            compteId: todo.compteId || '',
+            comptePseudo: todo.comptePseudo || '',
+            categorie: todo.categorie || 'Autre',
+            dateEcheance: todo.dateEcheance || new Date().toISOString().split('T')[0],
+            heureEcheance: todo.heureEcheance || '18:00',
+            rappelMinutes: parseInt(todo.rappelMinutes) || 15,
+            sousTaches: Array.isArray(todo.sousTaches) ? todo.sousTaches : [],
+            dateCreation: todo.dateCreation || new Date().toISOString(),
+            dateTerminee: todo.dateTerminee || null
         };
-
-        const idx = DEFAULT_CALENDRIER.findIndex(l => l.id === payload.id);
-        if (idx >= 0) DEFAULT_CALENDRIER[idx] = payload;
-        else DEFAULT_CALENDRIER.unshift(payload);
+        const idx = DEFAULT_TODOS.findIndex(t => t.id === payload.id);
+        if (idx >= 0) DEFAULT_TODOS[idx] = payload;
+        else DEFAULT_TODOS.unshift(payload);
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const dbPayload = toDbFormat(payload);
-                const { data, error } = await supabase.from('calendrier').upsert([dbPayload]).select();
-                if (!error && data && data.length) return fromDbFormat(data[0]);
-            } catch (err) {}
+                await supabase.from('todos').upsert([toDbFormat(payload)]);
+            } catch (e) {}
         }
         return payload;
     },
 
-    async updateCalendrierRow(id, fields) {
-        const idx = DEFAULT_CALENDRIER.findIndex(l => l.id === id);
+    async updateTodo(id, fields) {
+        const idx = DEFAULT_TODOS.findIndex(t => t.id === id);
         if (idx >= 0) {
-            const oldRow = { ...DEFAULT_CALENDRIER[idx] };
-            await this.saveToCorbeille('calendrier', id, 'UPDATE', oldRow);
-            DEFAULT_CALENDRIER[idx] = { ...DEFAULT_CALENDRIER[idx], ...fields };
+            const oldItem = { ...DEFAULT_TODOS[idx] };
+            await this.saveToCorbeille('todos', id, 'UPDATE', oldItem, oldItem.titre);
+            DEFAULT_TODOS[idx] = { ...DEFAULT_TODOS[idx], ...fields };
         }
-
         if (supabaseUrl && supabaseKey) {
             try {
-                const dbFields = toDbFormat(fields);
-                await supabase.from('calendrier').update(dbFields).eq('id', id);
-            } catch (err) {}
+                await supabase.from('todos').update(toDbFormat(fields)).eq('id', id);
+            } catch (e) {}
         }
-        return { id, ...fields };
+        return DEFAULT_TODOS.find(t => t.id === id) || { id, ...fields };
     },
 
-    async deleteCalendrierRow(id) {
-        const targetRow = DEFAULT_CALENDRIER.find(l => l.id === id);
-        if (targetRow) {
-            await this.saveToCorbeille('calendrier', id, 'DELETE', targetRow);
+    async deleteTodo(id) {
+        const target = DEFAULT_TODOS.find(t => t.id === id);
+        if (target) {
+            await this.saveToCorbeille('todos', id, 'DELETE', target, target.titre);
         }
-        DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.filter(l => l.id !== id);
+        DEFAULT_TODOS = DEFAULT_TODOS.filter(t => t.id !== id);
         if (supabaseUrl && supabaseKey) {
             try {
-                await supabase.from('calendrier').delete().eq('id', id);
-            } catch (err) {}
+                await supabase.from('todos').delete().eq('id', id);
+            } catch (e) {}
         }
         return true;
     },
 
-    async bulkUpdateCalendrierRows(ids, fields) {
+    async bulkUpdateTodos(ids, fields) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
         for (const id of ids) {
-            const item = DEFAULT_CALENDRIER.find(l => l.id === id);
-            if (item) await this.saveToCorbeille('calendrier', id, 'UPDATE', { ...item });
+            const item = DEFAULT_TODOS.find(t => t.id === id);
+            if (item) await this.saveToCorbeille('todos', id, 'UPDATE', { ...item }, item.titre);
         }
-        DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.map(l => ids.includes(l.id) ? { ...l, ...fields } : l);
+        DEFAULT_TODOS = DEFAULT_TODOS.map(t => ids.includes(t.id) ? { ...t, ...fields } : t);
         if (supabaseUrl && supabaseKey) {
             try {
-                const dbFields = toDbFormat(fields);
-                await supabase.from('calendrier').update(dbFields).in('id', ids);
-            } catch (err) {}
+                await supabase.from('todos').update(toDbFormat(fields)).in('id', ids);
+            } catch (e) {}
         }
         return true;
     },
 
-    async bulkDeleteCalendrierRows(ids) {
+    async bulkDeleteTodos(ids) {
         if (!Array.isArray(ids) || ids.length === 0) return true;
         for (const id of ids) {
-            const item = DEFAULT_CALENDRIER.find(l => l.id === id);
-            if (item) await this.saveToCorbeille('calendrier', id, 'DELETE', item);
+            const item = DEFAULT_TODOS.find(t => t.id === id);
+            if (item) await this.saveToCorbeille('todos', id, 'DELETE', item, item.titre);
         }
-        DEFAULT_CALENDRIER = DEFAULT_CALENDRIER.filter(l => !ids.includes(l.id));
+        DEFAULT_TODOS = DEFAULT_TODOS.filter(t => !ids.includes(t.id));
         if (supabaseUrl && supabaseKey) {
             try {
-                await supabase.from('calendrier').delete().in('id', ids);
-            } catch (err) {}
+                await supabase.from('todos').delete().in('id', ids);
+            } catch (e) {}
         }
+        return true;
+    },
+
+    // ------------------- CALENDRIER (DÉSACTIVÉ) -------------------
+    async getCalendrier() {
+        return [];
+    },
+    async getCalendrierRowById() {
+        return null;
+    },
+    async createCalendrierRow() {
+        return null;
+    },
+    async updateCalendrierRow() {
+        return null;
+    },
+    async deleteCalendrierRow() {
+        return true;
+    },
+    async bulkUpdateCalendrierRows() {
+        return true;
+    },
+    async bulkDeleteCalendrierRows() {
         return true;
     },
 

@@ -775,3 +775,326 @@ tbody tr:hover .input-table {
         padding: 3px 8px;
     }
 }
+
+/* ============================================================ */
+/* TO-DO LIST & NOTIFICATION CENTER ULTRA-AVANCÉ */
+/* ============================================================ */
+
+@keyframes badgePulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.badge-urgent-pulse {
+    animation: badgePulse 1.8s infinite ease-in-out;
+}
+
+@keyframes bellShake {
+    0%, 100% { transform: rotate(0deg); }
+    20%, 60% { transform: rotate(14deg); }
+    40%, 80% { transform: rotate(-14deg); }
+}
+
+.bell-shaking {
+    animation: bellShake 0.6s ease-in-out;
+}
+
+/* Priority Badges */
+.badge-priority-urgente {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+}
+
+.badge-priority-haute {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(249, 115, 22, 0.3);
+}
+
+.badge-priority-moyenne {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.badge-priority-basse {
+    background: #64748b;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+/* Notification Drawer / Dropdown */
+.notif-dropdown-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.notif-bell-btn {
+    position: relative;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.notif-bell-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.notif-badge-counter {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 800;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
+}
+
+.notif-popover {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 390px;
+    max-width: 90vw;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    z-index: 1000;
+    overflow: hidden;
+    animation: fadeInDropdown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInDropdown {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.notif-header {
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.notif-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notif-item {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    transition: background 0.15s ease;
+}
+
+.notif-item:hover {
+    background: #f8fafc;
+}
+
+.notif-item.notif-overdue {
+    background: #fff5f5;
+    border-left: 3px solid #ef4444;
+}
+
+.notif-item.notif-urgent {
+    background: #fffaf0;
+    border-left: 3px solid #f97316;
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+/* To-Do Item Cards */
+.todo-row {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.todo-row:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    transform: translateY(-1px);
+}
+
+.todo-row.completed {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    opacity: 0.82;
+}
+
+.todo-row.completed .todo-title {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+.todo-row.overdue {
+    border-left: 4px solid #ef4444;
+    background: linear-gradient(90deg, rgba(254, 242, 242, 0.4) 0%, #ffffff 100%);
+}
+
+.todo-checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 2px solid #cbd5e1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.todo-checkbox.checked {
+    background: #10b981;
+    border-color: #10b981;
+    color: #ffffff;
+}
+
+/* Subtasks Progress */
+.subtask-progress-bar {
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 8px 0;
+}
+
+.subtask-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #09b1ba 0%, #10b981 100%);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+/* ============================================================
+   PERMISSIONS & ROLES SYSTEM STYLES
+   ============================================================ */
+.perm-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.perm-item-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+}
+
+.perm-item-card:hover {
+    border-color: #09b1ba;
+    background: #f8fafc;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.perm-item-card.active {
+    border-color: #09b1ba;
+    background: rgba(9, 177, 186, 0.05);
+}
+
+.perm-item-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    margin-right: 10px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.perm-item-card.active .perm-item-icon {
+    background: #09b1ba;
+    color: #ffffff;
+}
+
+.perm-preset-btn {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.perm-preset-btn:hover {
+    border-color: #09b1ba;
+    color: #09b1ba;
+    background: rgba(9, 177, 186, 0.06);
+}
+
+.perm-badge-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+}
+
