@@ -6725,6 +6725,123 @@ function TodoView({
                                     />
                                 </div>
 
+                                {/* Photos & Pièces Jointes */}
+                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <label style={{ fontWeight: 700, fontSize: '12px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                                            <i className="fa-solid fa-camera" style={{ color: 'var(--primary-color)' }}></i>
+                                            Photos & Pièces Jointes ({photos.length})
+                                        </label>
+                                        <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                            Captures, bordereaux, preuves...
+                                        </span>
+                                    </div>
+
+                                    {/* Dropzone / Upload area */}
+                                    <label
+                                        className="todo-photo-dropzone"
+                                        style={{ display: 'block', margin: 0 }}
+                                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('dragover'); }}
+                                        onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('dragover'); }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            e.currentTarget.classList.remove('dragover');
+                                            if (e.dataTransfer && e.dataTransfer.files) {
+                                                handleFilesSelected(e.dataTransfer.files);
+                                            }
+                                        }}
+                                    >
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                                handleFilesSelected(e.target.files);
+                                                e.target.value = '';
+                                            }}
+                                            disabled={isUploadingPhoto}
+                                        />
+                                        {isUploadingPhoto ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#09b1ba', fontSize: '12px', padding: '6px 0' }}>
+                                                <i className="fa-solid fa-spinner fa-spin"></i>
+                                                <span>Traitement et optimisation des images...</span>
+                                            </div>
+                                        ) : (
+                                            <div style={{ cursor: 'pointer' }}>
+                                                <i className="fa-solid fa-cloud-arrow-up" style={{ fontSize: '24px', color: '#09b1ba', marginBottom: '6px', display: 'block' }}></i>
+                                                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155' }}>
+                                                    Cliquez ou glissez-déposez des photos ici
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                                                    JPG, PNG, WEBP • Plusieurs photos autorisées
+                                                </div>
+                                            </div>
+                                        )}
+                                    </label>
+
+                                    {/* Grille des photos */}
+                                    {photos.length > 0 && (
+                                        <div className="todo-photo-grid">
+                                            {photos.map((p, idx) => (
+                                                <div key={p.id || idx} className="todo-photo-card">
+                                                    <img
+                                                        src={p.url}
+                                                        alt={p.nom}
+                                                        className="todo-photo-card-img"
+                                                        onClick={() => setLightboxData({
+                                                            isOpen: true,
+                                                            photos: photos,
+                                                            initialIndex: idx,
+                                                            taskTitle: titre || 'Nouvelle tâche'
+                                                        })}
+                                                        title="Cliquer pour agrandir"
+                                                    />
+                                                    <div className="todo-photo-card-info">
+                                                        <span className="todo-photo-card-name" title={p.nom}>
+                                                            {p.nom}
+                                                        </span>
+                                                        <div className="todo-photo-card-actions">
+                                                            <button
+                                                                type="button"
+                                                                className="todo-photo-card-btn"
+                                                                style={{ color: '#09b1ba' }}
+                                                                onClick={() => setLightboxData({
+                                                                    isOpen: true,
+                                                                    photos: photos,
+                                                                    initialIndex: idx,
+                                                                    taskTitle: titre || 'Nouvelle tâche'
+                                                                })}
+                                                                title="Visualiser"
+                                                            >
+                                                                <i className="fa-solid fa-eye"></i>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="todo-photo-card-btn"
+                                                                style={{ color: '#10b981' }}
+                                                                onClick={() => TodoUtils.downloadImage(p)}
+                                                                title="Télécharger"
+                                                            >
+                                                                <i className="fa-solid fa-download"></i>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="todo-photo-card-btn"
+                                                                style={{ color: '#ef4444' }}
+                                                                onClick={() => handleRemovePhoto(idx)}
+                                                                title="Supprimer la photo"
+                                                            >
+                                                                <i className="fa-solid fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Priorité, Statut & Catégorie */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                                     <div className="form-group">
@@ -6948,123 +7065,6 @@ function TodoView({
                                             + Ajouter
                                         </button>
                                     </div>
-                                </div>
-
-                                {/* Photos & Pièces Jointes */}
-                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '14px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                        <label style={{ fontWeight: 700, fontSize: '12px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                                            <i className="fa-solid fa-camera" style={{ color: 'var(--primary-color)' }}></i>
-                                            Photos & Pièces Jointes ({photos.length})
-                                        </label>
-                                        <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                            Captures, bordereaux, preuves...
-                                        </span>
-                                    </div>
-
-                                    {/* Dropzone / Upload area */}
-                                    <label
-                                        className="todo-photo-dropzone"
-                                        style={{ display: 'block', margin: 0 }}
-                                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('dragover'); }}
-                                        onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('dragover'); }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            e.currentTarget.classList.remove('dragover');
-                                            if (e.dataTransfer && e.dataTransfer.files) {
-                                                handleFilesSelected(e.dataTransfer.files);
-                                            }
-                                        }}
-                                    >
-                                        <input
-                                            type="file"
-                                            multiple
-                                            accept="image/*"
-                                            style={{ display: 'none' }}
-                                            onChange={(e) => {
-                                                handleFilesSelected(e.target.files);
-                                                e.target.value = '';
-                                            }}
-                                            disabled={isUploadingPhoto}
-                                        />
-                                        {isUploadingPhoto ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#09b1ba', fontSize: '12px', padding: '6px 0' }}>
-                                                <i className="fa-solid fa-spinner fa-spin"></i>
-                                                <span>Traitement et optimisation des images...</span>
-                                            </div>
-                                        ) : (
-                                            <div style={{ cursor: 'pointer' }}>
-                                                <i className="fa-solid fa-cloud-arrow-up" style={{ fontSize: '24px', color: '#09b1ba', marginBottom: '6px', display: 'block' }}></i>
-                                                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155' }}>
-                                                    Cliquez ou glissez-déposez des photos ici
-                                                </div>
-                                                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
-                                                    JPG, PNG, WEBP • Plusieurs photos autorisées
-                                                </div>
-                                            </div>
-                                        )}
-                                    </label>
-
-                                    {/* Grille des photos */}
-                                    {photos.length > 0 && (
-                                        <div className="todo-photo-grid">
-                                            {photos.map((p, idx) => (
-                                                <div key={p.id || idx} className="todo-photo-card">
-                                                    <img
-                                                        src={p.url}
-                                                        alt={p.nom}
-                                                        className="todo-photo-card-img"
-                                                        onClick={() => setLightboxData({
-                                                            isOpen: true,
-                                                            photos: photos,
-                                                            initialIndex: idx,
-                                                            taskTitle: titre || 'Nouvelle tâche'
-                                                        })}
-                                                        title="Cliquer pour agrandir"
-                                                    />
-                                                    <div className="todo-photo-card-info">
-                                                        <span className="todo-photo-card-name" title={p.nom}>
-                                                            {p.nom}
-                                                        </span>
-                                                        <div className="todo-photo-card-actions">
-                                                            <button
-                                                                type="button"
-                                                                className="todo-photo-card-btn"
-                                                                style={{ color: '#09b1ba' }}
-                                                                onClick={() => setLightboxData({
-                                                                    isOpen: true,
-                                                                    photos: photos,
-                                                                    initialIndex: idx,
-                                                                    taskTitle: titre || 'Nouvelle tâche'
-                                                                })}
-                                                                title="Visualiser"
-                                                            >
-                                                                <i className="fa-solid fa-eye"></i>
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="todo-photo-card-btn"
-                                                                style={{ color: '#10b981' }}
-                                                                onClick={() => TodoUtils.downloadImage(p)}
-                                                                title="Télécharger"
-                                                            >
-                                                                <i className="fa-solid fa-download"></i>
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="todo-photo-card-btn"
-                                                                style={{ color: '#ef4444' }}
-                                                                onClick={() => handleRemovePhoto(idx)}
-                                                                title="Supprimer la photo"
-                                                            >
-                                                                <i className="fa-solid fa-trash"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
 

@@ -9561,6 +9561,168 @@ function TodoView({
     autoFocus: true
   })), /*#__PURE__*/React.createElement("div", {
     style: {
+      background: '#f8fafc',
+      padding: '12px',
+      borderRadius: '8px',
+      border: '1px solid #e2e8f0',
+      marginBottom: '14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontWeight: 700,
+      fontSize: '12px',
+      color: '#1e293b',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-camera",
+    style: {
+      color: 'var(--primary-color)'
+    }
+  }), "Photos & Pi\xE8ces Jointes (", photos.length, ")"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11px',
+      color: '#64748b'
+    }
+  }, "Captures, bordereaux, preuves...")), /*#__PURE__*/React.createElement("label", {
+    className: "todo-photo-dropzone",
+    style: {
+      display: 'block',
+      margin: 0
+    },
+    onDragOver: e => {
+      e.preventDefault();
+      e.currentTarget.classList.add('dragover');
+    },
+    onDragLeave: e => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+    },
+    onDrop: e => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files) {
+        handleFilesSelected(e.dataTransfer.files);
+      }
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    multiple: true,
+    accept: "image/*",
+    style: {
+      display: 'none'
+    },
+    onChange: e => {
+      handleFilesSelected(e.target.files);
+      e.target.value = '';
+    },
+    disabled: isUploadingPhoto
+  }), isUploadingPhoto ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '8px',
+      color: '#09b1ba',
+      fontSize: '12px',
+      padding: '6px 0'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-spinner fa-spin"
+  }), /*#__PURE__*/React.createElement("span", null, "Traitement et optimisation des images...")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-cloud-arrow-up",
+    style: {
+      fontSize: '24px',
+      color: '#09b1ba',
+      marginBottom: '6px',
+      display: 'block'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12.5px',
+      fontWeight: 600,
+      color: '#334155'
+    }
+  }, "Cliquez ou glissez-d\xE9posez des photos ici"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      color: '#94a3b8',
+      marginTop: '2px'
+    }
+  }, "JPG, PNG, WEBP \u2022 Plusieurs photos autoris\xE9es"))), photos.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "todo-photo-grid"
+  }, photos.map((p, idx) => /*#__PURE__*/React.createElement("div", {
+    key: p.id || idx,
+    className: "todo-photo-card"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: p.url,
+    alt: p.nom,
+    className: "todo-photo-card-img",
+    onClick: () => setLightboxData({
+      isOpen: true,
+      photos: photos,
+      initialIndex: idx,
+      taskTitle: titre || 'Nouvelle tâche'
+    }),
+    title: "Cliquer pour agrandir"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "todo-photo-card-info"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "todo-photo-card-name",
+    title: p.nom
+  }, p.nom), /*#__PURE__*/React.createElement("div", {
+    className: "todo-photo-card-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-photo-card-btn",
+    style: {
+      color: '#09b1ba'
+    },
+    onClick: () => setLightboxData({
+      isOpen: true,
+      photos: photos,
+      initialIndex: idx,
+      taskTitle: titre || 'Nouvelle tâche'
+    }),
+    title: "Visualiser"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-eye"
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-photo-card-btn",
+    style: {
+      color: '#10b981'
+    },
+    onClick: () => TodoUtils.downloadImage(p),
+    title: "T\xE9l\xE9charger"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-download"
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-photo-card-btn",
+    style: {
+      color: '#ef4444'
+    },
+    onClick: () => handleRemovePhoto(idx),
+    title: "Supprimer la photo"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-trash"
+  })))))))), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr 1fr',
       gap: '12px',
@@ -9916,169 +10078,7 @@ function TodoView({
     style: {
       whiteSpace: 'nowrap'
     }
-  }, "+ Ajouter"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: '#f8fafc',
-      padding: '12px',
-      borderRadius: '8px',
-      border: '1px solid #e2e8f0',
-      marginTop: '14px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '8px'
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontWeight: 700,
-      fontSize: '12px',
-      color: '#1e293b',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      margin: 0
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-camera",
-    style: {
-      color: 'var(--primary-color)'
-    }
-  }), "Photos & Pi\xE8ces Jointes (", photos.length, ")"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '11px',
-      color: '#64748b'
-    }
-  }, "Captures, bordereaux, preuves...")), /*#__PURE__*/React.createElement("label", {
-    className: "todo-photo-dropzone",
-    style: {
-      display: 'block',
-      margin: 0
-    },
-    onDragOver: e => {
-      e.preventDefault();
-      e.currentTarget.classList.add('dragover');
-    },
-    onDragLeave: e => {
-      e.preventDefault();
-      e.currentTarget.classList.remove('dragover');
-    },
-    onDrop: e => {
-      e.preventDefault();
-      e.currentTarget.classList.remove('dragover');
-      if (e.dataTransfer && e.dataTransfer.files) {
-        handleFilesSelected(e.dataTransfer.files);
-      }
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "file",
-    multiple: true,
-    accept: "image/*",
-    style: {
-      display: 'none'
-    },
-    onChange: e => {
-      handleFilesSelected(e.target.files);
-      e.target.value = '';
-    },
-    disabled: isUploadingPhoto
-  }), isUploadingPhoto ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '8px',
-      color: '#09b1ba',
-      fontSize: '12px',
-      padding: '6px 0'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-spinner fa-spin"
-  }), /*#__PURE__*/React.createElement("span", null, "Traitement et optimisation des images...")) : /*#__PURE__*/React.createElement("div", {
-    style: {
-      cursor: 'pointer'
-    }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-cloud-arrow-up",
-    style: {
-      fontSize: '24px',
-      color: '#09b1ba',
-      marginBottom: '6px',
-      display: 'block'
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '12.5px',
-      fontWeight: 600,
-      color: '#334155'
-    }
-  }, "Cliquez ou glissez-d\xE9posez des photos ici"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '11px',
-      color: '#94a3b8',
-      marginTop: '2px'
-    }
-  }, "JPG, PNG, WEBP \u2022 Plusieurs photos autoris\xE9es"))), photos.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "todo-photo-grid"
-  }, photos.map((p, idx) => /*#__PURE__*/React.createElement("div", {
-    key: p.id || idx,
-    className: "todo-photo-card"
-  }, /*#__PURE__*/React.createElement("img", {
-    src: p.url,
-    alt: p.nom,
-    className: "todo-photo-card-img",
-    onClick: () => setLightboxData({
-      isOpen: true,
-      photos: photos,
-      initialIndex: idx,
-      taskTitle: titre || 'Nouvelle tâche'
-    }),
-    title: "Cliquer pour agrandir"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "todo-photo-card-info"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "todo-photo-card-name",
-    title: p.nom
-  }, p.nom), /*#__PURE__*/React.createElement("div", {
-    className: "todo-photo-card-actions"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "todo-photo-card-btn",
-    style: {
-      color: '#09b1ba'
-    },
-    onClick: () => setLightboxData({
-      isOpen: true,
-      photos: photos,
-      initialIndex: idx,
-      taskTitle: titre || 'Nouvelle tâche'
-    }),
-    title: "Visualiser"
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-eye"
-  })), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "todo-photo-card-btn",
-    style: {
-      color: '#10b981'
-    },
-    onClick: () => TodoUtils.downloadImage(p),
-    title: "T\xE9l\xE9charger"
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-download"
-  })), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "todo-photo-card-btn",
-    style: {
-      color: '#ef4444'
-    },
-    onClick: () => handleRemovePhoto(idx),
-    title: "Supprimer la photo"
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-trash"
-  }))))))))), /*#__PURE__*/React.createElement("div", {
+  }, "+ Ajouter")))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
     style: {
       display: 'flex',
