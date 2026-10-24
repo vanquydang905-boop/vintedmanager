@@ -85,7 +85,9 @@ body {
     width: 270px;
     background-color: var(--card-bg);
     border-right: 1px solid var(--border);
-    padding: 20px 14px;
+    padding: 20px 14px 0 14px;
+    margin: 0 !important;
+    margin-bottom: 0 !important;
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -100,6 +102,19 @@ body {
     z-index: 100;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.02);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-footer {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+    margin-bottom: 0 !important;
+    padding-bottom: 8px;
+    flex-shrink: 0;
+    background: var(--card-bg);
 }
 
 /* Scrollbar discrète et élégante pour la barre latérale */

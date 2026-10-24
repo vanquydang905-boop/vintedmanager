@@ -347,7 +347,7 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
             )}
 
             {/* Menu Nav Links avec permissions personnalisées */}
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, paddingBottom: '14px' }}>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, paddingBottom: 0, marginBottom: 0 }}>
                 {canAccess('comptes') && (
                     <button className={`nav-btn ${activeView === 'comptes' ? 'active' : ''}`} onClick={() => onSelectView('comptes')} id="nav-btn-comptes">
                         <i className="fa-solid fa-store"></i> Comptes
@@ -426,7 +426,7 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
             </nav>
 
             {/* Pied de page Sidebar avec icône officielle */}
-            <div className="sidebar-footer" style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: 'auto' }}>
+            <div className="sidebar-footer">
                 <Logo variant="icon" height={20} alt="" />
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>© {new Date().getFullYear()} Vinted Manager</span>
             </div>

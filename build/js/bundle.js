@@ -622,7 +622,8 @@ function Sidebar({
       flexDirection: 'column',
       gap: '4px',
       flexShrink: 0,
-      paddingBottom: '14px'
+      paddingBottom: 0,
+      marginBottom: 0
     }
   }, canAccess('comptes') && /*#__PURE__*/React.createElement("button", {
     className: `nav-btn ${activeView === 'comptes' ? 'active' : ''}`,
@@ -702,15 +703,7 @@ function Sidebar({
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-clock-rotate-left"
   }), " Journal")), /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-footer",
-    style: {
-      padding: '12px 14px',
-      borderTop: '1px solid var(--border)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      marginTop: 'auto'
-    }
+    className: "sidebar-footer"
   }, /*#__PURE__*/React.createElement(Logo, {
     variant: "icon",
     height: 20,
