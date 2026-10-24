@@ -4765,7 +4765,7 @@ var TodoUtils = {
         }
         const d = this.parseDeadline(todo);
         if (!d) {
-            return { isDone: false, isOverdue: false, isImminent: false, label: 'Sans échéance', diffHours: 9999 };
+            return { isDone: false, isOverdue: false, isImminent: false, label: 'Non définie', diffHours: 9999 };
         }
         const now = Date.now();
         const diffMs = d.getTime() - now;
@@ -4811,6 +4811,60 @@ var TodoUtils = {
         } catch(e) {
             return '';
         }
+    },
+    compressImageFile: function(file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) {
+        return new Promise((resolve, reject) => {
+            if (!file) return reject(new Error("Aucun fichier fourni"));
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error("Erreur de lecture du fichier"));
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onerror = () => reject(new Error("Format d'image non supporté"));
+                img.onload = () => {
+                    let { width, height } = img;
+                    if (width > maxWidth || height > maxHeight) {
+                        if (width > height) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        } else {
+                            width = Math.round((width * maxHeight) / height);
+                            height = maxHeight;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                    
+                    const base64Length = compressedDataUrl.length - (compressedDataUrl.indexOf(',') + 1);
+                    const bytes = Math.round(base64Length * 0.75);
+                    const formattedSize = bytes > 1048576 
+                        ? (bytes / 1048576).toFixed(1) + ' Mo' 
+                        : Math.round(bytes / 1024) + ' Ko';
+
+                    resolve({
+                        id: 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                        nom: file.name || 'photo.jpg',
+                        taille: formattedSize,
+                        url: compressedDataUrl,
+                        dateAjout: new Date().toISOString()
+                    });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    },
+    downloadImage: function(photo) {
+        if (!photo || !photo.url) return;
+        const link = document.createElement('a');
+        link.href = photo.url;
+        link.download = photo.nom || `photo_${Date.now()}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 };
 
@@ -5178,6 +5232,153 @@ function NotificationBellCenter({ todos = [], currentUser = null, onNavigateTodo
 }
 
 // ============================================================
+// LIGHTBOX VIEWER POUR PHOTOS DE TÂCHES (VOIR & TÉLÉCHARGER)
+// ============================================================
+function TodoPhotoLightboxModal({ isOpen, onClose, photos = [], initialIndex = 0, taskTitle = '' }) {
+    if (!isOpen || !photos || photos.length === 0) return null;
+
+    const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
+
+    useEffect(() => {
+        setCurrentIndex(initialIndex || 0);
+    }, [initialIndex, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') onClose();
+            else if (e.key === 'ArrowLeft') setCurrentIndex(prev => (prev > 0 ? prev - 1 : photos.length - 1));
+            else if (e.key === 'ArrowRight') setCurrentIndex(prev => (prev < photos.length - 1 ? prev + 1 : 0));
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, photos.length]);
+
+    const handlePrev = (e) => {
+        if (e) e.stopPropagation();
+        setCurrentIndex(prev => (prev > 0 ? prev - 1 : photos.length - 1));
+    };
+
+    const handleNext = (e) => {
+        if (e) e.stopPropagation();
+        setCurrentIndex(prev => (prev < photos.length - 1 ? prev + 1 : 0));
+    };
+
+    const currentPhoto = photos[currentIndex] || photos[0];
+
+    const handleDownload = (e) => {
+        if (e) e.stopPropagation();
+        TodoUtils.downloadImage(currentPhoto);
+    };
+
+    return (
+        <div className="todo-lightbox-backdrop" onClick={onClose}>
+            <div className="todo-lightbox-content" onClick={e => e.stopPropagation()}>
+                {/* En-tête Lightbox */}
+                <div className="todo-lightbox-header">
+                    <div className="todo-lightbox-title-area">
+                        <span className="todo-lightbox-task-badge">
+                            <i className="fa-solid fa-list-check" style={{ marginRight: '6px' }}></i>
+                            {taskTitle || 'Tâche'}
+                        </span>
+                        <span className="todo-lightbox-photo-name" title={currentPhoto.nom}>
+                            {currentPhoto.nom || 'Photo'}
+                        </span>
+                        {currentPhoto.taille && (
+                            <span className="todo-lightbox-size-badge">{currentPhoto.taille}</span>
+                        )}
+                    </div>
+
+                    <div className="todo-lightbox-actions">
+                        <span className="todo-lightbox-counter">
+                            {currentIndex + 1} / {photos.length}
+                        </span>
+
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-primary todo-lightbox-download-btn"
+                            onClick={handleDownload}
+                            title="Télécharger l'image sur votre appareil"
+                        >
+                            <i className="fa-solid fa-download"></i>
+                            <span>Télécharger</span>
+                        </button>
+
+                        <a
+                            href={currentPhoto.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-sm btn-secondary todo-lightbox-icon-btn"
+                            title="Ouvrir dans un nouvel onglet"
+                        >
+                            <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+
+                        <button
+                            type="button"
+                            className="todo-lightbox-close-btn"
+                            onClick={onClose}
+                            title="Fermer (Échap)"
+                        >
+                            <i className="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Zone principale d'affichage de l'image */}
+                <div className="todo-lightbox-main">
+                    {photos.length > 1 && (
+                        <button
+                            type="button"
+                            className="todo-lightbox-nav prev"
+                            onClick={handlePrev}
+                            title="Photo précédente (←)"
+                        >
+                            <i className="fa-solid fa-chevron-left"></i>
+                        </button>
+                    )}
+
+                    <div className="todo-lightbox-image-wrapper">
+                        <img
+                            src={currentPhoto.url}
+                            alt={currentPhoto.nom || 'Photo tâche'}
+                            className="todo-lightbox-image"
+                        />
+                    </div>
+
+                    {photos.length > 1 && (
+                        <button
+                            type="button"
+                            className="todo-lightbox-nav next"
+                            onClick={handleNext}
+                            title="Photo suivante (→)"
+                        >
+                            <i className="fa-solid fa-chevron-right"></i>
+                        </button>
+                    )}
+                </div>
+
+                {/* Bandeau de vignettes en bas si plusieurs photos */}
+                {photos.length > 1 && (
+                    <div className="todo-lightbox-thumbnails">
+                        {photos.map((p, idx) => (
+                            <div
+                                key={p.id || idx}
+                                className={`todo-lightbox-thumb ${idx === currentIndex ? 'active' : ''}`}
+                                onClick={() => setCurrentIndex(idx)}
+                                title={p.nom}
+                            >
+                                <img src={p.url} alt={p.nom} />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ============================================================
 // MAIN TODO VIEW (PAGE TO-DO & GESTIONNAIRE AVANCÉ)
 // ============================================================
 function TodoView({
@@ -5216,22 +5417,22 @@ function TodoView({
     const [description, setDescription] = useState('');
     const [priorite, setPriorite] = useState('moyenne');
     const [statut, setStatut] = useState('a_faire');
-    const [categorie, setCategorie] = useState('Expédition');
+    const [categorie, setCategorie] = useState('Autre');
     const [compteId, setCompteId] = useState('');
     const [agentAssigne, setAgentAssigne] = useState('');
-    const [dateEcheance, setDateEcheance] = useState(() => {
-        const today = new Date();
-        return `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-    });
-    const [heureEcheance, setHeureEcheance] = useState('18:00');
+    const [dateEcheance, setDateEcheance] = useState('');
+    const [heureEcheance, setHeureEcheance] = useState('');
     const [rappelMinutes, setRappelMinutes] = useState(30);
     const [alerteSonore, setAlerteSonore] = useState(true);
     const [creePar, setCreePar] = useState('');
     const [sousTaches, setSousTaches] = useState([]);
     const [newSubtaskText, setNewSubtaskText] = useState('');
+    const [photos, setPhotos] = useState([]);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+    const [lightboxData, setLightboxData] = useState(null); // { isOpen, photos, initialIndex, taskTitle }
 
     // Pre-fill categories list
-    const predefinedCategories = ['Expédition', 'Litige & SAV', 'Annonce & Photos', 'Boost & Promos', 'Comptabilité', 'Inventaire', 'Autre'];
+    const predefinedCategories = ['Autre', 'Expédition', 'Litige & SAV', 'Annonce & Photos', 'Boost & Promos', 'Comptabilité', 'Inventaire'];
 
     // Stats calculations
     const stats = useMemo(() => {
@@ -5317,17 +5518,17 @@ function TodoView({
         setDescription('');
         setPriorite('moyenne');
         setStatut('a_faire');
-        setCategorie('Expédition');
+        setCategorie('Autre');
         setCompteId(comptes[0] ? comptes[0].id : '');
         setAgentAssigne(currentUser ? (currentUser.agentAssigne || currentUser.nom) : '');
         setCreePar(currentUser ? (currentUser.nom || currentUser.agentAssigne || 'Florencio') : 'Florencio');
-        const today = new Date();
-        setDateEcheance(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`);
-        setHeureEcheance('18:00');
+        setDateEcheance('');
+        setHeureEcheance('');
         setRappelMinutes(30);
         setAlerteSonore(true);
         setSousTaches([]);
         setNewSubtaskText('');
+        setPhotos([]);
         setIsModalOpen(true);
     };
 
@@ -5338,17 +5539,56 @@ function TodoView({
         setDescription(todo.description || '');
         setPriorite(todo.priorite || 'moyenne');
         setStatut(todo.statut || 'a_faire');
-        setCategorie(todo.categorie || 'Expédition');
+        setCategorie(todo.categorie || 'Autre');
         setCompteId(todo.compteId || '');
         setAgentAssigne(todo.agentAssigne || '');
         setCreePar(todo.creePar || (currentUser ? (currentUser.nom || currentUser.agentAssigne) : 'Florencio'));
         setDateEcheance(todo.dateEcheance || '');
-        setHeureEcheance(todo.heureEcheance || '18:00');
+        setHeureEcheance(todo.heureEcheance || '');
         setRappelMinutes(todo.rappelMinutes !== undefined ? todo.rappelMinutes : 30);
         setAlerteSonore(todo.alerteSonore !== false);
         setSousTaches(Array.isArray(todo.sousTaches) ? [...todo.sousTaches] : []);
         setNewSubtaskText('');
+        setPhotos(Array.isArray(todo.photos) ? [...todo.photos] : []);
         setIsModalOpen(true);
+    };
+
+    // Photo handlers
+    const handleFilesSelected = async (fileList) => {
+        if (!fileList || fileList.length === 0) return;
+        const validFiles = Array.from(fileList).filter(f => f.type && f.type.startsWith('image/'));
+        if (validFiles.length === 0) {
+            if (showToast) showToast('Veuillez sélectionner un fichier image valide (JPG, PNG, WEBP...)', true);
+            return;
+        }
+
+        setIsUploadingPhoto(true);
+        try {
+            const processed = await Promise.all(validFiles.map(f => TodoUtils.compressImageFile(f)));
+            setPhotos(prev => [...prev, ...processed]);
+            SoundEngine.playCheck();
+            if (showToast) showToast(`📷 ${processed.length} photo(s) ajoutée(s) à la tâche`);
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de la compression de l'image", true);
+        } finally {
+            setIsUploadingPhoto(false);
+        }
+    };
+
+    const handleRemovePhoto = (photoIndex) => {
+        setPhotos(prev => prev.filter((_, i) => i !== photoIndex));
+    };
+
+    const handleOpenLightbox = (todo, photoIndex = 0) => {
+        const todoPhotos = Array.isArray(todo.photos) ? todo.photos : [];
+        if (todoPhotos.length === 0) return;
+        setLightboxData({
+            isOpen: true,
+            photos: todoPhotos,
+            initialIndex: photoIndex,
+            taskTitle: todo.titre
+        });
     };
 
     // Save Todo
@@ -5368,7 +5608,7 @@ function TodoView({
             description: description.trim(),
             priorite,
             statut,
-            categorie,
+            categorie: categorie || 'Autre',
             compteId,
             compteNom,
             agentAssigne,
@@ -5376,11 +5616,12 @@ function TodoView({
             dateCreation: editingTodo ? (editingTodo.dateCreation || new Date().toISOString()) : new Date().toISOString(),
             dateTerminee: editingTodo ? editingTodo.dateTerminee : (statut === 'terminee' ? new Date().toISOString() : null),
             terminePar: editingTodo ? editingTodo.terminePar : (statut === 'terminee' ? (currentUser ? currentUser.nom : 'Florencio') : null),
-            dateEcheance,
-            heureEcheance,
+            dateEcheance: dateEcheance || null,
+            heureEcheance: dateEcheance ? (heureEcheance || null) : null,
             rappelMinutes: Number(rappelMinutes),
             alerteSonore,
-            sousTaches
+            sousTaches,
+            photos: Array.isArray(photos) ? photos : []
         };
 
         try {
@@ -5685,6 +5926,52 @@ function TodoView({
                             </div>
                         </div>
                     )}
+
+                    {/* Photos & Pièces Jointes attachées */}
+                    {Array.isArray(todo.photos) && todo.photos.length > 0 && (
+                        <div className="todo-photos-strip">
+                            {todo.photos.slice(0, 4).map((p, pIdx) => (
+                                <div
+                                    key={p.id || pIdx}
+                                    className="todo-photo-thumb-wrapper"
+                                    onClick={() => handleOpenLightbox(todo, pIdx)}
+                                    title={`${p.nom || 'Photo'} - Cliquez pour voir et télécharger`}
+                                >
+                                    <img src={p.url} alt={p.nom || 'Photo'} className="todo-photo-thumb" />
+                                    <div className="todo-photo-thumb-overlay">
+                                        <i className="fa-solid fa-eye"></i>
+                                    </div>
+                                </div>
+                            ))}
+                            {todo.photos.length > 4 && (
+                                <div
+                                    className="todo-photo-thumb-wrapper"
+                                    onClick={() => handleOpenLightbox(todo, 4)}
+                                    title={`+${todo.photos.length - 4} autre(s) photo(s)`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: '#e2e8f0',
+                                        color: '#334155',
+                                        fontWeight: 700,
+                                        fontSize: '11px'
+                                    }}
+                                >
+                                    +{todo.photos.length - 4}
+                                </div>
+                            )}
+                            <span
+                                className="todo-photos-badge"
+                                onClick={() => handleOpenLightbox(todo, 0)}
+                                title="Voir les photos en grand écran et les télécharger"
+                            >
+                                <i className="fa-solid fa-camera"></i>
+                                <span>{todo.photos.length} photo{todo.photos.length > 1 ? 's' : ''}</span>
+                                <i className="fa-solid fa-download" style={{ fontSize: '10px', marginLeft: '2px', opacity: 0.8 }}></i>
+                            </span>
+                        </div>
+                    )}
                 </td>
 
                 {/* Priority */}
@@ -5717,20 +6004,35 @@ function TodoView({
 
                 {/* Échéance & Countdown */}
                 <td>
-                    <div style={{
-                        fontSize: '12px',
-                        fontWeight: info.isOverdue ? 700 : (info.isImminent ? 600 : 500),
-                        color: info.isOverdue ? '#dc2626' : (info.isImminent ? '#ea580c' : '#334155'),
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                    }}>
-                        <i className={`fa-solid ${info.isOverdue ? 'fa-triangle-exclamation' : 'fa-calendar-day'}`}></i>
-                        <span>{info.label}</span>
-                    </div>
-                    {todo.heureEcheance && (
-                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
-                            Heure : {todo.heureEcheance}
+                    {todo.dateEcheance ? (
+                        <>
+                            <div style={{
+                                fontSize: '12px',
+                                fontWeight: info.isOverdue ? 700 : (info.isImminent ? 600 : 500),
+                                color: info.isOverdue ? '#dc2626' : (info.isImminent ? '#ea580c' : '#334155'),
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}>
+                                <i className={`fa-solid ${info.isOverdue ? 'fa-triangle-exclamation' : 'fa-calendar-day'}`}></i>
+                                <span>{info.label}</span>
+                            </div>
+                            {todo.heureEcheance && (
+                                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                                    Heure : {todo.heureEcheance}
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div style={{
+                            fontSize: '12px',
+                            color: '#94a3b8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }}>
+                            <i className="fa-regular fa-calendar-xmark" style={{ fontSize: '11px' }}></i>
+                            <span>Non définie</span>
                         </div>
                     )}
                 </td>
@@ -5738,7 +6040,7 @@ function TodoView({
                 {/* Actions */}
                 <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '4px' }}>
-                        {!isDone && (
+                        {!isDone && todo.dateEcheance && (
                             <button
                                 type="button"
                                 className="btn btn-secondary btn-xs"
@@ -6302,9 +6604,23 @@ function TodoView({
                                 {/* Échéance, Heure & Rappel */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '12px', marginBottom: '14px' }}>
                                     <div className="form-group">
-                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
-                                            Date d'échéance
-                                        </label>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                            <label style={{ fontWeight: 600, fontSize: '12px', margin: 0 }}>
+                                                Date d'échéance
+                                            </label>
+                                            {dateEcheance ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setDateEcheance(''); setHeureEcheance(''); }}
+                                                    style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '11px', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                                                    title="Retirer l'échéance"
+                                                >
+                                                    <i className="fa-solid fa-xmark" style={{ marginRight: '3px' }}></i>Effacer
+                                                </button>
+                                            ) : (
+                                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>Non définie</span>
+                                            )}
+                                        </div>
                                         <input
                                             type="date"
                                             className="form-control"
@@ -6314,7 +6630,7 @@ function TodoView({
                                     </div>
 
                                     <div className="form-group">
-                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block', color: dateEcheance ? undefined : '#94a3b8' }}>
                                             Heure
                                         </label>
                                         <input
@@ -6322,14 +6638,22 @@ function TodoView({
                                             className="form-control"
                                             value={heureEcheance}
                                             onChange={(e) => setHeureEcheance(e.target.value)}
+                                            disabled={!dateEcheance}
+                                            style={{ opacity: dateEcheance ? 1 : 0.6 }}
                                         />
                                     </div>
 
                                     <div className="form-group">
-                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                                        <label style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block', color: dateEcheance ? undefined : '#94a3b8' }}>
                                             Alerte & Rappel
                                         </label>
-                                        <select className="form-control" value={rappelMinutes} onChange={(e) => setRappelMinutes(e.target.value)}>
+                                        <select
+                                            className="form-control"
+                                            value={rappelMinutes}
+                                            onChange={(e) => setRappelMinutes(e.target.value)}
+                                            disabled={!dateEcheance}
+                                            style={{ opacity: dateEcheance ? 1 : 0.6 }}
+                                        >
                                             <option value="0">À l'heure exacte</option>
                                             <option value="15">15 minutes avant</option>
                                             <option value="30">30 minutes avant</option>
@@ -6342,11 +6666,12 @@ function TodoView({
 
                                 {/* Alerte sonore checkbox */}
                                 <div style={{ marginBottom: '14px' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px', color: '#1e293b' }}>
+                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12.5px', color: '#1e293b', margin: 0 }}>
                                         <input
                                             type="checkbox"
                                             checked={alerteSonore}
                                             onChange={(e) => setAlerteSonore(e.target.checked)}
+                                            style={{ width: '16px', height: '16px', margin: 0, cursor: 'pointer' }}
                                         />
                                         <span>🔔 Activer la sonnerie d'alerte lors du rappel ou en cas de retard</span>
                                     </label>
@@ -6418,6 +6743,123 @@ function TodoView({
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Photos & Pièces Jointes */}
+                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '14px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <label style={{ fontWeight: 700, fontSize: '12px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                                            <i className="fa-solid fa-camera" style={{ color: 'var(--primary-color)' }}></i>
+                                            Photos & Pièces Jointes ({photos.length})
+                                        </label>
+                                        <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                            Captures, bordereaux, preuves...
+                                        </span>
+                                    </div>
+
+                                    {/* Dropzone / Upload area */}
+                                    <label
+                                        className="todo-photo-dropzone"
+                                        style={{ display: 'block', margin: 0 }}
+                                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('dragover'); }}
+                                        onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('dragover'); }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            e.currentTarget.classList.remove('dragover');
+                                            if (e.dataTransfer && e.dataTransfer.files) {
+                                                handleFilesSelected(e.dataTransfer.files);
+                                            }
+                                        }}
+                                    >
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                                handleFilesSelected(e.target.files);
+                                                e.target.value = '';
+                                            }}
+                                            disabled={isUploadingPhoto}
+                                        />
+                                        {isUploadingPhoto ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#09b1ba', fontSize: '12px', padding: '6px 0' }}>
+                                                <i className="fa-solid fa-spinner fa-spin"></i>
+                                                <span>Traitement et optimisation des images...</span>
+                                            </div>
+                                        ) : (
+                                            <div style={{ cursor: 'pointer' }}>
+                                                <i className="fa-solid fa-cloud-arrow-up" style={{ fontSize: '24px', color: '#09b1ba', marginBottom: '6px', display: 'block' }}></i>
+                                                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#334155' }}>
+                                                    Cliquez ou glissez-déposez des photos ici
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                                                    JPG, PNG, WEBP • Plusieurs photos autorisées
+                                                </div>
+                                            </div>
+                                        )}
+                                    </label>
+
+                                    {/* Grille des photos */}
+                                    {photos.length > 0 && (
+                                        <div className="todo-photo-grid">
+                                            {photos.map((p, idx) => (
+                                                <div key={p.id || idx} className="todo-photo-card">
+                                                    <img
+                                                        src={p.url}
+                                                        alt={p.nom}
+                                                        className="todo-photo-card-img"
+                                                        onClick={() => setLightboxData({
+                                                            isOpen: true,
+                                                            photos: photos,
+                                                            initialIndex: idx,
+                                                            taskTitle: titre || 'Nouvelle tâche'
+                                                        })}
+                                                        title="Cliquer pour agrandir"
+                                                    />
+                                                    <div className="todo-photo-card-info">
+                                                        <span className="todo-photo-card-name" title={p.nom}>
+                                                            {p.nom}
+                                                        </span>
+                                                        <div className="todo-photo-card-actions">
+                                                            <button
+                                                                type="button"
+                                                                className="todo-photo-card-btn"
+                                                                style={{ color: '#09b1ba' }}
+                                                                onClick={() => setLightboxData({
+                                                                    isOpen: true,
+                                                                    photos: photos,
+                                                                    initialIndex: idx,
+                                                                    taskTitle: titre || 'Nouvelle tâche'
+                                                                })}
+                                                                title="Visualiser"
+                                                            >
+                                                                <i className="fa-solid fa-eye"></i>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="todo-photo-card-btn"
+                                                                style={{ color: '#10b981' }}
+                                                                onClick={() => TodoUtils.downloadImage(p)}
+                                                                title="Télécharger"
+                                                            >
+                                                                <i className="fa-solid fa-download"></i>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="todo-photo-card-btn"
+                                                                style={{ color: '#ef4444' }}
+                                                                onClick={() => handleRemovePhoto(idx)}
+                                                                title="Supprimer la photo"
+                                                            >
+                                                                <i className="fa-solid fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '16px 20px', borderTop: '1px solid #e2e8f0' }}>
@@ -6432,6 +6874,17 @@ function TodoView({
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* Modal Lightbox pour visualiser et télécharger les photos */}
+            {lightboxData && lightboxData.isOpen && (
+                <TodoPhotoLightboxModal
+                    isOpen={lightboxData.isOpen}
+                    onClose={() => setLightboxData(null)}
+                    photos={lightboxData.photos}
+                    initialIndex={lightboxData.initialIndex}
+                    taskTitle={lightboxData.taskTitle}
+                />
             )}
         </div>
     );
@@ -6691,6 +7144,12 @@ function StartupTodoModal({ isOpen, onClose, todos = [], currentUser = null, onN
                                                     {subDone}/{subtasks.length}
                                                 </span>
                                             )}
+                                            {Array.isArray(todo.photos) && todo.photos.length > 0 && (
+                                                <span style={{ color: '#09b1ba', fontWeight: 600 }}>
+                                                    <i className="fa-solid fa-camera" style={{ marginRight: '3px' }}></i>
+                                                    {todo.photos.length} photo{todo.photos.length > 1 ? 's' : ''}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -6795,5 +7254,6 @@ window.ReactComponents = {
     TodoUtils,
     NotificationBellCenter,
     TodoView,
-    StartupTodoModal
+    StartupTodoModal,
+    TodoPhotoLightboxModal
 };

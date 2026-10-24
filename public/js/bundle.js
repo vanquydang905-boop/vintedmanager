@@ -7179,7 +7179,7 @@ var TodoUtils = {
         isDone: false,
         isOverdue: false,
         isImminent: false,
-        label: 'Sans échéance',
+        label: 'Non définie',
         diffHours: 9999
       };
     }
@@ -7235,6 +7235,59 @@ var TodoUtils = {
     } catch (e) {
       return '';
     }
+  },
+  compressImageFile: function (file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+      if (!file) return reject(new Error("Aucun fichier fourni"));
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Erreur de lecture du fichier"));
+      reader.onload = e => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Format d'image non supporté"));
+        img.onload = () => {
+          let {
+            width,
+            height
+          } = img;
+          if (width > maxWidth || height > maxHeight) {
+            if (width > height) {
+              height = Math.round(height * maxWidth / width);
+              width = maxWidth;
+            } else {
+              width = Math.round(width * maxHeight / height);
+              height = maxHeight;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          const base64Length = compressedDataUrl.length - (compressedDataUrl.indexOf(',') + 1);
+          const bytes = Math.round(base64Length * 0.75);
+          const formattedSize = bytes > 1048576 ? (bytes / 1048576).toFixed(1) + ' Mo' : Math.round(bytes / 1024) + ' Ko';
+          resolve({
+            id: 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            nom: file.name || 'photo.jpg',
+            taille: formattedSize,
+            url: compressedDataUrl,
+            dateAjout: new Date().toISOString()
+          });
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+  downloadImage: function (photo) {
+    if (!photo || !photo.url) return;
+    const link = document.createElement('a');
+    link.href = photo.url;
+    link.download = photo.nom || `photo_${Date.now()}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 };
 
@@ -7694,6 +7747,125 @@ function NotificationBellCenter({
 }
 
 // ============================================================
+// LIGHTBOX VIEWER POUR PHOTOS DE TÂCHES (VOIR & TÉLÉCHARGER)
+// ============================================================
+function TodoPhotoLightboxModal({
+  isOpen,
+  onClose,
+  photos = [],
+  initialIndex = 0,
+  taskTitle = ''
+}) {
+  if (!isOpen || !photos || photos.length === 0) return null;
+  const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
+  useEffect(() => {
+    setCurrentIndex(initialIndex || 0);
+  }, [initialIndex, isOpen]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = e => {
+      if (e.key === 'Escape') onClose();else if (e.key === 'ArrowLeft') setCurrentIndex(prev => prev > 0 ? prev - 1 : photos.length - 1);else if (e.key === 'ArrowRight') setCurrentIndex(prev => prev < photos.length - 1 ? prev + 1 : 0);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, photos.length]);
+  const handlePrev = e => {
+    if (e) e.stopPropagation();
+    setCurrentIndex(prev => prev > 0 ? prev - 1 : photos.length - 1);
+  };
+  const handleNext = e => {
+    if (e) e.stopPropagation();
+    setCurrentIndex(prev => prev < photos.length - 1 ? prev + 1 : 0);
+  };
+  const currentPhoto = photos[currentIndex] || photos[0];
+  const handleDownload = e => {
+    if (e) e.stopPropagation();
+    TodoUtils.downloadImage(currentPhoto);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "todo-lightbox-backdrop",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-lightbox-content",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-lightbox-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "todo-lightbox-title-area"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "todo-lightbox-task-badge"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-list-check",
+    style: {
+      marginRight: '6px'
+    }
+  }), taskTitle || 'Tâche'), /*#__PURE__*/React.createElement("span", {
+    className: "todo-lightbox-photo-name",
+    title: currentPhoto.nom
+  }, currentPhoto.nom || 'Photo'), currentPhoto.taille && /*#__PURE__*/React.createElement("span", {
+    className: "todo-lightbox-size-badge"
+  }, currentPhoto.taille)), /*#__PURE__*/React.createElement("div", {
+    className: "todo-lightbox-actions"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "todo-lightbox-counter"
+  }, currentIndex + 1, " / ", photos.length), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-sm btn-primary todo-lightbox-download-btn",
+    onClick: handleDownload,
+    title: "T\xE9l\xE9charger l'image sur votre appareil"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-download"
+  }), /*#__PURE__*/React.createElement("span", null, "T\xE9l\xE9charger")), /*#__PURE__*/React.createElement("a", {
+    href: currentPhoto.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "btn btn-sm btn-secondary todo-lightbox-icon-btn",
+    title: "Ouvrir dans un nouvel onglet"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-arrow-up-right-from-square"
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-lightbox-close-btn",
+    onClick: onClose,
+    title: "Fermer (\xC9chap)"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark"
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "todo-lightbox-main"
+  }, photos.length > 1 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-lightbox-nav prev",
+    onClick: handlePrev,
+    title: "Photo pr\xE9c\xE9dente (\u2190)"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-chevron-left"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "todo-lightbox-image-wrapper"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: currentPhoto.url,
+    alt: currentPhoto.nom || 'Photo tâche',
+    className: "todo-lightbox-image"
+  })), photos.length > 1 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-lightbox-nav next",
+    onClick: handleNext,
+    title: "Photo suivante (\u2192)"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-chevron-right"
+  }))), photos.length > 1 && /*#__PURE__*/React.createElement("div", {
+    className: "todo-lightbox-thumbnails"
+  }, photos.map((p, idx) => /*#__PURE__*/React.createElement("div", {
+    key: p.id || idx,
+    className: `todo-lightbox-thumb ${idx === currentIndex ? 'active' : ''}`,
+    onClick: () => setCurrentIndex(idx),
+    title: p.nom
+  }, /*#__PURE__*/React.createElement("img", {
+    src: p.url,
+    alt: p.nom
+  }))))));
+}
+
+// ============================================================
 // MAIN TODO VIEW (PAGE TO-DO & GESTIONNAIRE AVANCÉ)
 // ============================================================
 function TodoView({
@@ -7732,22 +7904,22 @@ function TodoView({
   const [description, setDescription] = useState('');
   const [priorite, setPriorite] = useState('moyenne');
   const [statut, setStatut] = useState('a_faire');
-  const [categorie, setCategorie] = useState('Expédition');
+  const [categorie, setCategorie] = useState('Autre');
   const [compteId, setCompteId] = useState('');
   const [agentAssigne, setAgentAssigne] = useState('');
-  const [dateEcheance, setDateEcheance] = useState(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  });
-  const [heureEcheance, setHeureEcheance] = useState('18:00');
+  const [dateEcheance, setDateEcheance] = useState('');
+  const [heureEcheance, setHeureEcheance] = useState('');
   const [rappelMinutes, setRappelMinutes] = useState(30);
   const [alerteSonore, setAlerteSonore] = useState(true);
   const [creePar, setCreePar] = useState('');
   const [sousTaches, setSousTaches] = useState([]);
   const [newSubtaskText, setNewSubtaskText] = useState('');
+  const [photos, setPhotos] = useState([]);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [lightboxData, setLightboxData] = useState(null); // { isOpen, photos, initialIndex, taskTitle }
 
   // Pre-fill categories list
-  const predefinedCategories = ['Expédition', 'Litige & SAV', 'Annonce & Photos', 'Boost & Promos', 'Comptabilité', 'Inventaire', 'Autre'];
+  const predefinedCategories = ['Autre', 'Expédition', 'Litige & SAV', 'Annonce & Photos', 'Boost & Promos', 'Comptabilité', 'Inventaire'];
 
   // Stats calculations
   const stats = useMemo(() => {
@@ -7841,17 +8013,17 @@ function TodoView({
     setDescription('');
     setPriorite('moyenne');
     setStatut('a_faire');
-    setCategorie('Expédition');
+    setCategorie('Autre');
     setCompteId(comptes[0] ? comptes[0].id : '');
     setAgentAssigne(currentUser ? currentUser.agentAssigne || currentUser.nom : '');
     setCreePar(currentUser ? currentUser.nom || currentUser.agentAssigne || 'Florencio' : 'Florencio');
-    const today = new Date();
-    setDateEcheance(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
-    setHeureEcheance('18:00');
+    setDateEcheance('');
+    setHeureEcheance('');
     setRappelMinutes(30);
     setAlerteSonore(true);
     setSousTaches([]);
     setNewSubtaskText('');
+    setPhotos([]);
     setIsModalOpen(true);
   };
 
@@ -7862,17 +8034,53 @@ function TodoView({
     setDescription(todo.description || '');
     setPriorite(todo.priorite || 'moyenne');
     setStatut(todo.statut || 'a_faire');
-    setCategorie(todo.categorie || 'Expédition');
+    setCategorie(todo.categorie || 'Autre');
     setCompteId(todo.compteId || '');
     setAgentAssigne(todo.agentAssigne || '');
     setCreePar(todo.creePar || (currentUser ? currentUser.nom || currentUser.agentAssigne : 'Florencio'));
     setDateEcheance(todo.dateEcheance || '');
-    setHeureEcheance(todo.heureEcheance || '18:00');
+    setHeureEcheance(todo.heureEcheance || '');
     setRappelMinutes(todo.rappelMinutes !== undefined ? todo.rappelMinutes : 30);
     setAlerteSonore(todo.alerteSonore !== false);
     setSousTaches(Array.isArray(todo.sousTaches) ? [...todo.sousTaches] : []);
     setNewSubtaskText('');
+    setPhotos(Array.isArray(todo.photos) ? [...todo.photos] : []);
     setIsModalOpen(true);
+  };
+
+  // Photo handlers
+  const handleFilesSelected = async fileList => {
+    if (!fileList || fileList.length === 0) return;
+    const validFiles = Array.from(fileList).filter(f => f.type && f.type.startsWith('image/'));
+    if (validFiles.length === 0) {
+      if (showToast) showToast('Veuillez sélectionner un fichier image valide (JPG, PNG, WEBP...)', true);
+      return;
+    }
+    setIsUploadingPhoto(true);
+    try {
+      const processed = await Promise.all(validFiles.map(f => TodoUtils.compressImageFile(f)));
+      setPhotos(prev => [...prev, ...processed]);
+      SoundEngine.playCheck();
+      if (showToast) showToast(`📷 ${processed.length} photo(s) ajoutée(s) à la tâche`);
+    } catch (err) {
+      console.error(err);
+      if (showToast) showToast("Erreur lors de la compression de l'image", true);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+  const handleRemovePhoto = photoIndex => {
+    setPhotos(prev => prev.filter((_, i) => i !== photoIndex));
+  };
+  const handleOpenLightbox = (todo, photoIndex = 0) => {
+    const todoPhotos = Array.isArray(todo.photos) ? todo.photos : [];
+    if (todoPhotos.length === 0) return;
+    setLightboxData({
+      isOpen: true,
+      photos: todoPhotos,
+      initialIndex: photoIndex,
+      taskTitle: todo.titre
+    });
   };
 
   // Save Todo
@@ -7890,7 +8098,7 @@ function TodoView({
       description: description.trim(),
       priorite,
       statut,
-      categorie,
+      categorie: categorie || 'Autre',
       compteId,
       compteNom,
       agentAssigne,
@@ -7898,11 +8106,12 @@ function TodoView({
       dateCreation: editingTodo ? editingTodo.dateCreation || new Date().toISOString() : new Date().toISOString(),
       dateTerminee: editingTodo ? editingTodo.dateTerminee : statut === 'terminee' ? new Date().toISOString() : null,
       terminePar: editingTodo ? editingTodo.terminePar : statut === 'terminee' ? currentUser ? currentUser.nom : 'Florencio' : null,
-      dateEcheance,
-      heureEcheance,
+      dateEcheance: dateEcheance || null,
+      heureEcheance: dateEcheance ? heureEcheance || null : null,
       rappelMinutes: Number(rappelMinutes),
       alerteSonore,
-      sousTaches
+      sousTaches,
+      photos: Array.isArray(photos) ? photos : []
     };
     try {
       await onSaveTodo(payload);
@@ -8249,7 +8458,48 @@ function TodoView({
       style: {
         cursor: 'pointer'
       }
-    }), /*#__PURE__*/React.createElement("span", null, st.texte)))))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+    }), /*#__PURE__*/React.createElement("span", null, st.texte))))), Array.isArray(todo.photos) && todo.photos.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "todo-photos-strip"
+    }, todo.photos.slice(0, 4).map((p, pIdx) => /*#__PURE__*/React.createElement("div", {
+      key: p.id || pIdx,
+      className: "todo-photo-thumb-wrapper",
+      onClick: () => handleOpenLightbox(todo, pIdx),
+      title: `${p.nom || 'Photo'} - Cliquez pour voir et télécharger`
+    }, /*#__PURE__*/React.createElement("img", {
+      src: p.url,
+      alt: p.nom || 'Photo',
+      className: "todo-photo-thumb"
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "todo-photo-thumb-overlay"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-eye"
+    })))), todo.photos.length > 4 && /*#__PURE__*/React.createElement("div", {
+      className: "todo-photo-thumb-wrapper",
+      onClick: () => handleOpenLightbox(todo, 4),
+      title: `+${todo.photos.length - 4} autre(s) photo(s)`,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#e2e8f0',
+        color: '#334155',
+        fontWeight: 700,
+        fontSize: '11px'
+      }
+    }, "+", todo.photos.length - 4), /*#__PURE__*/React.createElement("span", {
+      className: "todo-photos-badge",
+      onClick: () => handleOpenLightbox(todo, 0),
+      title: "Voir les photos en grand \xE9cran et les t\xE9l\xE9charger"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-camera"
+    }), /*#__PURE__*/React.createElement("span", null, todo.photos.length, " photo", todo.photos.length > 1 ? 's' : ''), /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-download",
+      style: {
+        fontSize: '10px',
+        marginLeft: '2px',
+        opacity: 0.8
+      }
+    })))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
       className: `badge-priority badge-priority-${todo.priorite || 'moyenne'}`
     }, todo.priorite === 'urgente' && /*#__PURE__*/React.createElement("span", {
       className: "urgent-ping",
@@ -8290,7 +8540,7 @@ function TodoView({
         marginRight: '4px',
         fontSize: '10px'
       }
-    }), todo.agentAssigne)), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+    }), todo.agentAssigne)), /*#__PURE__*/React.createElement("td", null, todo.dateEcheance ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: '12px',
         fontWeight: info.isOverdue ? 700 : info.isImminent ? 600 : 500,
@@ -8307,7 +8557,20 @@ function TodoView({
         color: '#94a3b8',
         marginTop: '2px'
       }
-    }, "Heure : ", todo.heureEcheance)), /*#__PURE__*/React.createElement("td", {
+    }, "Heure : ", todo.heureEcheance)) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '12px',
+        color: '#94a3b8',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px'
+      }
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa-regular fa-calendar-xmark",
+      style: {
+        fontSize: '11px'
+      }
+    }), /*#__PURE__*/React.createElement("span", null, "Non d\xE9finie"))), /*#__PURE__*/React.createElement("td", {
       style: {
         textAlign: 'right'
       }
@@ -8316,7 +8579,7 @@ function TodoView({
         display: 'inline-flex',
         gap: '4px'
       }
-    }, !isDone && /*#__PURE__*/React.createElement("button", {
+    }, !isDone && todo.dateEcheance && /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-secondary btn-xs",
       onClick: () => handleQuickSnooze(todo, 1),
@@ -9167,14 +9430,46 @@ function TodoView({
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "form-group"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '4px'
+    }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
       fontWeight: 600,
       fontSize: '12px',
-      marginBottom: '4px',
-      display: 'block'
+      margin: 0
     }
-  }, "Date d'\xE9ch\xE9ance"), /*#__PURE__*/React.createElement("input", {
+  }, "Date d'\xE9ch\xE9ance"), dateEcheance ? /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setDateEcheance('');
+      setHeureEcheance('');
+    },
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#ef4444',
+      fontSize: '11px',
+      cursor: 'pointer',
+      padding: 0,
+      fontWeight: 600
+    },
+    title: "Retirer l'\xE9ch\xE9ance"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark",
+    style: {
+      marginRight: '3px'
+    }
+  }), "Effacer") : /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11px',
+      color: '#94a3b8'
+    }
+  }, "Non d\xE9finie")), /*#__PURE__*/React.createElement("input", {
     type: "date",
     className: "form-control",
     value: dateEcheance,
@@ -9186,13 +9481,18 @@ function TodoView({
       fontWeight: 600,
       fontSize: '12px',
       marginBottom: '4px',
-      display: 'block'
+      display: 'block',
+      color: dateEcheance ? undefined : '#94a3b8'
     }
   }, "Heure"), /*#__PURE__*/React.createElement("input", {
     type: "time",
     className: "form-control",
     value: heureEcheance,
-    onChange: e => setHeureEcheance(e.target.value)
+    onChange: e => setHeureEcheance(e.target.value),
+    disabled: !dateEcheance,
+    style: {
+      opacity: dateEcheance ? 1 : 0.6
+    }
   })), /*#__PURE__*/React.createElement("div", {
     className: "form-group"
   }, /*#__PURE__*/React.createElement("label", {
@@ -9200,12 +9500,17 @@ function TodoView({
       fontWeight: 600,
       fontSize: '12px',
       marginBottom: '4px',
-      display: 'block'
+      display: 'block',
+      color: dateEcheance ? undefined : '#94a3b8'
     }
   }, "Alerte & Rappel"), /*#__PURE__*/React.createElement("select", {
     className: "form-control",
     value: rappelMinutes,
-    onChange: e => setRappelMinutes(e.target.value)
+    onChange: e => setRappelMinutes(e.target.value),
+    disabled: !dateEcheance,
+    style: {
+      opacity: dateEcheance ? 1 : 0.6
+    }
   }, /*#__PURE__*/React.createElement("option", {
     value: "0"
   }, "\xC0 l'heure exacte"), /*#__PURE__*/React.createElement("option", {
@@ -9224,17 +9529,24 @@ function TodoView({
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
-      display: 'flex',
+      display: 'inline-flex',
       alignItems: 'center',
       gap: '8px',
       cursor: 'pointer',
       fontSize: '12.5px',
-      color: '#1e293b'
+      color: '#1e293b',
+      margin: 0
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: "checkbox",
     checked: alerteSonore,
-    onChange: e => setAlerteSonore(e.target.checked)
+    onChange: e => setAlerteSonore(e.target.checked),
+    style: {
+      width: '16px',
+      height: '16px',
+      margin: 0,
+      cursor: 'pointer'
+    }
   }), /*#__PURE__*/React.createElement("span", null, "\uD83D\uDD14 Activer la sonnerie d'alerte lors du rappel ou en cas de retard"))), /*#__PURE__*/React.createElement("div", {
     className: "form-group",
     style: {
@@ -9338,7 +9650,169 @@ function TodoView({
     style: {
       whiteSpace: 'nowrap'
     }
-  }, "+ Ajouter")))), /*#__PURE__*/React.createElement("div", {
+  }, "+ Ajouter"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: '#f8fafc',
+      padding: '12px',
+      borderRadius: '8px',
+      border: '1px solid #e2e8f0',
+      marginTop: '14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontWeight: 700,
+      fontSize: '12px',
+      color: '#1e293b',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-camera",
+    style: {
+      color: 'var(--primary-color)'
+    }
+  }), "Photos & Pi\xE8ces Jointes (", photos.length, ")"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11px',
+      color: '#64748b'
+    }
+  }, "Captures, bordereaux, preuves...")), /*#__PURE__*/React.createElement("label", {
+    className: "todo-photo-dropzone",
+    style: {
+      display: 'block',
+      margin: 0
+    },
+    onDragOver: e => {
+      e.preventDefault();
+      e.currentTarget.classList.add('dragover');
+    },
+    onDragLeave: e => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+    },
+    onDrop: e => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files) {
+        handleFilesSelected(e.dataTransfer.files);
+      }
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    multiple: true,
+    accept: "image/*",
+    style: {
+      display: 'none'
+    },
+    onChange: e => {
+      handleFilesSelected(e.target.files);
+      e.target.value = '';
+    },
+    disabled: isUploadingPhoto
+  }), isUploadingPhoto ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '8px',
+      color: '#09b1ba',
+      fontSize: '12px',
+      padding: '6px 0'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-spinner fa-spin"
+  }), /*#__PURE__*/React.createElement("span", null, "Traitement et optimisation des images...")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-cloud-arrow-up",
+    style: {
+      fontSize: '24px',
+      color: '#09b1ba',
+      marginBottom: '6px',
+      display: 'block'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12.5px',
+      fontWeight: 600,
+      color: '#334155'
+    }
+  }, "Cliquez ou glissez-d\xE9posez des photos ici"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '11px',
+      color: '#94a3b8',
+      marginTop: '2px'
+    }
+  }, "JPG, PNG, WEBP \u2022 Plusieurs photos autoris\xE9es"))), photos.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "todo-photo-grid"
+  }, photos.map((p, idx) => /*#__PURE__*/React.createElement("div", {
+    key: p.id || idx,
+    className: "todo-photo-card"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: p.url,
+    alt: p.nom,
+    className: "todo-photo-card-img",
+    onClick: () => setLightboxData({
+      isOpen: true,
+      photos: photos,
+      initialIndex: idx,
+      taskTitle: titre || 'Nouvelle tâche'
+    }),
+    title: "Cliquer pour agrandir"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "todo-photo-card-info"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "todo-photo-card-name",
+    title: p.nom
+  }, p.nom), /*#__PURE__*/React.createElement("div", {
+    className: "todo-photo-card-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-photo-card-btn",
+    style: {
+      color: '#09b1ba'
+    },
+    onClick: () => setLightboxData({
+      isOpen: true,
+      photos: photos,
+      initialIndex: idx,
+      taskTitle: titre || 'Nouvelle tâche'
+    }),
+    title: "Visualiser"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-eye"
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-photo-card-btn",
+    style: {
+      color: '#10b981'
+    },
+    onClick: () => TodoUtils.downloadImage(p),
+    title: "T\xE9l\xE9charger"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-download"
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "todo-photo-card-btn",
+    style: {
+      color: '#ef4444'
+    },
+    onClick: () => handleRemovePhoto(idx),
+    title: "Supprimer la photo"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-trash"
+  }))))))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
     style: {
       display: 'flex',
@@ -9362,7 +9836,13 @@ function TodoView({
     style: {
       marginRight: '6px'
     }
-  }), editingTodo ? 'Mettre à jour' : 'Enregistrer la tâche'))))));
+  }), editingTodo ? 'Mettre à jour' : 'Enregistrer la tâche'))))), lightboxData && lightboxData.isOpen && /*#__PURE__*/React.createElement(TodoPhotoLightboxModal, {
+    isOpen: lightboxData.isOpen,
+    onClose: () => setLightboxData(null),
+    photos: lightboxData.photos,
+    initialIndex: lightboxData.initialIndex,
+    taskTitle: lightboxData.taskTitle
+  }));
 }
 
 // ============================================================
@@ -9676,7 +10156,17 @@ function StartupTodoModal({
       style: {
         marginRight: '3px'
       }
-    }), subDone, "/", subtasks.length))), /*#__PURE__*/React.createElement("button", {
+    }), subDone, "/", subtasks.length), Array.isArray(todo.photos) && todo.photos.length > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#09b1ba',
+        fontWeight: 600
+      }
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-camera",
+      style: {
+        marginRight: '3px'
+      }
+    }), todo.photos.length, " photo", todo.photos.length > 1 ? 's' : ''))), /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: e => handleQuickDone(todo, e),
       className: "btn btn-outline-success btn-xs",
@@ -9765,7 +10255,8 @@ window.ReactComponents = {
   TodoUtils,
   NotificationBellCenter,
   TodoView,
-  StartupTodoModal
+  StartupTodoModal,
+  TodoPhotoLightboxModal
 };
 ;
 // ============================================================

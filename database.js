@@ -61,7 +61,7 @@ function toDbFormat(obj) {
     for (const key of Object.keys(obj)) {
         const lowerKey = key.toLowerCase();
         let value = obj[key];
-        if (['heuresventesreposts', 'heurespubs24h', 'detailventes', 'permissions', 'soustaches'].includes(lowerKey)) {
+        if (['heuresventesreposts', 'heurespubs24h', 'detailventes', 'permissions', 'soustaches', 'photos'].includes(lowerKey)) {
             if (Array.isArray(value) || (value && typeof value === 'object')) {
                 value = JSON.stringify(value);
             }
@@ -77,7 +77,7 @@ function fromDbFormat(dbObj) {
     for (const key of Object.keys(dbObj)) {
         const camelKey = camelMap[key.toLowerCase()] || key;
         let value = dbObj[key];
-        if (['heuresVentesReposts', 'heuresPubs24h', 'detailVentes', 'permissions', 'sousTaches'].includes(camelKey)) {
+        if (['heuresVentesReposts', 'heuresPubs24h', 'detailVentes', 'permissions', 'sousTaches', 'photos'].includes(camelKey)) {
             if (typeof value === 'string') {
                 try { value = JSON.parse(value); } catch (e) { value = camelKey === 'permissions' ? {} : []; }
             }
@@ -808,22 +808,32 @@ const dbService = {
             } catch (e) {}
 
             // 2. Si la table 'todos' n'existe pas ou est vide, synchroniser depuis le stockage cloud Supabase 'parametres'
-            if (!loadedFromRemote) {
-                try {
-                    const { data: paramData, error: paramError } = await supabase
-                        .from('parametres')
-                        .select('*')
-                        .eq('id', 'todos_' + orgKey);
-                    
-                    if (!paramError && Array.isArray(paramData) && paramData.length > 0 && paramData[0].data && Array.isArray(paramData[0].data.todos)) {
-                        const remoteTodos = paramData[0].data.todos;
+            try {
+                const { data: paramData, error: paramError } = await supabase
+                    .from('parametres')
+                    .select('*')
+                    .eq('id', 'todos_' + orgKey);
+                
+                if (!paramError && Array.isArray(paramData) && paramData.length > 0 && paramData[0].data && Array.isArray(paramData[0].data.todos)) {
+                    const remoteTodos = paramData[0].data.todos;
+                    if (!loadedFromRemote) {
                         // Conserver les tâches des autres organisations et charger celles de cette org
                         DEFAULT_TODOS = DEFAULT_TODOS.filter(t => t.organisationId && t.organisationId.toLowerCase() !== orgKey);
                         remoteTodos.forEach(rt => DEFAULT_TODOS.push(rt));
                         loadedFromRemote = true;
+                    } else {
+                        // Si chargé depuis la table 'todos', fusionner les photos depuis le backup au cas où la table n'a pas la colonne
+                        remoteTodos.forEach(rt => {
+                            const idx = DEFAULT_TODOS.findIndex(t => t.id === rt.id);
+                            if (idx >= 0 && Array.isArray(rt.photos) && rt.photos.length > 0) {
+                                if (!DEFAULT_TODOS[idx].photos || DEFAULT_TODOS[idx].photos.length === 0) {
+                                    DEFAULT_TODOS[idx].photos = rt.photos;
+                                }
+                            }
+                        });
                     }
-                } catch(e) {}
-            }
+                }
+            } catch(e) {}
         }
 
         // Si première initialisation, sauvegarder l'état initial dans Supabase
@@ -852,11 +862,12 @@ const dbService = {
             compteNom: todo.compteNom || todo.comptePseudo || '',
             comptePseudo: todo.comptePseudo || todo.compteNom || '',
             categorie: todo.categorie || 'Autre',
-            dateEcheance: todo.dateEcheance || new Date().toISOString().split('T')[0],
-            heureEcheance: todo.heureEcheance || '18:00',
+            dateEcheance: todo.dateEcheance || null,
+            heureEcheance: todo.heureEcheance || null,
             rappelMinutes: parseInt(todo.rappelMinutes) || 15,
             alerteSonore: todo.alerteSonore !== false,
             sousTaches: Array.isArray(todo.sousTaches) ? todo.sousTaches : [],
+            photos: Array.isArray(todo.photos) ? todo.photos : [],
             dateCreation: todo.dateCreation || new Date().toISOString(),
             dateTerminee: todo.statut === 'terminee' ? (todo.dateTerminee || new Date().toISOString()) : null,
             creePar: todo.creePar || todo.auteur || 'Florencio',
