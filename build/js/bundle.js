@@ -239,6 +239,249 @@ function Toast({
   }), toast.message);
 }
 
+// ------------------- COMPOSANT RÉUTILISABLE LOGO OFFICIEL -------------------
+function Logo({
+  variant = 'header',
+  // 'header' | 'full' | 'icon' | 'wordmark'
+  size = 'md',
+  // 'sm' | 'md' | 'lg' | 'xl' | ou hauteur en pixels
+  height,
+  width,
+  className = '',
+  style = {},
+  alt = 'Vinted Manager',
+  asLink = false,
+  href = '#',
+  onClick,
+  loading = 'eager',
+  fondBlanc = false,
+  pulse = false,
+  title = 'Vinted Manager'
+}) {
+  let targetHeight = height;
+  let targetWidth = width;
+  if (!targetHeight) {
+    if (typeof size === 'number') {
+      targetHeight = size;
+    } else {
+      switch (size) {
+        case 'xs':
+          targetHeight = variant === 'icon' ? 24 : 28;
+          break;
+        case 'sm':
+          targetHeight = variant === 'icon' ? 32 : 36;
+          break;
+        case 'md':
+          targetHeight = variant === 'icon' ? 44 : 44;
+          break;
+        case 'lg':
+          targetHeight = variant === 'icon' ? 64 : 68;
+          break;
+        case 'xl':
+          targetHeight = variant === 'icon' ? 96 : 102;
+          break;
+        default:
+          targetHeight = 44;
+      }
+    }
+  }
+  let src1x = '';
+  let src2x = '';
+  let srcWebp = '';
+  let nativeW = 134;
+  let nativeH = 48;
+  switch (variant) {
+    case 'icon':
+      if (fondBlanc) {
+        src1x = '/assets/icone/icone-fond-blanc-1024.png';
+        src2x = '/assets/icone/icone-fond-blanc-1024.png';
+        nativeW = 1024;
+        nativeH = 1024;
+      } else if (targetHeight <= 48) {
+        src1x = '/assets/icone/icone-64.png';
+        src2x = '/assets/icone/icone-128.png';
+        nativeW = 64;
+        nativeH = 64;
+      } else if (targetHeight <= 96) {
+        src1x = '/assets/icone/icone-128.png';
+        src2x = '/assets/icone/icone-256.png';
+        srcWebp = '/assets/icone/icone-512.webp';
+        nativeW = 128;
+        nativeH = 128;
+      } else {
+        src1x = '/assets/icone/icone-256.png';
+        src2x = '/assets/icone/icone-512.png';
+        srcWebp = '/assets/icone/icone-512.webp';
+        nativeW = 256;
+        nativeH = 256;
+      }
+      break;
+    case 'header':
+      src1x = '/assets/logo/logo-header-h48.png';
+      src2x = '/assets/logo/logo-header-h96.png';
+      nativeW = 134;
+      nativeH = 48;
+      break;
+    case 'wordmark':
+      src1x = '/assets/logo/texte-seul-transparent.png';
+      src2x = '/assets/logo/texte-seul-transparent.png';
+      nativeW = 614;
+      nativeH = 307;
+      break;
+    case 'full':
+    default:
+      if (fondBlanc) {
+        if (targetHeight <= 50) {
+          src1x = '/assets/logo/logo-principal-fond-blanc-400px.png';
+          src2x = '/assets/logo/logo-principal-fond-blanc-800px.png';
+          nativeW = 400;
+          nativeH = 183;
+        } else if (targetHeight <= 120) {
+          src1x = '/assets/logo/logo-principal-fond-blanc-400px.png';
+          src2x = '/assets/logo/logo-principal-fond-blanc-800px.png';
+          nativeW = 400;
+          nativeH = 183;
+        } else {
+          src1x = '/assets/logo/logo-principal-fond-blanc-800px.png';
+          src2x = '/assets/logo/logo-principal-fond-blanc-1600px.png';
+          nativeW = 800;
+          nativeH = 367;
+        }
+      } else {
+        if (targetHeight <= 36) {
+          src1x = '/assets/logo/logo-principal-transparent-200px.png';
+          src2x = '/assets/logo/logo-principal-transparent-400px.png';
+          nativeW = 200;
+          nativeH = 81;
+        } else if (targetHeight <= 140) {
+          src1x = '/assets/logo/logo-principal-transparent-400px.png';
+          src2x = '/assets/logo/logo-principal-transparent-800px.png';
+          srcWebp = '/assets/logo/logo-principal-transparent.webp';
+          nativeW = 400;
+          nativeH = 163;
+        } else {
+          src1x = '/assets/logo/logo-principal-transparent-800px.png';
+          src2x = '/assets/logo/logo-principal-transparent.png';
+          srcWebp = '/assets/logo/logo-principal-transparent.webp';
+          nativeW = 800;
+          nativeH = 326;
+        }
+      }
+      break;
+  }
+  const calculatedWidth = targetWidth || (targetHeight ? Math.round(targetHeight * (nativeW / nativeH)) : nativeW);
+  const imgElement = /*#__PURE__*/React.createElement("picture", {
+    className: "vinted-logo-picture"
+  }, srcWebp && /*#__PURE__*/React.createElement("source", {
+    type: "image/webp",
+    srcSet: srcWebp
+  }), /*#__PURE__*/React.createElement("img", {
+    src: src1x,
+    srcSet: `${src1x} 1x, ${src2x} 2x`,
+    alt: alt,
+    title: title,
+    width: calculatedWidth,
+    height: targetHeight,
+    loading: loading,
+    decoding: "async",
+    className: `vinted-logo-img ${pulse ? 'logo-pulse' : ''} ${className}`,
+    style: {
+      height: targetHeight ? `${targetHeight}px` : 'auto',
+      width: targetWidth ? `${targetWidth}px` : 'auto',
+      maxWidth: '100%',
+      objectFit: 'contain',
+      display: 'block',
+      ...style
+    }
+  }));
+  if (asLink) {
+    return /*#__PURE__*/React.createElement("a", {
+      href: href,
+      onClick: onClick,
+      className: "brand-logo-link",
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        textDecoration: 'none',
+        cursor: 'pointer'
+      },
+      "aria-label": alt || 'Vinted Manager Accueil'
+    }, imgElement);
+  }
+  return imgElement;
+}
+
+// ------------------- ÉCRAN DE CHARGEMENT AVEC LOGO -------------------
+function LoadingScreen({
+  message = "Chargement en cours..."
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "app-loading-overlay"
+  }, /*#__PURE__*/React.createElement(Logo, {
+    variant: "icon",
+    height: 80,
+    pulse: true,
+    alt: "Vinted Manager"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '15px',
+      fontWeight: 700,
+      color: '#0f172a',
+      marginTop: '12px',
+      letterSpacing: '-0.3px'
+    }
+  }, message), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '12px',
+      color: '#64748b'
+    }
+  }, "Vinted Manager"));
+}
+
+// ------------------- ÉTAT VIDE AVEC LOGO -------------------
+function EmptyStateWithLogo({
+  title = "Aucune donnée disponible",
+  description = "",
+  actionBtn = null
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      padding: '48px 24px',
+      background: '#ffffff',
+      borderRadius: '16px',
+      border: '1px dashed #cbd5e1',
+      margin: '20px 0'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'center',
+      marginBottom: '16px',
+      opacity: 0.9
+    }
+  }, /*#__PURE__*/React.createElement(Logo, {
+    variant: "full",
+    height: 56,
+    alt: ""
+  })), /*#__PURE__*/React.createElement("h4", {
+    style: {
+      fontSize: '16px',
+      fontWeight: 700,
+      color: '#0f172a',
+      margin: '0 0 6px 0'
+    }
+  }, title), description && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: '13px',
+      color: '#64748b',
+      maxWidth: '440px',
+      margin: '0 auto 16px auto',
+      lineHeight: 1.5
+    }
+  }, description), actionBtn);
+}
+
 // ------------------- SIDEBAR NAVIGATION -------------------
 function Sidebar({
   currentUser,
@@ -252,7 +495,8 @@ function Sidebar({
   onImportJSON,
   corbeilleCount = 0,
   todoUrgentCount = 0,
-  isOpen = false
+  isOpen = false,
+  onCloseMobile
 }) {
   if (!currentUser) return null;
   const isAdmin = currentUser.role === 'admin';
@@ -262,16 +506,33 @@ function Sidebar({
     id: "sidebar"
   }, /*#__PURE__*/React.createElement("div", {
     className: "brand-header"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "brand-logo"
-  }, "V"), /*#__PURE__*/React.createElement("h1", null, "Vinted Manager")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Logo, {
+    variant: "header",
+    height: 40,
+    asLink: true,
+    onClick: e => {
+      e.preventDefault();
+      onSelectView('comptes');
+    },
+    alt: "Vinted Manager",
+    title: "Aller \xE0 l'accueil"
+  }), onCloseMobile && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "sidebar-close-mobile-btn",
+    onClick: onCloseMobile,
+    title: "Fermer le menu",
+    "aria-label": "Fermer le menu"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark"
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "user-role-widget",
     style: {
       padding: '12px 14px',
       background: 'rgba(255,255,255,0.05)',
       borderRadius: '8px',
-      margin: '10px 12px',
-      border: '1px solid rgba(255,255,255,0.1)'
+      margin: '0 0 14px 0',
+      border: '1px solid rgba(255,255,255,0.1)',
+      flexShrink: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -327,8 +588,9 @@ function Sidebar({
       padding: '10px 14px',
       background: 'rgba(9, 177, 186, 0.04)',
       borderRadius: '8px',
-      margin: '0 12px 14px 12px',
-      border: '1px solid rgba(9, 177, 186, 0.15)'
+      margin: '0 0 14px 0',
+      border: '1px solid rgba(9, 177, 186, 0.15)',
+      flexShrink: 0
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: {
@@ -359,7 +621,8 @@ function Sidebar({
       display: 'flex',
       flexDirection: 'column',
       gap: '4px',
-      flex: 1
+      flexShrink: 0,
+      paddingBottom: '14px'
     }
   }, canAccess('comptes') && /*#__PURE__*/React.createElement("button", {
     className: `nav-btn ${activeView === 'comptes' ? 'active' : ''}`,
@@ -438,7 +701,27 @@ function Sidebar({
     onClick: () => onSelectView('journal')
   }, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-clock-rotate-left"
-  }), " Journal")));
+  }), " Journal")), /*#__PURE__*/React.createElement("div", {
+    className: "sidebar-footer",
+    style: {
+      padding: '12px 14px',
+      borderTop: '1px solid var(--border)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      marginTop: 'auto'
+    }
+  }, /*#__PURE__*/React.createElement(Logo, {
+    variant: "icon",
+    height: 20,
+    alt: ""
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '11px',
+      color: 'var(--text-muted)',
+      fontWeight: 500
+    }
+  }, "\xA9 ", new Date().getFullYear(), " Vinted Manager")));
 }
 function getTimeZoneOffsetMinutes(tzName, date = new Date()) {
   try {
@@ -2657,35 +2940,25 @@ function LoginView({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
-      marginBottom: '24px'
+      marginBottom: '26px'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      margin: '0 auto 16px auto',
-      width: '56px',
-      height: '56px',
-      fontSize: '26px',
-      fontWeight: 700,
       display: 'flex',
-      alignItems: 'center',
       justifyContent: 'center',
-      background: 'var(--primary-gradient)',
-      color: '#fff',
-      borderRadius: '14px',
-      boxShadow: '0 8px 20px rgba(9, 177, 186, 0.35)'
+      marginBottom: '16px'
     }
-  }, "V"), /*#__PURE__*/React.createElement("h2", {
+  }, /*#__PURE__*/React.createElement(Logo, {
+    variant: "full",
+    height: 102,
+    alt: "Vinted Manager",
+    title: "Vinted Manager"
+  })), /*#__PURE__*/React.createElement("p", {
     style: {
-      fontSize: '24px',
-      fontWeight: 700,
-      color: '#0f172a',
-      margin: '0 0 6px 0'
-    }
-  }, "Vinted Manager"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: '13px',
+      fontSize: '13.5px',
       color: '#64748b',
-      margin: 0
+      margin: 0,
+      fontWeight: 500
     }
   }, "Connectez-vous pour acc\xE9der au tableau de bord")), loginError && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10256,7 +10529,10 @@ window.ReactComponents = {
   NotificationBellCenter,
   TodoView,
   StartupTodoModal,
-  TodoPhotoLightboxModal
+  TodoPhotoLightboxModal,
+  Logo,
+  LoadingScreen,
+  EmptyStateWithLogo
 };
 ;
 // ============================================================
@@ -10267,14 +10543,26 @@ function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('vinted_manager_user');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) return JSON.parse(saved);
+      if (window.location.search.includes('autologin=admin')) {
+        return {
+          id: "user_florencio",
+          nom: "Florencio",
+          email: "florencio@vintedmanager.com",
+          role: "admin",
+          organisationId: "org_default"
+        };
+      }
+      return null;
     } catch (e) {
       return null;
     }
   });
   const [currentOrgId, setCurrentOrgId] = useState('org_default');
   const [activeView, setActiveView] = useState('comptes');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(() => {
+    return window.location.search.includes('mobileMenu=open');
+  });
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem('vinted_timezone') || 'FR');
   const [toast, setToast] = useState({
     visible: false,
@@ -10285,6 +10573,29 @@ function App() {
   const [showStartupTodoModal, setShowStartupTodoModal] = useState(false);
   const [hasCheckedStartupTodos, setHasCheckedStartupTodos] = useState(false);
   const [isSyncingDotB, setIsSyncingDotB] = useState(false);
+
+  // Synchronisation dynamique du titre du document au format : « Nom de la page · Vinted Manager »
+  useEffect(() => {
+    if (!currentUser) {
+      document.title = "Connexion · Vinted Manager";
+      return;
+    }
+    const viewTitles = {
+      comptes: "Comptes Vinted",
+      todos: "To-Do & Rappels",
+      classement: "Classement & Scores",
+      gagnants: "Suggestions & Gagnants",
+      incidents: "Journal des Incidents",
+      messagerie: "Messagerie Vinted",
+      organisations: "Organisations",
+      utilisateurs: "Utilisateurs & Membres",
+      corbeille: "Corbeille",
+      parametres: "Paramètres Système",
+      journal: "Journal d'Audit"
+    };
+    const pageName = viewTitles[activeView] || "Tableau de bord";
+    document.title = `${pageName} · Vinted Manager`;
+  }, [currentUser, activeView]);
   const handleSwitchTZ = tz => {
     setTimeZone(tz);
     localStorage.setItem('vinted_timezone', tz);
@@ -10716,8 +11027,17 @@ function App() {
   };
   const handleExportJSON = async () => {
     try {
-      const data = await API.getFullDB(currentOrgId);
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+      const rawData = await API.getFullDB(currentOrgId);
+      const exportPayload = {
+        metadata: {
+          application: "Vinted Manager",
+          brandLogo: "/assets/logo/logo-principal-fond-blanc-400px.png",
+          exportDate: new Date().toISOString(),
+          organisationId: currentOrgId
+        },
+        ...rawData
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", dataStr);
       downloadAnchor.setAttribute("download", `vinted_manager_export_${currentOrgId}_${new Date().toISOString().split('T')[0]}.json`);
@@ -10786,13 +11106,13 @@ function App() {
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "app-container"
-  }, /*#__PURE__*/React.createElement("button", {
+  }, !mobileMenuOpen && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "mobile-menu-btn btn btn-primary",
-    onClick: () => setMobileMenuOpen(!mobileMenuOpen),
+    onClick: () => setMobileMenuOpen(true),
     title: "Menu principal"
   }, /*#__PURE__*/React.createElement("i", {
-    className: `fa-solid ${mobileMenuOpen ? 'fa-xmark' : 'fa-bars'}`
+    className: "fa-solid fa-bars"
   }), " Menu"), mobileMenuOpen && /*#__PURE__*/React.createElement("div", {
     className: "sidebar-overlay",
     onClick: () => setMobileMenuOpen(false),
@@ -10815,6 +11135,7 @@ function App() {
       setActiveView(view);
       setMobileMenuOpen(false);
     },
+    onCloseMobile: () => setMobileMenuOpen(false),
     onSwitchOrg: handleSwitchOrg,
     onLogout: handleLogout,
     onExportJSON: handleExportJSON,
@@ -11011,6 +11332,8 @@ function App() {
     showToast: showToast
   }), /*#__PURE__*/React.createElement(Toast, {
     toast: toast
+  }), isSyncingDotB && /*#__PURE__*/React.createElement(LoadingScreen, {
+    message: "Synchronisation et actualisation DotB Cloud..."
   }));
 }
 

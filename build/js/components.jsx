@@ -94,8 +94,193 @@ function Toast({ toast }) {
     );
 }
 
+// ------------------- COMPOSANT RÉUTILISABLE LOGO OFFICIEL -------------------
+function Logo({
+    variant = 'header', // 'header' | 'full' | 'icon' | 'wordmark'
+    size = 'md',        // 'sm' | 'md' | 'lg' | 'xl' | ou hauteur en pixels
+    height,
+    width,
+    className = '',
+    style = {},
+    alt = 'Vinted Manager',
+    asLink = false,
+    href = '#',
+    onClick,
+    loading = 'eager',
+    fondBlanc = false,
+    pulse = false,
+    title = 'Vinted Manager'
+}) {
+    let targetHeight = height;
+    let targetWidth = width;
+
+    if (!targetHeight) {
+        if (typeof size === 'number') {
+            targetHeight = size;
+        } else {
+            switch (size) {
+                case 'xs': targetHeight = variant === 'icon' ? 24 : 28; break;
+                case 'sm': targetHeight = variant === 'icon' ? 32 : 36; break;
+                case 'md': targetHeight = variant === 'icon' ? 44 : 44; break;
+                case 'lg': targetHeight = variant === 'icon' ? 64 : 68; break;
+                case 'xl': targetHeight = variant === 'icon' ? 96 : 102; break;
+                default: targetHeight = 44;
+            }
+        }
+    }
+
+    let src1x = '';
+    let src2x = '';
+    let srcWebp = '';
+    let nativeW = 134;
+    let nativeH = 48;
+
+    switch (variant) {
+        case 'icon':
+            if (fondBlanc) {
+                src1x = '/assets/icone/icone-fond-blanc-1024.png';
+                src2x = '/assets/icone/icone-fond-blanc-1024.png';
+                nativeW = 1024; nativeH = 1024;
+            } else if (targetHeight <= 48) {
+                src1x = '/assets/icone/icone-64.png';
+                src2x = '/assets/icone/icone-128.png';
+                nativeW = 64; nativeH = 64;
+            } else if (targetHeight <= 96) {
+                src1x = '/assets/icone/icone-128.png';
+                src2x = '/assets/icone/icone-256.png';
+                srcWebp = '/assets/icone/icone-512.webp';
+                nativeW = 128; nativeH = 128;
+            } else {
+                src1x = '/assets/icone/icone-256.png';
+                src2x = '/assets/icone/icone-512.png';
+                srcWebp = '/assets/icone/icone-512.webp';
+                nativeW = 256; nativeH = 256;
+            }
+            break;
+
+        case 'header':
+            src1x = '/assets/logo/logo-header-h48.png';
+            src2x = '/assets/logo/logo-header-h96.png';
+            nativeW = 134; nativeH = 48;
+            break;
+
+        case 'wordmark':
+            src1x = '/assets/logo/texte-seul-transparent.png';
+            src2x = '/assets/logo/texte-seul-transparent.png';
+            nativeW = 614; nativeH = 307;
+            break;
+
+        case 'full':
+        default:
+            if (fondBlanc) {
+                if (targetHeight <= 50) {
+                    src1x = '/assets/logo/logo-principal-fond-blanc-400px.png';
+                    src2x = '/assets/logo/logo-principal-fond-blanc-800px.png';
+                    nativeW = 400; nativeH = 183;
+                } else if (targetHeight <= 120) {
+                    src1x = '/assets/logo/logo-principal-fond-blanc-400px.png';
+                    src2x = '/assets/logo/logo-principal-fond-blanc-800px.png';
+                    nativeW = 400; nativeH = 183;
+                } else {
+                    src1x = '/assets/logo/logo-principal-fond-blanc-800px.png';
+                    src2x = '/assets/logo/logo-principal-fond-blanc-1600px.png';
+                    nativeW = 800; nativeH = 367;
+                }
+            } else {
+                if (targetHeight <= 36) {
+                    src1x = '/assets/logo/logo-principal-transparent-200px.png';
+                    src2x = '/assets/logo/logo-principal-transparent-400px.png';
+                    nativeW = 200; nativeH = 81;
+                } else if (targetHeight <= 140) {
+                    src1x = '/assets/logo/logo-principal-transparent-400px.png';
+                    src2x = '/assets/logo/logo-principal-transparent-800px.png';
+                    srcWebp = '/assets/logo/logo-principal-transparent.webp';
+                    nativeW = 400; nativeH = 163;
+                } else {
+                    src1x = '/assets/logo/logo-principal-transparent-800px.png';
+                    src2x = '/assets/logo/logo-principal-transparent.png';
+                    srcWebp = '/assets/logo/logo-principal-transparent.webp';
+                    nativeW = 800; nativeH = 326;
+                }
+            }
+            break;
+    }
+
+    const calculatedWidth = targetWidth || (targetHeight ? Math.round(targetHeight * (nativeW / nativeH)) : nativeW);
+
+    const imgElement = (
+        <picture className="vinted-logo-picture">
+            {srcWebp && <source type="image/webp" srcSet={srcWebp} />}
+            <img
+                src={src1x}
+                srcSet={`${src1x} 1x, ${src2x} 2x`}
+                alt={alt}
+                title={title}
+                width={calculatedWidth}
+                height={targetHeight}
+                loading={loading}
+                decoding="async"
+                className={`vinted-logo-img ${pulse ? 'logo-pulse' : ''} ${className}`}
+                style={{
+                    height: targetHeight ? `${targetHeight}px` : 'auto',
+                    width: targetWidth ? `${targetWidth}px` : 'auto',
+                    maxWidth: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                    ...style
+                }}
+            />
+        </picture>
+    );
+
+    if (asLink) {
+        return (
+            <a
+                href={href}
+                onClick={onClick}
+                className="brand-logo-link"
+                style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none', cursor: 'pointer' }}
+                aria-label={alt || 'Vinted Manager Accueil'}
+            >
+                {imgElement}
+            </a>
+        );
+    }
+
+    return imgElement;
+}
+
+// ------------------- ÉCRAN DE CHARGEMENT AVEC LOGO -------------------
+function LoadingScreen({ message = "Chargement en cours..." }) {
+    return (
+        <div className="app-loading-overlay">
+            <Logo variant="icon" height={80} pulse={true} alt="Vinted Manager" />
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginTop: '12px', letterSpacing: '-0.3px' }}>
+                {message}
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748b' }}>
+                Vinted Manager
+            </div>
+        </div>
+    );
+}
+
+// ------------------- ÉTAT VIDE AVEC LOGO -------------------
+function EmptyStateWithLogo({ title = "Aucune donnée disponible", description = "", actionBtn = null }) {
+    return (
+        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', borderRadius: '16px', border: '1px dashed #cbd5e1', margin: '20px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px', opacity: 0.9 }}>
+                <Logo variant="full" height={56} alt="" />
+            </div>
+            <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>{title}</h4>
+            {description && <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '440px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>{description}</p>}
+            {actionBtn}
+        </div>
+    );
+}
+
 // ------------------- SIDEBAR NAVIGATION -------------------
-function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0, todoUrgentCount = 0, isOpen = false }) {
+function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0, todoUrgentCount = 0, isOpen = false, onCloseMobile }) {
     if (!currentUser) return null;
 
     const isAdmin = currentUser.role === 'admin';
@@ -104,12 +289,32 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
     return (
         <aside className={`sidebar ${isOpen ? 'open' : ''}`} id="sidebar">
             <div className="brand-header">
-                <div className="brand-logo">V</div>
-                <h1>Vinted Manager</h1>
+                <Logo
+                    variant="header"
+                    height={40}
+                    asLink={true}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        onSelectView('comptes');
+                    }}
+                    alt="Vinted Manager"
+                    title="Aller à l'accueil"
+                />
+                {onCloseMobile && (
+                    <button
+                        type="button"
+                        className="sidebar-close-mobile-btn"
+                        onClick={onCloseMobile}
+                        title="Fermer le menu"
+                        aria-label="Fermer le menu"
+                    >
+                        <i className="fa-solid fa-xmark"></i>
+                    </button>
+                )}
             </div>
 
             {/* Utilisateur Connecté Widget */}
-            <div className="user-role-widget" style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', margin: '10px 12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="user-role-widget" style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', margin: '0 0 14px 0', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
                 <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginBottom: '4px' }}>Utilisateur Connecté</div>
                 <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-main)', marginBottom: '2px' }}>{currentUser.nom || 'Utilisateur'}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser.email || ''}</div>
@@ -128,7 +333,7 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
 
             {/* Selector Organisation (Seulement si autorisé) */}
             {canAccess('organisations') && (
-                <div id="orgSelectorWidget" style={{ padding: '10px 14px', background: 'rgba(9, 177, 186, 0.04)', borderRadius: '8px', margin: '0 12px 14px 12px', border: '1px solid rgba(9, 177, 186, 0.15)' }}>
+                <div id="orgSelectorWidget" style={{ padding: '10px 14px', background: 'rgba(9, 177, 186, 0.04)', borderRadius: '8px', margin: '0 0 14px 0', border: '1px solid rgba(9, 177, 186, 0.15)', flexShrink: 0 }}>
                     <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>🏢 Organisation Active</label>
                     <select
                         value={currentOrgId}
@@ -142,7 +347,7 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
             )}
 
             {/* Menu Nav Links avec permissions personnalisées */}
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, paddingBottom: '14px' }}>
                 {canAccess('comptes') && (
                     <button className={`nav-btn ${activeView === 'comptes' ? 'active' : ''}`} onClick={() => onSelectView('comptes')} id="nav-btn-comptes">
                         <i className="fa-solid fa-store"></i> Comptes
@@ -219,6 +424,12 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                     </button>
                 )}
             </nav>
+
+            {/* Pied de page Sidebar avec icône officielle */}
+            <div className="sidebar-footer" style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: 'auto' }}>
+                <Logo variant="icon" height={20} alt="" />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>© {new Date().getFullYear()} Vinted Manager</span>
+            </div>
         </aside>
     );
 }
@@ -1710,23 +1921,18 @@ function LoginView({ onLoginSubmit, loginError }) {
                 borderTop: '6px solid var(--primary-color)',
                 margin: 'auto'
             }}>
-                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                    <div style={{
-                        margin: '0 auto 16px auto',
-                        width: '56px',
-                        height: '56px',
-                        fontSize: '26px',
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'var(--primary-gradient)',
-                        color: '#fff',
-                        borderRadius: '14px',
-                        boxShadow: '0 8px 20px rgba(9, 177, 186, 0.35)'
-                    }}>V</div>
-                    <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>Vinted Manager</h2>
-                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Connectez-vous pour accéder au tableau de bord</p>
+                <div style={{ textAlign: 'center', marginBottom: '26px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                        <Logo
+                            variant="full"
+                            height={102}
+                            alt="Vinted Manager"
+                            title="Vinted Manager"
+                        />
+                    </div>
+                    <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0, fontWeight: 500 }}>
+                        Connectez-vous pour accéder au tableau de bord
+                    </p>
                 </div>
 
                 {loginError && (
@@ -7255,5 +7461,8 @@ window.ReactComponents = {
     NotificationBellCenter,
     TodoView,
     StartupTodoModal,
-    TodoPhotoLightboxModal
+    TodoPhotoLightboxModal,
+    Logo,
+    LoadingScreen,
+    EmptyStateWithLogo
 };

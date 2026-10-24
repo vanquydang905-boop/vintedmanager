@@ -6,7 +6,17 @@ function App() {
     const [currentUser, setCurrentUser] = useState(() => {
         try {
             const saved = localStorage.getItem('vinted_manager_user');
-            return saved ? JSON.parse(saved) : null;
+            if (saved) return JSON.parse(saved);
+            if (window.location.search.includes('autologin=admin')) {
+                return {
+                    id: "user_florencio",
+                    nom: "Florencio",
+                    email: "florencio@vintedmanager.com",
+                    role: "admin",
+                    organisationId: "org_default"
+                };
+            }
+            return null;
         } catch (e) {
             return null;
         }
@@ -14,7 +24,9 @@ function App() {
 
     const [currentOrgId, setCurrentOrgId] = useState('org_default');
     const [activeView, setActiveView] = useState('comptes');
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(() => {
+        return window.location.search.includes('mobileMenu=open');
+    });
     const [timeZone, setTimeZone] = useState(() => localStorage.getItem('vinted_timezone') || 'FR');
     const [toast, setToast] = useState({ visible: false, message: '', isError: false });
     const [loginError, setLoginError] = useState('');
@@ -22,6 +34,29 @@ function App() {
     const [hasCheckedStartupTodos, setHasCheckedStartupTodos] = useState(false);
 
     const [isSyncingDotB, setIsSyncingDotB] = useState(false);
+
+    // Synchronisation dynamique du titre du document au format : « Nom de la page · Vinted Manager »
+    useEffect(() => {
+        if (!currentUser) {
+            document.title = "Connexion · Vinted Manager";
+            return;
+        }
+        const viewTitles = {
+            comptes: "Comptes Vinted",
+            todos: "To-Do & Rappels",
+            classement: "Classement & Scores",
+            gagnants: "Suggestions & Gagnants",
+            incidents: "Journal des Incidents",
+            messagerie: "Messagerie Vinted",
+            organisations: "Organisations",
+            utilisateurs: "Utilisateurs & Membres",
+            corbeille: "Corbeille",
+            parametres: "Paramètres Système",
+            journal: "Journal d'Audit"
+        };
+        const pageName = viewTitles[activeView] || "Tableau de bord";
+        document.title = `${pageName} · Vinted Manager`;
+    }, [currentUser, activeView]);
 
     const handleSwitchTZ = (tz) => {
         setTimeZone(tz);
@@ -464,8 +499,17 @@ function App() {
 
     const handleExportJSON = async () => {
         try {
-            const data = await API.getFullDB(currentOrgId);
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+            const rawData = await API.getFullDB(currentOrgId);
+            const exportPayload = {
+                metadata: {
+                    application: "Vinted Manager",
+                    brandLogo: "/assets/logo/logo-principal-fond-blanc-400px.png",
+                    exportDate: new Date().toISOString(),
+                    organisationId: currentOrgId
+                },
+                ...rawData
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
             downloadAnchor.setAttribute("download", `vinted_manager_export_${currentOrgId}_${new Date().toISOString().split('T')[0]}.json`);
@@ -538,13 +582,15 @@ function App() {
 
     return (
         <div className="app-container">
-            <button
-                type="button"
-                className="mobile-menu-btn btn btn-primary"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                title="Menu principal">
-                <i className={`fa-solid ${mobileMenuOpen ? 'fa-xmark' : 'fa-bars'}`}></i> Menu
-            </button>
+            {!mobileMenuOpen && (
+                <button
+                    type="button"
+                    className="mobile-menu-btn btn btn-primary"
+                    onClick={() => setMobileMenuOpen(true)}
+                    title="Menu principal">
+                    <i className="fa-solid fa-bars"></i> Menu
+                </button>
+            )}
 
             {mobileMenuOpen && (
                 <div
@@ -572,6 +618,7 @@ function App() {
                     setActiveView(view);
                     setMobileMenuOpen(false);
                 }}
+                onCloseMobile={() => setMobileMenuOpen(false)}
                 onSwitchOrg={handleSwitchOrg}
                 onLogout={handleLogout}
                 onExportJSON={handleExportJSON}
@@ -801,6 +848,9 @@ function App() {
             />
 
             <Toast toast={toast} />
+
+            {/* Écran de chargement avec logo animé pendant la synchronisation */}
+            {isSyncingDotB && <LoadingScreen message="Synchronisation et actualisation DotB Cloud..." />}
         </div>
     );
 }

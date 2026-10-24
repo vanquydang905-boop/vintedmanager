@@ -85,48 +85,122 @@ body {
     width: 270px;
     background-color: var(--card-bg);
     border-right: 1px solid var(--border);
-    padding: 24px 18px;
+    padding: 20px 14px;
     display: flex;
     flex-direction: column;
     position: fixed;
     top: 0;
     bottom: 0;
     left: 0;
-    height: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     z-index: 100;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.02);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Scrollbar discrète et élégante pour la barre latérale */
+.sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Bouton fermer sur mobile dans le header de la sidebar */
+.sidebar-close-mobile-btn {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    line-height: 1;
+    margin-left: auto;
+    transition: all 0.15s ease;
+}
+.sidebar-close-mobile-btn:hover {
+    color: var(--danger);
+    background: var(--danger-bg);
+}
+
 .brand-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-    padding: 0 6px;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding: 4px 10px;
+    flex-shrink: 0;
 }
 
-.brand-logo {
-    width: 40px;
-    height: 40px;
-    background: var(--primary-gradient);
-    color: white;
-    border-radius: 12px;
-    display: flex;
+.brand-logo-link {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.brand-logo-link:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+}
+
+.vinted-logo-picture {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
-    font-weight: 700;
-    box-shadow: 0 4px 14px var(--primary-glow);
 }
 
-.brand-header h1 {
-    font-family: 'Outfit', sans-serif;
-    color: var(--primary-dark);
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
+.vinted-logo-img {
+    display: block;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
 }
+
+@keyframes logoPulseAnimation {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.06);
+        opacity: 0.88;
+    }
+}
+
+.logo-pulse {
+    animation: logoPulseAnimation 2s ease-in-out infinite;
+}
+
+/* Loading Overlay with Logo */
+.app-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(4px);
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+
 
 /* User Role Widget */
 .user-role-widget {
