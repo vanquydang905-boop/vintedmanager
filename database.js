@@ -1150,19 +1150,60 @@ const dbService = {
         return true;
     },
 
-    // ------------------- INCIDENTS -------------------
+    // ------------------- INCIDENTS (PERSISTANCE HYBRIDE & PHOTOS) -------------------
+    async persistIncidentsBackup(organisationId = null) {
+        if (!supabaseUrl || !supabaseKey) return;
+        try {
+            const oid = (organisationId || 'org_default').toLowerCase();
+            const incidentsForOrg = DEFAULT_INCIDENTS.filter(i => !i.organisationId || i.organisationId.toLowerCase() === oid);
+            await supabase.from('parametres').upsert([{
+                id: 'incidents_' + oid,
+                organisationid: oid,
+                data: { incidents: incidentsForOrg }
+            }]);
+        } catch(err) {
+            console.error('[Supabase Backup Incidents error]', err);
+        }
+    },
+
     async getIncidents(organisationId = null) {
+        const orgKey = (organisationId || 'org_default').toLowerCase();
         let list = [...DEFAULT_INCIDENTS];
         if (supabaseUrl && supabaseKey) {
+            // 1. Table SQL 'incidents'
             try {
                 let query = supabase.from('incidents').select('*');
-                if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
+                if (organisationId) query = query.eq('organisationid', orgKey);
                 const { data, error } = await query;
                 if (!error && Array.isArray(data)) {
                     data.map(fromDbFormat).forEach(dbRow => {
                         const idx = list.findIndex(item => item.id === dbRow.id);
                         if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
                         else list.push(dbRow);
+                    });
+                }
+            } catch (e) {}
+
+            // 2. Backup JSON dans 'parametres' pour conserver les photos et notes étendues
+            try {
+                const { data: paramRow, error: paramErr } = await supabase
+                    .from('parametres')
+                    .select('data')
+                    .eq('id', 'incidents_' + orgKey)
+                    .maybeSingle();
+
+                if (!paramErr && paramRow && paramRow.data && Array.isArray(paramRow.data.incidents)) {
+                    paramRow.data.incidents.forEach(bkInc => {
+                        const idx = list.findIndex(item => item.id === bkInc.id);
+                        if (idx >= 0) {
+                            list[idx] = {
+                                ...bkInc,
+                                ...list[idx],
+                                photos: (bkInc.photos && bkInc.photos.length > 0) ? bkInc.photos : (list[idx].photos || [])
+                            };
+                        } else {
+                            list.push(bkInc);
+                        }
                     });
                 }
             } catch (e) {}
@@ -1178,7 +1219,8 @@ const dbService = {
             organisationId: 'org_default',
             ...incident,
             heuresPubs24h: Array.isArray(incident.heuresPubs24h) ? incident.heuresPubs24h : [],
-            detailVentes: Array.isArray(incident.detailVentes) ? incident.detailVentes : []
+            detailVentes: Array.isArray(incident.detailVentes) ? incident.detailVentes : [],
+            photos: Array.isArray(incident.photos) ? incident.photos : []
         };
         DEFAULT_INCIDENTS.unshift(payload);
 
@@ -1187,6 +1229,7 @@ const dbService = {
                 const dbPayload = toDbFormat(payload);
                 await supabase.from('incidents').upsert([dbPayload]);
             } catch (err) {}
+            await this.persistIncidentsBackup(payload.organisationId);
         }
         return payload;
     },
@@ -1201,6 +1244,8 @@ const dbService = {
                 const dbPayload = toDbFormat(updates);
                 await supabase.from('incidents').update(dbPayload).eq('id', id);
             } catch (err) {}
+            const target = DEFAULT_INCIDENTS.find(i => i.id === id);
+            await this.persistIncidentsBackup(target ? target.organisationId : 'org_default');
         }
         return true;
     },
@@ -1213,6 +1258,7 @@ const dbService = {
             try {
                 await supabase.from('incidents').delete().eq('id', id);
             } catch (err) {}
+            await this.persistIncidentsBackup(item ? item.organisationId : 'org_default');
         }
         return true;
     },

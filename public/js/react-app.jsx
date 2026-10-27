@@ -213,6 +213,82 @@ function App() {
         return () => clearInterval(timer);
     }, [currentUser, appState.todos]);
 
+    // Surveillance et notification des Cadres et Admins sur chaque nouvel incident
+    const knownIncidentIdsRef = React.useRef(null);
+
+    useEffect(() => {
+        if (!currentUser) {
+            knownIncidentIdsRef.current = null;
+            return;
+        }
+
+        const incidentsList = appState.incidents || [];
+        const isSupervisor = (currentUser.role === 'admin' || currentUser.role === 'cadre');
+
+        // Initialisation lors du premier chargement des données
+        if (knownIncidentIdsRef.current === null) {
+            knownIncidentIdsRef.current = new Set(incidentsList.map(i => i.id));
+            return;
+        }
+
+        // Détection des incidents nouvellement arrivés
+        const newIncidents = incidentsList.filter(i => i && i.id && !knownIncidentIdsRef.current.has(i.id));
+
+        if (newIncidents.length > 0) {
+            newIncidents.forEach(i => knownIncidentIdsRef.current.add(i.id));
+
+            // Règle : Alerter UNIQUEMENT les cadres et admins
+            if (isSupervisor) {
+                newIncidents.forEach(newInc => {
+                    const comp = (appState.comptes || []).find(c => c.id === newInc.compteId);
+                    const pseudoCompte = comp ? (comp.pseudo || comp.nomCompte || `Compte #${comp.id}`) : (newInc.compteId || 'Inconnu');
+                    const declarant = newInc.declarePar || 'Un agent';
+                    const incidentType = newInc.type || 'Incident';
+
+                    // 1. Alerte sonore d'urgence
+                    if (typeof SoundEngine !== 'undefined' && SoundEngine.playUrgentAlert) {
+                        try { SoundEngine.playUrgentAlert(); } catch (e) {}
+                    }
+
+                    // 2. Notification Push Système
+                    if (typeof SystemNotifications !== 'undefined' && SystemNotifications.notify) {
+                        SystemNotifications.notify(
+                            `🚨 NOUVEL INCIDENT : ${incidentType}`,
+                            `Compte: @${pseudoCompte} • Signalé par: ${declarant}${newInc.notesActivites ? `\nMotif: ${newInc.notesActivites}` : ''}`,
+                            {
+                                tag: `incident-${newInc.id}`,
+                                urgent: true,
+                                onClick: () => {
+                                    setActiveView('incidents');
+                                }
+                            }
+                        );
+                    }
+
+                    // 3. Alerte Toast visuelle
+                    showToast(`🚨 NOUVEL INCIDENT (${incidentType}) sur @${pseudoCompte} signalé par ${declarant} !`, true);
+                });
+            }
+        }
+    }, [currentUser, appState.incidents, appState.comptes, showToast]);
+
+    // Polling d'arrière-plan (toutes les 25 secondes) pour actualiser la liste des incidents en temps réel
+    useEffect(() => {
+        if (!currentUser) return;
+        const supervisorPoll = setInterval(() => {
+            const targetOrgId = (currentUser.role !== 'admin' && currentUser.organisationId)
+                ? currentUser.organisationId
+                : currentOrgId;
+            API.getFullDB(targetOrgId).then(data => {
+                if (data && data.incidents) {
+                    setAppState(prev => ({ ...prev, ...data }));
+                }
+            }).catch(() => {});
+        }, 25000);
+
+        return () => clearInterval(supervisorPoll);
+    }, [currentUser, currentOrgId]);
+
     // Synchronisation automatique DotB toutes les 1h (60 * 60 * 1000 ms)
     useEffect(() => {
         if (!currentUser) return;
@@ -326,6 +402,11 @@ function App() {
             } else {
                 await API.createIncident({ ...incidentData, organisationId: currentOrgId });
                 showToast("Incident enregistré et statut du compte mis à jour");
+                if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'cadre')) {
+                    if (typeof SoundEngine !== 'undefined' && SoundEngine.playUrgentAlert) {
+                        try { SoundEngine.playUrgentAlert(); } catch (e) {}
+                    }
+                }
             }
             await loadData();
         } catch (err) {
@@ -677,6 +758,7 @@ function App() {
                 onImportJSON={handleImportJSON}
                 corbeilleCount={(appState.corbeille || []).length}
                 todoUrgentCount={todoUrgentCount}
+                incidentsCount={(appState.incidents || []).length}
                 isOpen={mobileMenuOpen}
             />
 
@@ -820,6 +902,8 @@ function App() {
                 {activeView === 'incidents' && PermissionManager.can(currentUser, 'incidents') && (
                     <IncidentsView
                         appState={appState}
+                        currentUser={currentUser}
+                        showToast={showToast}
                         onSaveIncident={handleSaveIncident}
                         onBulkDeleteIncidents={handleBulkDeleteIncidents}
                     />

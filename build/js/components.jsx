@@ -322,7 +322,7 @@ function EmptyStateWithLogo({ title = "Aucune donnée disponible", description =
 }
 
 // ------------------- SIDEBAR NAVIGATION -------------------
-function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0, todoUrgentCount = 0, isOpen = false, onCloseMobile }) {
+function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelectView, onSwitchOrg, onLogout, onExportJSON, onImportJSON, corbeilleCount = 0, todoUrgentCount = 0, incidentsCount = 0, isOpen = false, onCloseMobile }) {
     if (!currentUser) return null;
 
     const isAdmin = currentUser.role === 'admin';
@@ -422,6 +422,11 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                 {canAccess('incidents') && (
                     <button className={`nav-btn ${activeView === 'incidents' ? 'active' : ''}`} onClick={() => onSelectView('incidents')}>
                         <i className="fa-solid fa-triangle-exclamation"></i> Incidents
+                        {incidentsCount > 0 && (
+                            <span className="badge" style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '10px' }}>
+                                {incidentsCount}
+                            </span>
+                        )}
                     </button>
                 )}
 
@@ -1310,7 +1315,7 @@ function PlanningView() {
 }
 
 // ------------------- VIEW: INCIDENTS -------------------
-function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
+function IncidentsView({ appState, currentUser, showToast, onSaveIncident, onBulkDeleteIncidents }) {
     const todayDateTimeStr = new Date().toISOString().slice(0, 16);
     const formRef = React.useRef(null);
     const [editingIncidentId, setEditingIncidentId] = useState('');
@@ -1320,6 +1325,9 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
     const [nbAnnonces, setNbAnnonces] = useState('');
     const [skuAnnonces, setSkuAnnonces] = useState('');
     const [notesActivites, setNotesActivites] = useState('');
+    const [photos, setPhotos] = useState([]);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+    const [lightboxData, setLightboxData] = useState({ isOpen: false, photos: [], initialIndex: 0, taskTitle: '' });
     const [selectedIncidentIds, setSelectedIncidentIds] = useState([]);
 
     const comptes = appState.comptes || [];
@@ -1352,6 +1360,95 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
         return c.pseudo || (c.numeroCompte ? `Compte #${c.numeroCompte}` : `Compte (${c.id})`);
     };
 
+    // Gestion de l'upload et compression des captures d'écran
+    const handleFilesSelected = useCallback(async (fileList) => {
+        if (!fileList || fileList.length === 0) return;
+        const validFiles = Array.from(fileList).filter(f => f.type && f.type.startsWith('image/'));
+        if (validFiles.length === 0) {
+            if (showToast) showToast('Veuillez sélectionner un fichier image valide (JPG, PNG, WEBP...)', true);
+            return;
+        }
+
+        setIsUploadingPhoto(true);
+        try {
+            const utils = (typeof TodoUtils !== 'undefined' ? TodoUtils : window.TodoUtils);
+            let processed = [];
+            if (utils && utils.compressImageFile) {
+                processed = await Promise.all(validFiles.map(f => utils.compressImageFile(f)));
+            } else {
+                processed = await Promise.all(validFiles.map(f => new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onerror = () => reject(new Error('Erreur de lecture'));
+                    reader.onload = (e) => {
+                        const base64Length = e.target.result.length;
+                        const bytes = Math.round(base64Length * 0.75);
+                        const formattedSize = bytes > 1048576 
+                            ? (bytes / 1048576).toFixed(1) + ' Mo' 
+                            : Math.round(bytes / 1024) + ' Ko';
+                        resolve({
+                            id: 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                            nom: f.name || 'capture.jpg',
+                            taille: formattedSize,
+                            url: e.target.result,
+                            dateAjout: new Date().toISOString()
+                        });
+                    };
+                    reader.readAsDataURL(f);
+                })));
+            }
+            setPhotos(prev => [...prev, ...processed]);
+            if (typeof SoundEngine !== 'undefined' && SoundEngine.playCheck) {
+                SoundEngine.playCheck();
+            }
+            if (showToast) showToast(`📷 ${processed.length} capture(s) / preuve(s) ajoutée(s)`);
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de l'optimisation des images", true);
+        } finally {
+            setIsUploadingPhoto(false);
+        }
+    }, [showToast]);
+
+    const handleRemovePhoto = (photoIndex) => {
+        setPhotos(prev => prev.filter((_, i) => i !== photoIndex));
+    };
+
+    const handleDownloadPhoto = (p) => {
+        const utils = (typeof TodoUtils !== 'undefined' ? TodoUtils : window.TodoUtils);
+        if (utils && utils.downloadImage) {
+            utils.downloadImage(p);
+        } else if (p && p.url) {
+            const a = document.createElement('a');
+            a.href = p.url;
+            a.download = p.nom || 'photo-incident.jpg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    };
+
+    // Support du collage direct (Ctrl+V / Cmd+V)
+    useEffect(() => {
+        const handlePaste = (e) => {
+            if (!e.clipboardData || !e.clipboardData.items) return;
+            const imageFiles = [];
+            for (let i = 0; i < e.clipboardData.items.length; i++) {
+                const item = e.clipboardData.items[i];
+                if (item.type && item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) imageFiles.push(file);
+                }
+            }
+            if (imageFiles.length > 0) {
+                e.preventDefault();
+                handleFilesSelected(imageFiles);
+            }
+        };
+
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+    }, [handleFilesSelected]);
+
     const handleEditIncident = (inc) => {
         setEditingIncidentId(inc.id);
         setCompteId(inc.compteId || '');
@@ -1362,6 +1459,7 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
         setNbAnnonces(inc.nbAnnoncesMasquees || '');
         setSkuAnnonces(inc.skuAnnoncesMasquees || '');
         setNotesActivites(inc.notesActivites || '');
+        setPhotos(Array.isArray(inc.photos) ? [...inc.photos] : []);
         if (formRef.current) {
             formRef.current.scrollIntoView({ behavior: 'smooth' });
         }
@@ -1375,6 +1473,7 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
         setNbAnnonces('');
         setSkuAnnonces('');
         setNotesActivites('');
+        setPhotos([]);
     };
 
     const handleSubmit = (e) => {
@@ -1387,7 +1486,10 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
             dateHeure,
             nbAnnoncesMasquees: parseInt(nbAnnonces) || 0,
             skuAnnoncesMasquees: skuAnnonces,
-            notesActivites: notesActivites
+            notesActivites: notesActivites,
+            photos: Array.isArray(photos) ? photos : [],
+            declarePar: currentUser ? (currentUser.nom || currentUser.agentAssigne || currentUser.email) : 'Agent',
+            declareParRole: currentUser ? currentUser.role : 'agent'
         });
         handleResetForm();
     };
@@ -1447,6 +1549,123 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                             onChange={(e) => setNotesActivites(e.target.value)}
                             placeholder="ex: 5 republications rapides en 10 min, Changement d'IP Proxy Adspower, Message suspect Vinted..."
                         />
+                    </div>
+
+                    {/* SECTION PREUVES & PHOTOS DE L'INCIDENT */}
+                    <div style={{ marginTop: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                            <label style={{ fontWeight: 700, fontSize: '13px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                                <i className="fa-solid fa-camera" style={{ color: 'var(--primary)' }}></i>
+                                Photos & Preuves de l'Incident ({photos.length})
+                            </label>
+                            <span style={{ fontSize: '12px', color: '#64748b' }}>
+                                Captures de blocage, avertissement Vinted... (Coller avec <kbd style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', border: '1px solid #cbd5e1', fontSize: '10.5px' }}>Ctrl+V</kbd> supporté)
+                            </span>
+                        </div>
+
+                        {/* Dropzone d'upload */}
+                        <label
+                            className="todo-photo-dropzone"
+                            style={{ display: 'block', margin: 0 }}
+                            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('dragover'); }}
+                            onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('dragover'); }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.remove('dragover');
+                                if (e.dataTransfer && e.dataTransfer.files) {
+                                    handleFilesSelected(e.dataTransfer.files);
+                                }
+                            }}
+                        >
+                            <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                    handleFilesSelected(e.target.files);
+                                    e.target.value = '';
+                                }}
+                                disabled={isUploadingPhoto}
+                            />
+                            {isUploadingPhoto ? (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: '#09b1ba', fontSize: '13px', padding: '12px 0' }}>
+                                    <CircularIconLoader size={26} pulse={false} showOuterRing={false} />
+                                    <span>Compression et traitement des captures...</span>
+                                </div>
+                            ) : (
+                                <div style={{ cursor: 'pointer', textAlign: 'center', padding: '12px 10px' }}>
+                                    <i className="fa-solid fa-cloud-arrow-up" style={{ fontSize: '26px', color: '#09b1ba', marginBottom: '6px', display: 'block' }}></i>
+                                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                                        Cliquez ou glissez une capture d'écran ici
+                                    </div>
+                                    <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '2px' }}>
+                                        JPG, PNG, WEBP • Supporte le collage direct depuis le presse-papier (<kbd style={{ background: '#e2e8f0', padding: '2px 5px', borderRadius: '4px', fontSize: '10px', color: '#475569' }}>Ctrl+V / Cmd+V</kbd>)
+                                    </div>
+                                </div>
+                            )}
+                        </label>
+
+                        {/* Grille des photos de l'incident en cours */}
+                        {photos.length > 0 && (
+                            <div className="todo-photo-grid" style={{ marginTop: '12px' }}>
+                                {photos.map((p, idx) => (
+                                    <div key={p.id || idx} className="todo-photo-card">
+                                        <img
+                                            src={p.url}
+                                            alt={p.nom}
+                                            className="todo-photo-card-img"
+                                            onClick={() => setLightboxData({
+                                                isOpen: true,
+                                                photos: photos,
+                                                initialIndex: idx,
+                                                taskTitle: `Incident: @${getComptePseudo(compteId)} (${type})`
+                                            })}
+                                            title="Cliquer pour agrandir"
+                                        />
+                                        <div className="todo-photo-card-info">
+                                            <span className="todo-photo-card-name" title={p.nom}>
+                                                {p.nom}
+                                            </span>
+                                            <div className="todo-photo-card-actions">
+                                                <button
+                                                    type="button"
+                                                    className="todo-photo-card-btn"
+                                                    style={{ color: '#09b1ba' }}
+                                                    onClick={() => setLightboxData({
+                                                        isOpen: true,
+                                                        photos: photos,
+                                                        initialIndex: idx,
+                                                        taskTitle: `Incident: @${getComptePseudo(compteId)} (${type})`
+                                                    })}
+                                                    title="Visualiser en grand"
+                                                >
+                                                    <i className="fa-solid fa-eye"></i>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="todo-photo-card-btn"
+                                                    style={{ color: '#10b981' }}
+                                                    onClick={() => handleDownloadPhoto(p)}
+                                                    title="Télécharger"
+                                                >
+                                                    <i className="fa-solid fa-download"></i>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="todo-photo-card-btn"
+                                                    style={{ color: '#ef4444' }}
+                                                    onClick={() => handleRemovePhoto(idx)}
+                                                    title="Supprimer cette capture"
+                                                >
+                                                    <i className="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* SECTION CONDITIONNELLE ANNONCES MASQUÉES */}
@@ -1527,9 +1746,11 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                                 <th>Date & Heure</th>
                                 <th>Compte</th>
                                 <th>Type</th>
+                                <th>Preuves & Photos</th>
                                 <th>Pubs 24h Précédentes</th>
                                 <th>Détail Ventes / Annonces</th>
                                 <th>Cause Suspectée / Activités</th>
+                                <th>Déclaré Par</th>
                                 <th style={{ width: '110px', textAlign: 'center' }}>Actions</th>
                             </tr>
                         </thead>
@@ -1552,12 +1773,87 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                                             <td><b>{inc.dateBlocage}</b> {inc.heureBlocage}</td>
                                             <td><span className="badge badge-compte">{getComptePseudo(inc.compteId)}</span></td>
                                             <td><span className={`badge ${badgeClass}`}>{inc.type}</span></td>
+                                            <td>
+                                                {Array.isArray(inc.photos) && inc.photos.length > 0 ? (
+                                                    <div className="todo-photos-strip" style={{ marginTop: 0 }}>
+                                                        {inc.photos.slice(0, 3).map((p, pIdx) => (
+                                                            <div
+                                                                key={p.id || pIdx}
+                                                                className="todo-photo-thumb-wrapper"
+                                                                onClick={() => setLightboxData({
+                                                                    isOpen: true,
+                                                                    photos: inc.photos,
+                                                                    initialIndex: pIdx,
+                                                                    taskTitle: `Incident: @${getComptePseudo(inc.compteId)} (${inc.type})`
+                                                                })}
+                                                                title={`${p.nom || 'Preuve'} - Cliquer pour agrandir`}
+                                                                style={{ width: '36px', height: '36px' }}
+                                                            >
+                                                                <img src={p.url} alt={p.nom || 'Photo'} className="todo-photo-thumb" />
+                                                                <div className="todo-photo-thumb-overlay">
+                                                                    <i className="fa-solid fa-eye" style={{ fontSize: '11px' }}></i>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {inc.photos.length > 3 && (
+                                                            <div
+                                                                className="todo-photo-thumb-wrapper"
+                                                                onClick={() => setLightboxData({
+                                                                    isOpen: true,
+                                                                    photos: inc.photos,
+                                                                    initialIndex: 3,
+                                                                    taskTitle: `Incident: @${getComptePseudo(inc.compteId)} (${inc.type})`
+                                                                })}
+                                                                title={`+${inc.photos.length - 3} autre(s) capture(s)`}
+                                                                style={{
+                                                                    width: '36px',
+                                                                    height: '36px',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    background: '#e2e8f0',
+                                                                    color: '#334155',
+                                                                    fontWeight: 700,
+                                                                    fontSize: '11px'
+                                                                }}
+                                                            >
+                                                                +{inc.photos.length - 3}
+                                                            </div>
+                                                        )}
+                                                        <span
+                                                            className="todo-photos-badge"
+                                                            onClick={() => setLightboxData({
+                                                                isOpen: true,
+                                                                photos: inc.photos,
+                                                                initialIndex: 0,
+                                                                taskTitle: `Incident: @${getComptePseudo(inc.compteId)} (${inc.type})`
+                                                            })}
+                                                            title="Voir toutes les captures"
+                                                            style={{ fontSize: '10.5px', padding: '2px 7px' }}
+                                                        >
+                                                            <i className="fa-solid fa-camera"></i> {inc.photos.length}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>Aucune</span>
+                                                )}
+                                            </td>
                                             <td><b>{inc.nbPubs24h}</b> pubs</td>
                                             <td>{detailsCol}</td>
                                             <td>
                                                 {inc.notesActivites ? (
                                                     <span style={{ fontSize: '12px', color: '#334155', fontWeight: 500 }}>
                                                         📝 {inc.notesActivites}
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>-</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {inc.declarePar ? (
+                                                    <span className="badge badge-secondary" style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                        <i className="fa-solid fa-user" style={{ fontSize: '10px' }}></i>
+                                                        {inc.declarePar}
                                                     </span>
                                                 ) : (
                                                     <span style={{ fontSize: '11px', color: '#94a3b8' }}>-</span>
@@ -1594,7 +1890,7 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                                 })
                             ) : (
                                  <tr>
-                                    <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="10" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                                         Aucun incident enregistré.
                                     </td>
                                 </tr>
@@ -1603,6 +1899,15 @@ function IncidentsView({ appState, onSaveIncident, onBulkDeleteIncidents }) {
                     </table>
                 </div>
             </div>
+
+            {/* LIGHTBOX POUR VOIR ET TÉLÉCHARGER LES PREUVES DE L'INCIDENT */}
+            <TodoPhotoLightboxModal
+                isOpen={lightboxData.isOpen}
+                onClose={() => setLightboxData(prev => ({ ...prev, isOpen: false }))}
+                photos={lightboxData.photos}
+                initialIndex={lightboxData.initialIndex}
+                taskTitle={lightboxData.taskTitle}
+            />
         </section>
     );
 }

@@ -1193,7 +1193,7 @@ app.get('/api/incidents', async (req, res) => {
 
 app.post('/api/incidents', async (req, res) => {
     try {
-        const { compteId, type, dateHeure, organisationId, nbAnnoncesMasquees, skuAnnoncesMasquees, notesActivites } = req.body;
+        const { compteId, type, dateHeure, organisationId, nbAnnoncesMasquees, skuAnnoncesMasquees, notesActivites, photos, declarePar, declareParRole } = req.body;
         const orgId = organisationId || 'org_default';
         if (!compteId || !dateHeure) return res.status(400).json({ error: "Compte et Date/Heure requis" });
 
@@ -1215,7 +1215,7 @@ app.post('/api/incidents', async (req, res) => {
         const heuresPubs24h = pubs24h.map(p => p.heurePrevue);
 
         const id = "inc_" + Date.now();
-        await dbService.createIncident({
+        const incidentObj = {
             id,
             organisationId: orgId,
             compteId,
@@ -1228,15 +1228,23 @@ app.post('/api/incidents', async (req, res) => {
             detailVentes: ventes24h,
             nbAnnoncesMasquees: parseInt(nbAnnoncesMasquees) || 0,
             skuAnnoncesMasquees: skuAnnoncesMasquees || '',
-            notesActivites: notesActivites || ''
-        });
+            notesActivites: notesActivites || '',
+            photos: Array.isArray(photos) ? photos : [],
+            declarePar: declarePar || 'Agent',
+            declareParRole: declareParRole || 'agent',
+            dateCreation: new Date().toISOString()
+        };
+
+        await dbService.createIncident(incidentObj);
 
         // Mise à jour du statut du compte
         const nouveauStatut = (type === 'Ban définitif') ? 'Banni' : 'Limité';
         await dbService.updateCompte(compteId, { statut: nouveauStatut });
 
-        await dbService.logAction("Incident", `Incident ${type} enregistré pour le compte ${compte.pseudo}`, "Succès", orgId);
-        res.json({ success: true, id, nouveauStatut });
+        const authorInfo = declarePar ? ` par ${declarePar}` : '';
+        const photoInfo = incidentObj.photos.length > 0 ? ` [${incidentObj.photos.length} photo(s)]` : '';
+        await dbService.logAction("Incident", `🚨 Alerte Cadres & Admins : Incident "${type}" sur @${compte.pseudo}${authorInfo}.${photoInfo}`, "Urgent", orgId);
+        res.json({ success: true, id, nouveauStatut, incident: incidentObj });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1245,7 +1253,7 @@ app.post('/api/incidents', async (req, res) => {
 app.put('/api/incidents/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { compteId, type, dateHeure, nbAnnoncesMasquees, skuAnnoncesMasquees, notesActivites } = req.body;
+        const { compteId, type, dateHeure, nbAnnoncesMasquees, skuAnnoncesMasquees, notesActivites, photos } = req.body;
         const updates = {};
         if (compteId) updates.compteId = compteId;
         if (type) updates.type = type;
@@ -1257,6 +1265,7 @@ app.put('/api/incidents/:id', async (req, res) => {
         if (nbAnnoncesMasquees !== undefined) updates.nbAnnoncesMasquees = parseInt(nbAnnoncesMasquees) || 0;
         if (skuAnnoncesMasquees !== undefined) updates.skuAnnoncesMasquees = skuAnnoncesMasquees;
         if (notesActivites !== undefined) updates.notesActivites = notesActivites;
+        if (photos !== undefined) updates.photos = Array.isArray(photos) ? photos : [];
 
         await dbService.updateIncident(id, updates);
         res.json({ success: true, id });
