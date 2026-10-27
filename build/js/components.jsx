@@ -19,7 +19,8 @@ var PermissionManager = {
         { key: 'utilisateurs', label: 'Utilisateurs & Membres', icon: 'fa-users-gear', desc: 'Gestion des comptes et droits d\'accès' },
         { key: 'corbeille', label: 'Corbeille & Restauration', icon: 'fa-trash-can', desc: 'Éléments supprimés et restauration' },
         { key: 'parametres', label: 'Paramètres Système', icon: 'fa-sliders', desc: 'Configuration des scores et créneaux' },
-        { key: 'journal', label: 'Journal d\'Audit', icon: 'fa-clock-rotate-left', desc: 'Historique des actions système' }
+        { key: 'journal', label: 'Journal d\'Audit', icon: 'fa-clock-rotate-left', desc: 'Historique des actions système' },
+        { key: 'stock', label: 'Gestion des Stocks', icon: 'fa-boxes-stacked', desc: 'Gestion des inventaires, tailles, SKU et emplacements' }
     ],
 
     ACTIONS: [
@@ -28,6 +29,7 @@ var PermissionManager = {
         { key: 'comptes_delete', label: 'Supprimer des comptes Vinted', icon: 'fa-trash', desc: 'Supprimer ou archiver des comptes' },
         { key: 'todos_manage', label: 'Gérer la To-Do List', icon: 'fa-list-check', desc: 'Créer, réassigner et modifier les tâches' },
         { key: 'incidents_manage', label: 'Gérer les incidents', icon: 'fa-circle-exclamation', desc: 'Déclarer et clôturer des litiges' },
+        { key: 'stock_manage', label: 'Gérer les stocks', icon: 'fa-boxes-packing', desc: 'Ajouter, éditer et supprimer des articles en stock' },
         { key: 'sync_dotb', label: 'Synchronisation DotB Cloud', icon: 'fa-arrows-rotate', desc: 'Actualisation en direct depuis DotB' },
         { key: 'export_data', label: 'Exporter la base (JSON)', icon: 'fa-download', desc: 'Télécharger les sauvegardes complètes' },
         { key: 'import_data', label: 'Importer / Restaurer (JSON)', icon: 'fa-file-import', desc: 'Restaurer une sauvegarde JSON' }
@@ -36,27 +38,27 @@ var PermissionManager = {
     PRESETS: {
         admin: {
             comptes: true, todos: true, classement: true, gagnants: true, incidents: true, messagerie: true,
-            organisations: true, utilisateurs: true, corbeille: true, parametres: true, journal: true,
+            organisations: true, utilisateurs: true, corbeille: true, parametres: true, journal: true, stock: true,
             comptes_create: true, comptes_edit: true, comptes_delete: true, todos_manage: true,
-            incidents_manage: true, sync_dotb: true, export_data: true, import_data: true
+            incidents_manage: true, stock_manage: true, sync_dotb: true, export_data: true, import_data: true
         },
         cadre: {
             comptes: true, todos: true, classement: true, gagnants: true, incidents: true, messagerie: true,
-            organisations: false, utilisateurs: true, corbeille: true, parametres: true, journal: true,
+            organisations: false, utilisateurs: true, corbeille: true, parametres: true, journal: true, stock: true,
             comptes_create: true, comptes_edit: true, comptes_delete: true, todos_manage: true,
-            incidents_manage: true, sync_dotb: false, export_data: true, import_data: false
+            incidents_manage: true, stock_manage: true, sync_dotb: false, export_data: true, import_data: false
         },
         agent: {
             comptes: true, todos: true, classement: true, gagnants: true, incidents: true, messagerie: true,
-            organisations: false, utilisateurs: false, corbeille: false, parametres: false, journal: false,
+            organisations: false, utilisateurs: false, corbeille: false, parametres: false, journal: false, stock: true,
             comptes_create: false, comptes_edit: false, comptes_delete: false, todos_manage: true,
-            incidents_manage: true, sync_dotb: false, export_data: false, import_data: false
+            incidents_manage: true, stock_manage: true, sync_dotb: false, export_data: false, import_data: false
         },
         read_only: {
             comptes: true, todos: true, classement: true, gagnants: true, incidents: true, messagerie: true,
-            organisations: false, utilisateurs: false, corbeille: false, parametres: false, journal: false,
+            organisations: false, utilisateurs: false, corbeille: false, parametres: false, journal: false, stock: true,
             comptes_create: false, comptes_edit: false, comptes_delete: false, todos_manage: false,
-            incidents_manage: false, sync_dotb: false, export_data: false, import_data: false
+            incidents_manage: false, stock_manage: false, sync_dotb: false, export_data: false, import_data: false
         }
     },
 
@@ -404,6 +406,12 @@ function Sidebar({ currentUser, currentOrgId, organisations, activeView, onSelec
                                 {todoUrgentCount}
                             </span>
                         )}
+                    </button>
+                )}
+
+                {canAccess('stock') && (
+                    <button className={`nav-btn ${activeView === 'stock' ? 'active' : ''}`} onClick={() => onSelectView('stock')} id="nav-btn-stock">
+                        <i className="fa-solid fa-boxes-stacked"></i> Stock & Inventaire
                     </button>
                 )}
 
@@ -1312,6 +1320,1207 @@ function getLocalDateString(d = new Date()) {
 // ------------------- VIEW: PLANNING GENERATION (SUPPRIMÉ) -------------------
 function PlanningView() {
     return null;
+}
+
+// ============================================================
+// ------------------- VIEW: GESTION DES STOCKS -------------------
+// ============================================================
+function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveStockItem, onDeleteStockItem, onSyncGoogleStock }) {
+    const DEFAULT_TABS = useMemo(() => [
+        { key: 'tops', name: 'TOPS', icon: 'fa-shirt', color: '#3b82f6' },
+        { key: 'bas', name: 'BAS', icon: 'fa-socks', color: '#10b981' },
+        { key: 'robes', name: 'ROBES + ENSEMBLES', icon: 'fa-person-dress', color: '#ec4899' },
+        { key: 'maillots', name: 'MAILLOTS', icon: 'fa-person-swimming', color: '#06b6d4' },
+        { key: 'divers', name: 'DIVERS', icon: 'fa-box-open', color: '#8b5cf6' },
+        { key: 'bijoux', name: 'BIJOUX', icon: 'fa-gem', color: '#f59e0b' },
+        { key: 'chaussures', name: 'CHAUSSURES', icon: 'fa-shoe-prints', color: '#ef4444' },
+        { key: 'sacs', name: 'SACS', icon: 'fa-bag-shopping', color: '#14b8a6' }
+    ], []);
+
+    const [activeTab, setActiveTab] = useState('tops');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterLocation, setFilterLocation] = useState('all');
+    const [filterStockStatus, setFilterStockStatus] = useState('all');
+
+    const [items, setItems] = useState([]);
+    const [savingRowId, setSavingRowId] = useState(null);
+    const [savedFeedbackId, setSavedFeedbackId] = useState(null);
+    const [isSavingTab, setIsSavingTab] = useState(false);
+    const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
+
+    // Modal Nouvel Article
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalData, setModalData] = useState({
+        sku: '',
+        photo: '',
+        tailleS: '',
+        tailleM: '',
+        tailleL: '',
+        tailleXL: '',
+        tailleUnique: '',
+        taille: '38',
+        qte: 1,
+        localisation: '',
+        notes: ''
+    });
+
+    // Lightbox
+    const [lightboxData, setLightboxData] = useState({ isOpen: false, photos: [], initialIndex: 0, taskTitle: '' });
+
+    const isChaussures = activeTab === 'chaussures';
+    const currentTabDef = DEFAULT_TABS.find(t => t.key === activeTab) || DEFAULT_TABS[0];
+
+    // Synchronisation locale avec appState.stock
+    useEffect(() => {
+        const stockData = appState.stock || {};
+        const tabData = stockData[activeTab];
+        if (tabData && Array.isArray(tabData.items)) {
+            setItems(tabData.items);
+        } else {
+            setItems([]);
+        }
+    }, [appState.stock, activeTab]);
+
+    // Calcul de quantité totale pour un article
+    const getItemTotalQty = useCallback((item) => {
+        if (!item) return 0;
+        if (activeTab === 'chaussures') {
+            const q = parseInt(item.qte);
+            return isNaN(q) ? 0 : q;
+        }
+        const s = parseInt(item.tailleS) || 0;
+        const m = parseInt(item.tailleM) || 0;
+        const l = parseInt(item.tailleL) || 0;
+        const xl = parseInt(item.tailleXL) || 0;
+        const u = parseInt(item.tailleUnique) || 0;
+        return s + m + l + xl + u;
+    }, [activeTab]);
+
+    // Emplacements uniques dans l'onglet
+    const availableLocations = useMemo(() => {
+        const locs = new Set();
+        items.forEach(it => {
+            if (it.localisation && it.localisation.trim()) {
+                locs.add(it.localisation.trim().toUpperCase());
+            }
+        });
+        return Array.from(locs).sort();
+    }, [items]);
+
+    // Articles filtrés
+    const filteredItems = useMemo(() => {
+        return items.filter(it => {
+            // Recherche texte
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                const matchSku = (it.sku || '').toLowerCase().includes(q);
+                const matchLoc = (it.localisation || '').toLowerCase().includes(q);
+                const matchNotes = (it.notes || '').toLowerCase().includes(q);
+                const matchPhotoDesc = (it.photo || '').toLowerCase().includes(q);
+                if (!matchSku && !matchLoc && !matchNotes && !matchPhotoDesc) return false;
+            }
+
+            // Filtre Emplacement
+            if (filterLocation !== 'all') {
+                const itemLoc = (it.localisation || '').trim().toUpperCase();
+                if (filterLocation === 'NO_LOC') {
+                    if (itemLoc) return false;
+                } else if (itemLoc !== filterLocation) {
+                    return false;
+                }
+            }
+
+            // Filtre Statut Stock
+            const totalQty = getItemTotalQty(it);
+            if (filterStockStatus === 'in_stock' && totalQty <= 0) return false;
+            if (filterStockStatus === 'out_of_stock' && totalQty > 0) return false;
+
+            return true;
+        });
+    }, [items, searchQuery, filterLocation, filterStockStatus, getItemTotalQty]);
+
+    // KPIs calculés
+    const stats = useMemo(() => {
+        const totalRefs = items.length;
+        let totalUnits = 0;
+        let outOfStock = 0;
+        items.forEach(it => {
+            const qty = getItemTotalQty(it);
+            totalUnits += qty;
+            if (qty <= 0) outOfStock++;
+        });
+        return {
+            totalRefs,
+            totalUnits,
+            locationsCount: availableLocations.length,
+            outOfStock
+        };
+    }, [items, getItemTotalQty, availableLocations]);
+
+    // Modification d'une cellule en direct
+    const handleCellChange = (rowId, field, value) => {
+        setItems(prev => prev.map(item => {
+            if (item.id === rowId) {
+                return { ...item, [field]: value, isDirty: true };
+            }
+            return item;
+        }));
+    };
+
+    // Sauvegarde directe de la ligne (déclenchée au Blur ou clic sur Check)
+    const handleSaveRowDirect = async (item) => {
+        if (!item || !onSaveStockItem) return;
+        setSavingRowId(item.id);
+        try {
+            await onSaveStockItem(activeTab, item);
+            setSavedFeedbackId(item.id);
+            setItems(prev => prev.map(it => it.id === item.id ? { ...it, isDirty: false } : it));
+            setTimeout(() => setSavedFeedbackId(null), 2000);
+            if (typeof SoundEngine !== 'undefined' && SoundEngine.playCheck) {
+                SoundEngine.playCheck();
+            }
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de l'enregistrement de l'article", true);
+        } finally {
+            setSavingRowId(null);
+        }
+    };
+
+    // Sauvegarde globale de l'onglet actif
+    const handleSaveTab = async () => {
+        if (!onSaveStockTab) return;
+        setIsSavingTab(true);
+        try {
+            await onSaveStockTab(activeTab, items);
+            setItems(prev => prev.map(it => ({ ...it, isDirty: false })));
+            if (showToast) showToast(`💾 Onglet "${currentTabDef.name}" enregistré avec succès (${items.length} références) !`);
+            if (typeof SoundEngine !== 'undefined' && SoundEngine.playSuccess) {
+                SoundEngine.playSuccess();
+            }
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de la sauvegarde de l'onglet", true);
+        } finally {
+            setIsSavingTab(false);
+        }
+    };
+
+    // Ajout d'une ligne rapide directement dans le tableau
+    const handleAddQuickRow = () => {
+        const newId = `stock_${activeTab}_${Date.now()}`;
+        const newRow = isChaussures ? {
+            id: newId,
+            sku: '',
+            photo: '',
+            taille: '38',
+            qte: 1,
+            localisation: availableLocations[0] || 'LABO',
+            notes: '',
+            isNew: true,
+            isDirty: true
+        } : {
+            id: newId,
+            sku: '',
+            photo: '',
+            tailleS: '',
+            tailleM: '',
+            tailleL: '',
+            tailleXL: '',
+            tailleUnique: '',
+            localisation: availableLocations[0] || 'LABO',
+            notes: '',
+            isNew: true,
+            isDirty: true
+        };
+        setItems(prev => [newRow, ...prev]);
+        if (showToast) showToast("➕ Ligne ajoutée en haut du tableau. Remplissez les données et cliquez sur enregistrer !");
+    };
+
+    // Suppression d'un article
+    const handleDeleteRow = async (itemId) => {
+        if (!window.confirm("Voulez-vous vraiment supprimer cet article de l'inventaire ?")) return;
+        try {
+            setItems(prev => prev.filter(it => it.id !== itemId));
+            if (onDeleteStockItem) {
+                await onDeleteStockItem(activeTab, itemId);
+            }
+            if (showToast) showToast("Article supprimé de l'onglet");
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de la suppression de l'article", true);
+        }
+    };
+
+    // Synchronisation en direct depuis Google Sheet
+    const handleSyncGoogle = async () => {
+        if (!window.confirm("Voulez-vous synchroniser et actualiser les stocks directement depuis le Google Sheet source ?")) return;
+        setIsSyncingGoogle(true);
+        try {
+            if (onSyncGoogleStock) {
+                await onSyncGoogleStock();
+            }
+            if (showToast) showToast("✅ Stocks synchronisés en direct depuis le Google Sheet !");
+            if (typeof SoundEngine !== 'undefined' && SoundEngine.playSuccess) {
+                SoundEngine.playSuccess();
+            }
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de la synchronisation avec Google Sheet", true);
+        } finally {
+            setIsSyncingGoogle(false);
+        }
+    };
+
+    // Export CSV de l'onglet
+    const handleExportCSV = () => {
+        const isChaus = (activeTab === 'chaussures');
+        const headers = isChaus
+            ? ["SKU", "PHOTO", "TAILLE", "QTES", "LOCALISATION", "NOTES"]
+            : ["SKU", "PHOTO", "Taille S", "TAILLE M", "Taille L", "Taille XL", "TAILLE UNIQUE", "TOTAL", "LOCALISATION", "NOTES"];
+
+        const csvRows = [headers.join(",")];
+        items.forEach(it => {
+            const tot = getItemTotalQty(it);
+            const line = isChaus ? [
+                `"${(it.sku || '').replace(/"/g, '""')}"`,
+                `"${(it.photo || '').replace(/"/g, '""')}"`,
+                `"${(it.taille || '').replace(/"/g, '""')}"`,
+                `"${it.qte || 0}"`,
+                `"${(it.localisation || '').replace(/"/g, '""')}"`,
+                `"${(it.notes || '').replace(/"/g, '""')}"`
+            ] : [
+                `"${(it.sku || '').replace(/"/g, '""')}"`,
+                `"${(it.photo || '').replace(/"/g, '""')}"`,
+                `"${it.tailleS || ''}"`,
+                `"${it.tailleM || ''}"`,
+                `"${it.tailleL || ''}"`,
+                `"${it.tailleXL || ''}"`,
+                `"${it.tailleUnique || ''}"`,
+                `"${tot}"`,
+                `"${(it.localisation || '').replace(/"/g, '""')}"`,
+                `"${(it.notes || '').replace(/"/g, '""')}"`
+            ];
+            csvRows.push(line.join(","));
+        });
+
+        const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `stock_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // Modal Submit
+    const handleModalSubmit = async (e) => {
+        e.preventDefault();
+        if (!modalData.sku.trim() && !modalData.localisation.trim()) {
+            if (showToast) showToast("Veuillez renseigner au moins le SKU ou la localisation", true);
+            return;
+        }
+
+        const newId = `stock_${activeTab}_${Date.now()}`;
+        const itemObj = {
+            id: newId,
+            ...modalData,
+            isNew: true
+        };
+
+        try {
+            await onSaveStockItem(activeTab, itemObj);
+            setItems(prev => [itemObj, ...prev]);
+            setIsModalOpen(false);
+            setModalData({
+                sku: '',
+                photo: '',
+                tailleS: '',
+                tailleM: '',
+                tailleL: '',
+                tailleXL: '',
+                tailleUnique: '',
+                taille: '38',
+                qte: 1,
+                localisation: '',
+                notes: ''
+            });
+            if (showToast) showToast("✅ Nouvel article ajouté et enregistré au stock !");
+            if (typeof SoundEngine !== 'undefined' && SoundEngine.playCheck) {
+                SoundEngine.playCheck();
+            }
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de l'enregistrement du nouvel article", true);
+        }
+    };
+
+    // Upload photo pour une ligne
+    const handleRowPhotoUpload = async (rowId, file) => {
+        if (!file || !file.type.startsWith('image/')) return;
+        try {
+            const utils = (typeof TodoUtils !== 'undefined' ? TodoUtils : window.TodoUtils);
+            let photoObj = null;
+            if (utils && utils.compressImageFile) {
+                photoObj = await utils.compressImageFile(file);
+            } else {
+                const reader = new FileReader();
+                photoObj = await new Promise(res => {
+                    reader.onload = e => res({ url: e.target.result, nom: file.name });
+                    reader.readAsDataURL(file);
+                });
+            }
+            const targetItem = items.find(it => it.id === rowId);
+            if (targetItem) {
+                const updated = { ...targetItem, photo: photoObj.url };
+                handleCellChange(rowId, 'photo', photoObj.url);
+                await onSaveStockItem(activeTab, updated);
+                if (showToast) showToast("📷 Photo de l'article enregistrée en direct !");
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    // Badge couleur pour localisation
+    const getLocationBadgeStyle = (loc) => {
+        if (!loc) return { background: '#f1f5f9', color: '#64748b' };
+        const l = loc.trim().toUpperCase();
+        if (l.startsWith('B1')) return { background: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
+        if (l.startsWith('B2')) return { background: '#cffafe', color: '#155e75', border: '1px solid #a5f3fc' };
+        if (l.startsWith('B3')) return { background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' };
+        if (l.includes('LABO')) return { background: '#ede9fe', color: '#5b21b6', border: '1px solid #ddd6fe' };
+        if (l.includes('IKEA')) return { background: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' };
+        return { background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' };
+    };
+
+    return (
+        <section className="view" style={{ maxWidth: '100%', paddingBottom: '60px' }}>
+            {/* EN-TÊTE PRINCIPAL */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                <div>
+                    <h2 className="page-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <i className="fa-solid fa-boxes-stacked" style={{ color: 'var(--primary-color)' }}></i>
+                        Gestion des Stocks & Inventaire Multi-Onglets
+                    </h2>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+                        Suivi en direct des références SKU, tailles, quantités et emplacements avec enregistrement direct sur chaque onglet
+                    </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleSyncGoogle}
+                        disabled={isSyncingGoogle}
+                        title="Synchroniser avec le Google Sheet source"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        {isSyncingGoogle ? (
+                            <>
+                                <CircularIconLoader size={16} pulse={false} showOuterRing={false} />
+                                <span>Sync Google...</span>
+                            </>
+                        ) : (
+                            <>
+                                <i className="fa-solid fa-arrows-rotate" style={{ color: '#09b1ba' }}></i>
+                                <span>Sync Google Sheet</span>
+                            </>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleExportCSV}
+                        title="Exporter les données de cet onglet en CSV"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        <i className="fa-solid fa-download"></i>
+                        <span>Exporter CSV</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleAddQuickRow}
+                        title="Ajouter une ligne vide en haut du tableau pour saisie rapide"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        <i className="fa-solid fa-plus" style={{ color: '#10b981' }}></i>
+                        <span>+ Ligne Rapide</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setIsModalOpen(true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        <i className="fa-solid fa-box-open"></i>
+                        <span>Nouvel Article</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn btn-success btn-sm"
+                        onClick={handleSaveTab}
+                        disabled={isSavingTab}
+                        style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+                        title="Enregistrer toutes les modifications de cet onglet"
+                    >
+                        <i className="fa-solid fa-floppy-disk"></i>
+                        <span>{isSavingTab ? 'Sauvegarde...' : 'Enregistrer Onglet'}</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* BARRE D'ONGLETS (TABS) INTERACTIFS */}
+            <div style={{
+                display: 'flex',
+                gap: '8px',
+                overflowX: 'auto',
+                paddingBottom: '8px',
+                marginBottom: '16px',
+                borderBottom: '2px solid #e2e8f0',
+                scrollbarWidth: 'thin'
+            }}>
+                {DEFAULT_TABS.map(tab => {
+                    const isActive = tab.key === activeTab;
+                    const tabData = (appState.stock && appState.stock[tab.key]) || {};
+                    const tabItems = tabData.items || [];
+                    const itemCount = tabItems.length;
+
+                    return (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => {
+                                setActiveTab(tab.key);
+                                setFilterLocation('all');
+                                setSearchQuery('');
+                            }}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 16px',
+                                borderRadius: '10px 10px 0 0',
+                                border: 'none',
+                                borderBottom: isActive ? '3px solid var(--primary-color)' : '3px solid transparent',
+                                backgroundColor: isActive ? '#ffffff' : 'rgba(241, 245, 249, 0.7)',
+                                color: isActive ? 'var(--primary-color)' : '#64748b',
+                                fontWeight: isActive ? 700 : 500,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                transition: 'all 0.15s ease',
+                                boxShadow: isActive ? '0 -2px 8px rgba(0,0,0,0.04)' : 'none'
+                            }}
+                        >
+                            <i className={`fa-solid ${tab.icon}`} style={{ color: isActive ? tab.color : '#94a3b8' }}></i>
+                            <span>{tab.name}</span>
+                            <span style={{
+                                backgroundColor: isActive ? 'var(--primary-color)' : '#cbd5e1',
+                                color: '#ffffff',
+                                fontSize: '11px',
+                                padding: '1px 7px',
+                                borderRadius: '12px',
+                                fontWeight: 700
+                            }}>
+                                {itemCount}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* CARTES STATISTIQUES / KPIS DE L'ONGLET ACTIF */}
+            <div className="grid-4" style={{ marginBottom: '18px' }}>
+                <div className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', borderLeft: `4px solid ${currentTabDef.color}` }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(9, 177, 186, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-color)', fontSize: '18px' }}>
+                        <i className={`fa-solid ${currentTabDef.icon}`}></i>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                            Références {currentTabDef.name}
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b' }}>
+                            {stats.totalRefs} <span style={{ fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>modèles</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', borderLeft: '4px solid #10b981' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', fontSize: '18px' }}>
+                        <i className="fa-solid fa-cubes-stacked"></i>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                            Total Pièces en Stock
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 800, color: '#10b981' }}>
+                            {stats.totalUnits} <span style={{ fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>unités</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', borderLeft: '4px solid #8b5cf6' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6', fontSize: '18px' }}>
+                        <i className="fa-solid fa-location-dot"></i>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                            Emplacements Actifs
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b' }}>
+                            {stats.locationsCount} <span style={{ fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>lieux ({availableLocations.slice(0, 3).join(', ')}{availableLocations.length > 3 ? '...' : ''})</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', borderLeft: `4px solid ${stats.outOfStock > 0 ? '#ef4444' : '#64748b'}` }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: stats.outOfStock > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(100, 116, 139, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: stats.outOfStock > 0 ? '#ef4444' : '#64748b', fontSize: '18px' }}>
+                        <i className="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                            Ruptures / Stock 0
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 800, color: stats.outOfStock > 0 ? '#ef4444' : '#1e293b' }}>
+                            {stats.outOfStock} <span style={{ fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>références</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* BARRE DE RECHERCHE ET FILTRES */}
+            <div className="card" style={{ padding: '12px 18px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 300px' }}>
+                        <div style={{ position: 'relative', width: '100%' }}>
+                            <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}></i>
+                            <input
+                                type="text"
+                                className="input"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Rechercher par SKU, localisation, note, description..."
+                                style={{ paddingLeft: '34px', fontSize: '13px' }}
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                                >
+                                    <i className="fa-solid fa-xmark"></i>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', margin: 0 }}>📍 Emplacement :</label>
+                            <select
+                                value={filterLocation}
+                                onChange={(e) => setFilterLocation(e.target.value)}
+                                style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '12.5px', border: '1px solid #cbd5e1' }}
+                            >
+                                <option value="all">Tous ({items.length})</option>
+                                {availableLocations.map(loc => (
+                                    <option key={loc} value={loc}>{loc}</option>
+                                ))}
+                                <option value="NO_LOC">Sans emplacement</option>
+                            </select>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', margin: 0 }}>📦 Statut :</label>
+                            <select
+                                value={filterStockStatus}
+                                onChange={(e) => setFilterStockStatus(e.target.value)}
+                                style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '12.5px', border: '1px solid #cbd5e1' }}
+                            >
+                                <option value="all">Tous</option>
+                                <option value="in_stock">En stock (> 0)</option>
+                                <option value="out_of_stock">Rupture (0)</option>
+                            </select>
+                        </div>
+
+                        <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>
+                            Affichage : <b>{filteredItems.length}</b> / {items.length}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* TABLEAU INTERACTIF AVEC ENREGISTREMENT DIRECT */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{
+                    padding: '12px 18px',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: '#f8fafc',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '14px', color: '#1e293b' }}>
+                            Inventaire : {currentTabDef.name}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                            <i className="fa-solid fa-circle-check"></i> Enregistrement direct actif
+                        </span>
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                        💡 Modifiez une cellule et quittez le champ pour enregistrer automatiquement la ligne
+                    </div>
+                </div>
+
+                <div className="table-container" style={{ maxHeight: '680px', overflowY: 'auto' }}>
+                    <table style={{ minWidth: '1050px', borderCollapse: 'collapse' }}>
+                        <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                            <tr>
+                                <th style={{ width: '40px', textAlign: 'center' }}>#</th>
+                                <th style={{ minWidth: '220px' }}>SKU / Code Article (MM)</th>
+                                <th style={{ width: '85px', textAlign: 'center' }}>Photo</th>
+                                {isChaussures ? (
+                                    <>
+                                        <th style={{ width: '100px', textAlign: 'center' }}>Pointure</th>
+                                        <th style={{ width: '100px', textAlign: 'center' }}>Quantité</th>
+                                    </>
+                                ) : (
+                                    <>
+                                        <th style={{ width: '85px', textAlign: 'center' }}>Taille S</th>
+                                        <th style={{ width: '85px', textAlign: 'center' }}>Taille M</th>
+                                        <th style={{ width: '85px', textAlign: 'center' }}>Taille L</th>
+                                        <th style={{ width: '85px', textAlign: 'center' }}>Taille XL</th>
+                                        <th style={{ width: '95px', textAlign: 'center' }}>Taille Unique</th>
+                                    </>
+                                )}
+                                <th style={{ width: '85px', textAlign: 'center' }}>Total</th>
+                                <th style={{ width: '160px' }}>Localisation</th>
+                                <th>Notes & Observations</th>
+                                <th style={{ width: '90px', textAlign: 'center' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredItems.length > 0 ? (
+                                filteredItems.map((item, idx) => {
+                                    const totalQty = getItemTotalQty(item);
+                                    const isSavingThis = savingRowId === item.id;
+                                    const isSavedFeedback = savedFeedbackId === item.id;
+                                    const hasPhoto = !!item.photo;
+                                    const locBadge = getLocationBadgeStyle(item.localisation);
+
+                                    return (
+                                        <tr
+                                            key={item.id || idx}
+                                            style={{
+                                                backgroundColor: item.isDirty ? 'rgba(254, 240, 138, 0.15)' : (isSavedFeedback ? 'rgba(16, 185, 129, 0.1)' : 'transparent'),
+                                                transition: 'background-color 0.3s ease'
+                                            }}
+                                        >
+                                            {/* Index & Feedback */}
+                                            <td style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8' }}>
+                                                {isSavingThis ? (
+                                                    <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--primary-color)' }}></i>
+                                                ) : (isSavedFeedback ? (
+                                                    <i className="fa-solid fa-check" style={{ color: '#10b981', fontWeight: 800 }}></i>
+                                                ) : (
+                                                    idx + 1
+                                                ))}
+                                            </td>
+
+                                            {/* SKU */}
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={item.sku || ''}
+                                                        onChange={(e) => handleCellChange(item.id, 'sku', e.target.value)}
+                                                        onBlur={() => handleSaveRowDirect(item)}
+                                                        placeholder="ex: sz2508091..."
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '5px 8px',
+                                                            fontSize: '12px',
+                                                            borderRadius: '5px',
+                                                            border: '1px solid #cbd5e1',
+                                                            fontWeight: 600,
+                                                            color: '#0f172a',
+                                                            backgroundColor: '#ffffff'
+                                                        }}
+                                                    />
+                                                    {item.sku && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(item.sku);
+                                                                if (showToast) showToast(`📋 SKU copié : ${item.sku}`);
+                                                            }}
+                                                            title="Copier le SKU"
+                                                            style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', padding: '3px' }}
+                                                        >
+                                                            <i className="fa-regular fa-copy"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+
+                                            {/* PHOTO */}
+                                            <td style={{ textAlign: 'center' }}>
+                                                {hasPhoto ? (
+                                                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                        <img
+                                                            src={item.photo}
+                                                            alt="Photo"
+                                                            onClick={() => setLightboxData({
+                                                                isOpen: true,
+                                                                photos: [{ id: item.id, url: item.photo, nom: item.sku || 'Photo Article' }],
+                                                                initialIndex: 0,
+                                                                taskTitle: `Stock: ${item.sku || 'Article'} (${currentTabDef.name})`
+                                                            })}
+                                                            style={{
+                                                                width: '34px',
+                                                                height: '34px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: '6px',
+                                                                border: '1px solid #cbd5e1',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                            title="Cliquer pour agrandir la photo"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <label style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', padding: '4px 6px', color: '#94a3b8', borderRadius: '4px', background: '#f1f5f9' }} title="Ajouter une photo">
+                                                        <i className="fa-solid fa-camera" style={{ fontSize: '13px' }}></i>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            style={{ display: 'none' }}
+                                                            onChange={(e) => {
+                                                                if (e.target.files && e.target.files[0]) {
+                                                                    handleRowPhotoUpload(item.id, e.target.files[0]);
+                                                                }
+                                                                e.target.value = '';
+                                                            }}
+                                                        />
+                                                    </label>
+                                                )}
+                                            </td>
+
+                                            {/* TAILLES OU CHAUSSURES */}
+                                            {isChaussures ? (
+                                                <>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={item.taille || ''}
+                                                            onChange={(e) => handleCellChange(item.id, 'taille', e.target.value)}
+                                                            onBlur={() => handleSaveRowDirect(item)}
+                                                            placeholder="ex: 38"
+                                                            style={{ width: '60px', textAlign: 'center', padding: '4px', fontSize: '12px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                                                        />
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            value={item.qte !== undefined ? item.qte : ''}
+                                                            onChange={(e) => handleCellChange(item.id, 'qte', e.target.value)}
+                                                            onBlur={() => handleSaveRowDirect(item)}
+                                                            placeholder="0"
+                                                            style={{ width: '60px', textAlign: 'center', padding: '4px', fontSize: '12px', borderRadius: '4px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                                                        />
+                                                    </td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {/* Taille S */}
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={item.tailleS !== undefined ? item.tailleS : ''}
+                                                            onChange={(e) => handleCellChange(item.id, 'tailleS', e.target.value)}
+                                                            onBlur={() => handleSaveRowDirect(item)}
+                                                            placeholder="-"
+                                                            style={{
+                                                                width: '54px',
+                                                                textAlign: 'center',
+                                                                padding: '4px',
+                                                                fontSize: '12px',
+                                                                borderRadius: '4px',
+                                                                border: '1px solid #cbd5e1',
+                                                                backgroundColor: item.tailleS ? '#f0fdf4' : '#fff',
+                                                                fontWeight: item.tailleS ? 700 : 400
+                                                            }}
+                                                        />
+                                                    </td>
+
+                                                    {/* Taille M */}
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={item.tailleM !== undefined ? item.tailleM : ''}
+                                                            onChange={(e) => handleCellChange(item.id, 'tailleM', e.target.value)}
+                                                            onBlur={() => handleSaveRowDirect(item)}
+                                                            placeholder="-"
+                                                            style={{
+                                                                width: '54px',
+                                                                textAlign: 'center',
+                                                                padding: '4px',
+                                                                fontSize: '12px',
+                                                                borderRadius: '4px',
+                                                                border: '1px solid #cbd5e1',
+                                                                backgroundColor: item.tailleM ? '#f0fdf4' : '#fff',
+                                                                fontWeight: item.tailleM ? 700 : 400
+                                                            }}
+                                                        />
+                                                    </td>
+
+                                                    {/* Taille L */}
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={item.tailleL !== undefined ? item.tailleL : ''}
+                                                            onChange={(e) => handleCellChange(item.id, 'tailleL', e.target.value)}
+                                                            onBlur={() => handleSaveRowDirect(item)}
+                                                            placeholder="-"
+                                                            style={{
+                                                                width: '54px',
+                                                                textAlign: 'center',
+                                                                padding: '4px',
+                                                                fontSize: '12px',
+                                                                borderRadius: '4px',
+                                                                border: '1px solid #cbd5e1',
+                                                                backgroundColor: item.tailleL ? '#f0fdf4' : '#fff',
+                                                                fontWeight: item.tailleL ? 700 : 400
+                                                            }}
+                                                        />
+                                                    </td>
+
+                                                    {/* Taille XL */}
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={item.tailleXL !== undefined ? item.tailleXL : ''}
+                                                            onChange={(e) => handleCellChange(item.id, 'tailleXL', e.target.value)}
+                                                            onBlur={() => handleSaveRowDirect(item)}
+                                                            placeholder="-"
+                                                            style={{
+                                                                width: '54px',
+                                                                textAlign: 'center',
+                                                                padding: '4px',
+                                                                fontSize: '12px',
+                                                                borderRadius: '4px',
+                                                                border: '1px solid #cbd5e1',
+                                                                backgroundColor: item.tailleXL ? '#f0fdf4' : '#fff',
+                                                                fontWeight: item.tailleXL ? 700 : 400
+                                                            }}
+                                                        />
+                                                    </td>
+
+                                                    {/* Taille Unique */}
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={item.tailleUnique !== undefined ? item.tailleUnique : ''}
+                                                            onChange={(e) => handleCellChange(item.id, 'tailleUnique', e.target.value)}
+                                                            onBlur={() => handleSaveRowDirect(item)}
+                                                            placeholder="-"
+                                                            style={{
+                                                                width: '60px',
+                                                                textAlign: 'center',
+                                                                padding: '4px',
+                                                                fontSize: '12px',
+                                                                borderRadius: '4px',
+                                                                border: '1px solid #cbd5e1',
+                                                                backgroundColor: item.tailleUnique ? '#f0fdf4' : '#fff',
+                                                                fontWeight: item.tailleUnique ? 700 : 400
+                                                            }}
+                                                        />
+                                                    </td>
+                                                </>
+                                            )}
+
+                                            {/* Total Unités */}
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    minWidth: '28px',
+                                                    padding: '3px 7px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    fontWeight: 800,
+                                                    backgroundColor: totalQty > 0 ? '#dcfce7' : '#fee2e2',
+                                                    color: totalQty > 0 ? '#15803d' : '#b91c1c'
+                                                }}>
+                                                    {totalQty}
+                                                </span>
+                                            </td>
+
+                                            {/* Localisation */}
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={item.localisation || ''}
+                                                        onChange={(e) => handleCellChange(item.id, 'localisation', e.target.value)}
+                                                        onBlur={() => handleSaveRowDirect(item)}
+                                                        placeholder="LABO, B1, SAC..."
+                                                        list="stock-locations-datalist"
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '4px 8px',
+                                                            fontSize: '12px',
+                                                            borderRadius: '5px',
+                                                            border: '1px solid #cbd5e1',
+                                                            fontWeight: 600,
+                                                            ...locBadge
+                                                        }}
+                                                    />
+                                                </div>
+                                            </td>
+
+                                            {/* Notes / Observations */}
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    value={item.notes || ''}
+                                                    onChange={(e) => handleCellChange(item.id, 'notes', e.target.value)}
+                                                    onBlur={() => handleSaveRowDirect(item)}
+                                                    placeholder="Observations..."
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '4px 8px',
+                                                        fontSize: '12px',
+                                                        borderRadius: '5px',
+                                                        border: '1px solid #cbd5e1'
+                                                    }}
+                                                />
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td style={{ textAlign: 'center' }}>
+                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveRowDirect(item)}
+                                                        className="btn btn-sm btn-success"
+                                                        style={{ padding: '4px 8px', fontSize: '11px', backgroundColor: item.isDirty ? '#f59e0b' : '#10b981' }}
+                                                        title={item.isDirty ? "Enregistrer les modifications" : "Ligne à jour"}
+                                                    >
+                                                        <i className={`fa-solid ${item.isDirty ? 'fa-floppy-disk' : 'fa-check'}`}></i>
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteRow(item.id)}
+                                                        className="btn btn-sm btn-danger"
+                                                        style={{ padding: '4px 8px', fontSize: '11px' }}
+                                                        title="Supprimer cet article"
+                                                    >
+                                                        <i className="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                <tr>
+                                    <td colSpan={isChaussures ? 8 : 11} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                                        <i className="fa-solid fa-box-open" style={{ fontSize: '32px', marginBottom: '10px', display: 'block', color: '#cbd5e1' }}></i>
+                                        Aucun article trouvé dans l'onglet <b>{currentTabDef.name}</b> {searchQuery ? 'correspondant à la recherche' : ''}.
+                                        <div style={{ marginTop: '10px' }}>
+                                            <button type="button" className="btn btn-primary btn-sm" onClick={handleAddQuickRow}>
+                                                + Ajouter un premier article
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Datalist pour autocomplétion des emplacements */}
+                <datalist id="stock-locations-datalist">
+                    <option value="LABO" />
+                    <option value="B1" />
+                    <option value="B2" />
+                    <option value="B3" />
+                    <option value="SAC IKEA" />
+                </datalist>
+            </div>
+
+            {/* MODAL NOUVEL ARTICLE */}
+            {isModalOpen && (
+                <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+                        <div className="modal-header">
+                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className={`fa-solid ${currentTabDef.icon}`} style={{ color: currentTabDef.color }}></i>
+                                Ajouter un article dans "{currentTabDef.name}"
+                            </h3>
+                            <button type="button" className="modal-close-btn" onClick={() => setIsModalOpen(false)}>
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <form onSubmit={handleModalSubmit}>
+                            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div className="form-group">
+                                    <label>SKU / Référence Article (Code Shein / Vinted)</label>
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        value={modalData.sku}
+                                        onChange={(e) => setModalData(prev => ({ ...prev, sku: e.target.value }))}
+                                        placeholder="ex: sz25080912890297393"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Emplacement / Localisation</label>
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        value={modalData.localisation}
+                                        onChange={(e) => setModalData(prev => ({ ...prev, localisation: e.target.value }))}
+                                        placeholder="ex: LABO, B1, B2, B3, SAC IKEA..."
+                                        list="stock-locations-datalist"
+                                    />
+                                </div>
+
+                                {isChaussures ? (
+                                    <div className="grid-2">
+                                        <div className="form-group">
+                                            <label>Pointure</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={modalData.taille}
+                                                onChange={(e) => setModalData(prev => ({ ...prev, taille: e.target.value }))}
+                                                placeholder="ex: 38"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Quantité</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="input"
+                                                value={modalData.qte}
+                                                onChange={(e) => setModalData(prev => ({ ...prev, qte: parseInt(e.target.value) || 0 }))}
+                                                placeholder="1"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid-3">
+                                        <div className="form-group">
+                                            <label>Taille S</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={modalData.tailleS}
+                                                onChange={(e) => setModalData(prev => ({ ...prev, tailleS: e.target.value }))}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Taille M</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={modalData.tailleM}
+                                                onChange={(e) => setModalData(prev => ({ ...prev, tailleM: e.target.value }))}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Taille L</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={modalData.tailleL}
+                                                onChange={(e) => setModalData(prev => ({ ...prev, tailleL: e.target.value }))}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Taille XL</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={modalData.tailleXL}
+                                                onChange={(e) => setModalData(prev => ({ ...prev, tailleXL: e.target.value }))}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Taille Unique</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={modalData.tailleUnique}
+                                                onChange={(e) => setModalData(prev => ({ ...prev, tailleUnique: e.target.value }))}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="form-group">
+                                    <label>Notes & Observations</label>
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        value={modalData.notes}
+                                        onChange={(e) => setModalData(prev => ({ ...prev, notes: e.target.value }))}
+                                        placeholder="Observations particulières..."
+                                    />
+                                </div>
+                            </div>
+                            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
+                                    Annuler
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    <i className="fa-solid fa-plus" style={{ marginRight: '6px' }}></i>
+                                    Enregistrer l'article
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* LIGHTBOX MODAL */}
+            <TodoPhotoLightboxModal
+                isOpen={lightboxData.isOpen}
+                onClose={() => setLightboxData(prev => ({ ...prev, isOpen: false }))}
+                photos={lightboxData.photos}
+                initialIndex={lightboxData.initialIndex}
+                taskTitle={lightboxData.taskTitle}
+            />
+        </section>
+    );
 }
 
 // ------------------- VIEW: INCIDENTS -------------------
@@ -7980,6 +9189,7 @@ window.ReactComponents = {
     DashboardView,
     ComptesView,
     PlanningView,
+    StockView,
     IncidentsView,
     MessagerieView,
     ParametresView,

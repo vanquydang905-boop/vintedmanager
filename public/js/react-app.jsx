@@ -47,6 +47,7 @@ function App() {
         const viewTitles = {
             comptes: "Comptes Vinted",
             todos: "To-Do & Rappels",
+            stock: "Stock & Inventaire",
             classement: "Classement & Scores",
             gagnants: "Suggestions & Gagnants",
             incidents: "Journal des Incidents",
@@ -99,7 +100,8 @@ function App() {
         todos: [],
         incidents: [],
         journal: [],
-        corbeille: []
+        corbeille: [],
+        stock: {}
     });
 
     const showToast = useCallback((message, isError = false) => {
@@ -424,7 +426,53 @@ function App() {
         }
     };
 
+    const handleSaveStockTab = async (tabKey, items) => {
+        try {
+            await API.saveStockTab(tabKey, items, currentOrgId);
+            showToast(`Onglet ${tabKey} sauvegardé avec succès`);
+            await loadData();
+        } catch (err) {
+            console.error("Erreur saveStockTab:", err);
+            showToast("Erreur lors de la sauvegarde de l'onglet : " + (err.message || "Échec"), true);
+        }
+    };
 
+    const handleSaveStockItem = async (tabKey, itemData) => {
+        try {
+            await API.saveStockItem(tabKey, itemData, currentOrgId);
+            await loadData();
+        } catch (err) {
+            console.error("Erreur saveStockItem:", err);
+            showToast("Erreur lors de l'enregistrement de l'article", true);
+        }
+    };
+
+    const handleDeleteStockItem = async (tabKey, itemId) => {
+        try {
+            await API.deleteStockItem(tabKey, itemId, currentOrgId);
+            showToast("Article supprimé du stock");
+            await loadData();
+        } catch (err) {
+            console.error("Erreur handleDeleteStockItem:", err);
+            showToast("Erreur lors de la suppression de l'article", true);
+        }
+    };
+
+    const handleSyncGoogleStock = async () => {
+        try {
+            showToast("⚡ Synchronisation des 8 onglets avec le Google Sheet en cours...");
+            const res = await API.syncGoogleStock(currentOrgId);
+            if (res && res.success) {
+                showToast(`✅ Synchronisation Google Sheet réussie ! (${res.totalItems || 0} articles importés)`);
+                await loadData();
+            } else {
+                showToast(`❌ Erreur: ${res?.error || 'Échec de la synchronisation'}`, true);
+            }
+        } catch (err) {
+            console.error("Erreur handleSyncGoogleStock:", err);
+            showToast("❌ Erreur réseau lors de la synchronisation Google Sheet", true);
+        }
+    };
 
     const handleBulkUpdateComptes = async (ids, fields) => {
         try {
@@ -571,7 +619,7 @@ function App() {
     useEffect(() => {
         if (!currentUser) return;
         const availableViews = [
-            'comptes', 'todos', 'classement', 'gagnants', 'incidents',
+            'comptes', 'todos', 'stock', 'classement', 'gagnants', 'incidents',
             'messagerie', 'organisations', 'utilisateurs', 'corbeille',
             'parametres', 'journal'
         ];
@@ -896,6 +944,18 @@ function App() {
                         onBulkUpdateComptes={handleBulkUpdateComptes}
                         onBulkDeleteComptes={handleBulkDeleteComptes}
                         onOpenQuickAgentModal={() => setActiveView('utilisateurs')}
+                    />
+                )}
+
+                {activeView === 'stock' && PermissionManager.can(currentUser, 'stock') && (
+                    <StockView
+                        currentUser={currentUser}
+                        appState={appState}
+                        showToast={showToast}
+                        onSaveStockTab={handleSaveStockTab}
+                        onSaveStockItem={handleSaveStockItem}
+                        onDeleteStockItem={handleDeleteStockItem}
+                        onSyncGoogleStock={handleSyncGoogleStock}
                     />
                 )}
 

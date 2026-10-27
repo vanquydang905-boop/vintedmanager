@@ -242,5 +242,41 @@ const API = {
     async emptyCorbeille(organisationId = null) {
         const query = organisationId ? `?organisationId=${encodeURIComponent(organisationId)}` : '';
         return this.fetchJSON(`/api/corbeille/empty${query}`, { method: 'DELETE' });
+    },
+
+    // Stock & Inventaire Multi-Onglets
+    async getStock(organisationId = null) {
+        const query = organisationId ? `?organisationId=${encodeURIComponent(organisationId)}` : '';
+        return this.fetchJSON(`/api/stock${query}`);
+    },
+    async saveStockTab(tabKey, items, organisationId = null) {
+        return this.fetchJSON(`/api/stock/${encodeURIComponent(tabKey)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ items, organisationId })
+        });
+    },
+    async saveStockItem(tabKey, item, organisationId = null) {
+        if (item.id && !item.isNew) {
+            return this.fetchJSON(`/api/stock/${encodeURIComponent(tabKey)}/item/${encodeURIComponent(item.id)}`, {
+                method: 'PUT',
+                body: JSON.stringify({ item, organisationId })
+            });
+        }
+        return this.fetchJSON(`/api/stock/${encodeURIComponent(tabKey)}/item`, {
+            method: 'POST',
+            body: JSON.stringify({ item, organisationId })
+        });
+    },
+    async deleteStockItem(tabKey, itemId, organisationId = null) {
+        const query = organisationId ? `?organisationId=${encodeURIComponent(organisationId)}` : '';
+        return this.fetchJSON(`/api/stock/${encodeURIComponent(tabKey)}/item/${encodeURIComponent(itemId)}${query}`, {
+            method: 'DELETE'
+        });
+    },
+    async syncGoogleStock(organisationId = null) {
+        return this.fetchJSON('/api/stock/sync-google', {
+            method: 'POST',
+            body: JSON.stringify({ organisationId })
+        });
     }
 };

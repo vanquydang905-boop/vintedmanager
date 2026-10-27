@@ -121,8 +121,82 @@ app.get('/api/db', async (req, res) => {
         const journal = await dbService.getJournal(orgId);
         const corbeille = await dbService.getCorbeille(orgId);
         const todos = await dbService.getTodos(orgId);
+        const stock = await dbService.getStock(orgId || 'org_default');
 
-        res.json({ organisations, parametres, utilisateurs, comptes, calendrier, incidents, journal, corbeille, todos });
+        res.json({ organisations, parametres, utilisateurs, comptes, calendrier, incidents, journal, corbeille, todos, stock });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 1. GESTION DES STOCKS MULTI-ONGLETS
+app.get('/api/stock', async (req, res) => {
+    try {
+        const orgId = req.query.organisationId || 'org_default';
+        const stock = await dbService.getStock(orgId);
+        res.json({ success: true, stock });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/stock/:tabKey', async (req, res) => {
+    try {
+        const { tabKey } = req.params;
+        const { items, organisationId } = req.body;
+        const orgId = organisationId || 'org_default';
+        const updated = await dbService.saveStockTab(orgId, tabKey, items);
+        await dbService.logAction("Stock", `Mise à jour complète de l'onglet de stock "${tabKey.toUpperCase()}" (${items ? items.length : 0} articles)`, "Succès", orgId);
+        res.json({ success: true, stock: updated });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/stock/:tabKey/item', async (req, res) => {
+    try {
+        const { tabKey } = req.params;
+        const item = req.body.item || req.body;
+        const orgId = req.body.organisationId || 'org_default';
+        const result = await dbService.saveStockItem(orgId, tabKey, item);
+        await dbService.logAction("Stock", `Ajout de l'article ${item.sku || 'Nouveau'} dans "${tabKey.toUpperCase()}"`, "Succès", orgId);
+        res.json({ success: true, ...result });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/stock/:tabKey/item/:id', async (req, res) => {
+    try {
+        const { tabKey, id } = req.params;
+        const item = req.body.item || req.body;
+        const orgId = req.body.organisationId || 'org_default';
+        const result = await dbService.saveStockItem(orgId, tabKey, { ...item, id });
+        res.json({ success: true, ...result });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/stock/:tabKey/item/:id', async (req, res) => {
+    try {
+        const { tabKey, id } = req.params;
+        const orgId = req.query.organisationId || 'org_default';
+        await dbService.deleteStockItem(orgId, tabKey, id);
+        await dbService.logAction("Stock", `Suppression d'un article dans "${tabKey.toUpperCase()}" (ID: ${id})`, "Succès", orgId);
+        res.json({ success: true, id, tabKey });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/stock/sync-google', async (req, res) => {
+    try {
+        const { organisationId } = req.body;
+        const orgId = organisationId || 'org_default';
+        const freshStock = await dbService.syncGoogleStock(orgId);
+        await dbService.logAction("Stock", `Synchronisation complète depuis Google Sheet (8 onglets synchronisés)`, "Succès", orgId);
+        res.json({ success: true, stock: freshStock });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

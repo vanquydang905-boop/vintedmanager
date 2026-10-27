@@ -104,6 +104,18 @@ let DEFAULT_PARAMETRES = {
     heureDeclencheurAuto: "05:00"
 };
 
+let DEFAULT_STOCK = {};
+try {
+    const fs = require('fs');
+    const path = require('path');
+    const stockPath = path.join(__dirname, 'initial_stock.json');
+    if (fs.existsSync(stockPath)) {
+        DEFAULT_STOCK = JSON.parse(fs.readFileSync(stockPath, 'utf8'));
+    }
+} catch (e) {
+    console.warn('[Stock] Could not load initial_stock.json:', e);
+}
+
 const crypto = require('crypto');
 
 function hashPassword(password) {
@@ -1345,6 +1357,191 @@ const dbService = {
             } catch (err) {}
         }
         return item;
+    },
+
+    // ------------------- GESTION DES STOCKS MULTI-ONGLETS -------------------
+    async getStock(organisationId = 'org_default') {
+        const oid = (organisationId || 'org_default').toLowerCase();
+        let stockData = global[`STOCK_${oid}`] || DEFAULT_STOCK;
+
+        if (supabaseUrl && supabaseKey) {
+            try {
+                const { data, error } = await supabase
+                    .from('parametres')
+                    .select('data')
+                    .eq('id', 'stock_' + oid)
+                    .maybeSingle();
+
+                if (!error && data && data.data && data.data.stock) {
+                    stockData = data.data.stock;
+                    global[`STOCK_${oid}`] = stockData;
+                }
+            } catch (err) {
+                console.error('[Supabase getStock error]', err);
+            }
+        }
+        return stockData;
+    },
+
+    async persistStock(organisationId = 'org_default', stockData) {
+        const oid = (organisationId || 'org_default').toLowerCase();
+        global[`STOCK_${oid}`] = stockData;
+
+        if (supabaseUrl && supabaseKey) {
+            try {
+                await supabase.from('parametres').upsert([{
+                    id: 'stock_' + oid,
+                    organisationid: oid,
+                    data: { stock: stockData }
+                }]);
+            } catch (err) {
+                console.error('[Supabase persistStock error]', err);
+            }
+        }
+        return stockData;
+    },
+
+    async saveStockTab(organisationId = 'org_default', tabKey, items) {
+        const currentStock = await this.getStock(organisationId);
+        const updatedStock = { ...currentStock };
+        if (updatedStock[tabKey]) {
+            updatedStock[tabKey] = {
+                ...updatedStock[tabKey],
+                items: Array.isArray(items) ? items : []
+            };
+        } else {
+            updatedStock[tabKey] = {
+                key: tabKey,
+                name: tabKey.toUpperCase(),
+                icon: 'fa-box-open',
+                items: Array.isArray(items) ? items : []
+            };
+        }
+        return await this.persistStock(organisationId, updatedStock);
+    },
+
+    async saveStockItem(organisationId = 'org_default', tabKey, itemData) {
+        const currentStock = await this.getStock(organisationId);
+        const updatedStock = { ...currentStock };
+        if (!updatedStock[tabKey]) {
+            updatedStock[tabKey] = {
+                key: tabKey,
+                name: tabKey.toUpperCase(),
+                icon: 'fa-box-open',
+                items: []
+            };
+        }
+
+        const items = [...(updatedStock[tabKey].items || [])];
+        const existingIdx = items.findIndex(it => it.id === itemData.id);
+
+        if (existingIdx >= 0) {
+            items[existingIdx] = { ...items[existingIdx], ...itemData };
+        } else {
+            const newItem = {
+                id: itemData.id || `stock_${tabKey}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                ...itemData
+            };
+            items.unshift(newItem);
+        }
+
+        updatedStock[tabKey] = {
+            ...updatedStock[tabKey],
+            items
+        };
+
+        await this.persistStock(organisationId, updatedStock);
+        return { success: true, item: itemData, tabKey };
+    },
+
+    async deleteStockItem(organisationId = 'org_default', tabKey, itemId) {
+        const currentStock = await this.getStock(organisationId);
+        const updatedStock = { ...currentStock };
+        if (!updatedStock[tabKey] || !Array.isArray(updatedStock[tabKey].items)) return false;
+
+        updatedStock[tabKey].items = updatedStock[tabKey].items.filter(it => it.id !== itemId);
+        await this.persistStock(organisationId, updatedStock);
+        return true;
+    },
+
+    async syncGoogleStock(organisationId = 'org_default') {
+        const { execSync } = require('child_process');
+        const gids = [
+            { key: 'tops', name: 'TOPS', icon: 'fa-shirt', gid: '0' },
+            { key: 'bas', name: 'BAS', icon: 'fa-socks', gid: '96160675' },
+            { key: 'robes', name: 'ROBES + ENSEMBLES', icon: 'fa-person-dress', gid: '827780982' },
+            { key: 'maillots', name: 'MAILLOTS', icon: 'fa-person-swimming', gid: '1160523751' },
+            { key: 'divers', name: 'DIVERS', icon: 'fa-box-open', gid: '645845453' },
+            { key: 'bijoux', name: 'BIJOUX', icon: 'fa-gem', gid: '1281491528' },
+            { key: 'chaussures', name: 'CHAUSSURES', icon: 'fa-shoe-prints', gid: '1756531177' },
+            { key: 'sacs', name: 'SACS', icon: 'fa-bag-shopping', gid: '1519340196' }
+        ];
+
+        function parseCsv(text) {
+            const lines = text.split('\n');
+            const result = [];
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const cells = [];
+                let current = '';
+                let inQuotes = false;
+                for (let j = 0; j < line.length; j++) {
+                    const c = line[j];
+                    if (c === '"') inQuotes = !inQuotes;
+                    else if (c === ',' && !inQuotes) { cells.push(current.trim()); current = ''; }
+                    else current += c;
+                }
+                cells.push(current.trim());
+                result.push(cells);
+            }
+            return result;
+        }
+
+        const freshStock = {};
+        for (const tab of gids) {
+            try {
+                const raw = execSync(`curl -sL "https://docs.google.com/spreadsheets/d/1oQUUfCg6orAkTApNDYLQekKJxTXE6B-rttdxVeXro_0/export?format=csv&gid=${tab.gid}"`).toString();
+                const rows = parseCsv(raw);
+                const items = rows.map((r, idx) => {
+                    if (tab.key === 'chaussures') {
+                        return {
+                            id: `stock_${tab.key}_${idx + 1}`,
+                            sku: r[0] || '',
+                            photo: r[1] || '',
+                            taille: r[2] || '',
+                            qte: parseInt(r[3]) || (r[3] ? 1 : 0),
+                            localisation: r[4] || '',
+                            notes: ''
+                        };
+                    }
+                    return {
+                        id: `stock_${tab.key}_${idx + 1}`,
+                        sku: r[0] || '',
+                        photo: r[1] || '',
+                        tailleS: r[2] || '',
+                        tailleM: r[3] || '',
+                        tailleL: r[4] || '',
+                        tailleXL: r[5] || '',
+                        tailleUnique: r[6] || '',
+                        localisation: r[7] || '',
+                        notes: ''
+                    };
+                }).filter(it => it.sku || it.localisation || it.tailleS || it.tailleM || it.tailleL || it.tailleXL || it.tailleUnique || it.qte);
+
+                freshStock[tab.key] = {
+                    key: tab.key,
+                    name: tab.name,
+                    icon: tab.icon,
+                    items
+                };
+            } catch (e) {
+                console.error(`Error syncing tab ${tab.name}:`, e.message);
+            }
+        }
+
+        await this.persistStock(organisationId, freshStock);
+        return freshStock;
     },
 
     // ------------------- RESTORE COMPLET -------------------
