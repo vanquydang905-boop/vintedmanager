@@ -458,8 +458,7 @@ var CircularIconLoader = CircularLogoLoader;
 // ------------------- ÉCRAN DE CHARGEMENT AVEC LOGO & ANIMATION CIRCULAIRE -------------------
 function LoadingScreen({
   message = "Chargement en cours...",
-  subtext = "Vinted Manager",
-  showHeaderLogo = true
+  subtext = "Vinted Manager"
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "app-loading-overlay"
@@ -475,22 +474,12 @@ function LoadingScreen({
     pulse: true,
     showOuterRing: true,
     variant: "icon"
-  }), showHeaderLogo && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: '20px',
-      marginBottom: '4px',
-      opacity: 0.95
-    }
-  }, /*#__PURE__*/React.createElement(Logo, {
-    variant: "header",
-    height: 36,
-    alt: "Vinted Manager"
-  })), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: '15px',
       fontWeight: 700,
       color: '#0f172a',
-      marginTop: showHeaderLogo ? '8px' : '16px',
+      marginTop: '22px',
       letterSpacing: '-0.3px',
       textAlign: 'center'
     }
@@ -500,7 +489,7 @@ function LoadingScreen({
       color: '#64748b',
       fontWeight: 500,
       textAlign: 'center',
-      marginTop: '3px'
+      marginTop: '4px'
     }
   }, subtext), /*#__PURE__*/React.createElement("div", {
     className: "loading-progress-bar-indeterminate"

@@ -286,21 +286,16 @@ function CircularLogoLoader({ size = 64, pulse = true, showOuterRing = true, var
 var CircularIconLoader = CircularLogoLoader;
 
 // ------------------- ÉCRAN DE CHARGEMENT AVEC LOGO & ANIMATION CIRCULAIRE -------------------
-function LoadingScreen({ message = "Chargement en cours...", subtext = "Vinted Manager", showHeaderLogo = true }) {
+function LoadingScreen({ message = "Chargement en cours...", subtext = "Vinted Manager" }) {
     return (
         <div className="app-loading-overlay">
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <CircularLogoLoader size={84} pulse={true} showOuterRing={true} variant="icon" />
-                {showHeaderLogo && (
-                    <div style={{ marginTop: '20px', marginBottom: '4px', opacity: 0.95 }}>
-                        <Logo variant="header" height={36} alt="Vinted Manager" />
-                    </div>
-                )}
-                <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginTop: showHeaderLogo ? '8px' : '16px', letterSpacing: '-0.3px', textAlign: 'center' }}>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginTop: '22px', letterSpacing: '-0.3px', textAlign: 'center' }}>
                     {message}
                 </div>
                 {subtext && (
-                    <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500, textAlign: 'center', marginTop: '3px' }}>
+                    <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500, textAlign: 'center', marginTop: '4px' }}>
                         {subtext}
                     </div>
                 )}
