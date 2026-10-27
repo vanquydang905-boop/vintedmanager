@@ -5057,6 +5057,45 @@ var TodoUtils = {
 
         return { isDone: false, isOverdue: false, isImminent, label: text, diffMinutes, diffHours };
     },
+    isAuthor: function(todo, user) {
+        if (!todo || !user) return false;
+        const userNom = (user.nom || '').trim().toLowerCase();
+        const userAgent = (user.agentAssigne || '').trim().toLowerCase();
+        const userEmail = (user.email || '').trim().toLowerCase();
+        const userId = user.id;
+
+        if (todo.creeParId && userId && String(todo.creeParId) === String(userId)) return true;
+        const creator = (todo.creePar || '').trim().toLowerCase();
+        if (creator && (creator === userNom || (userAgent && creator === userAgent) || (userEmail && creator === userEmail))) {
+            return true;
+        }
+        return false;
+    },
+    isGlobalTask: function(todo) {
+        if (!todo) return false;
+        const assigned = (todo.agentAssigne || todo.agent || '').trim().toLowerCase();
+        return !assigned || assigned === 'tous' || assigned === 'all' || assigned === 'équipe' || assigned === 'equipe' || assigned === 'non assigné';
+    },
+    isTaskForUser: function(todo, user) {
+        if (!todo || !user) return false;
+        // Si c'est une tâche globale destinée à toute l'équipe
+        if (this.isGlobalTask(todo)) return true;
+
+        const userNom = (user.nom || '').trim().toLowerCase();
+        const userAgent = (user.agentAssigne || '').trim().toLowerCase();
+        const userEmail = (user.email || '').trim().toLowerCase();
+        const assigned = (todo.agentAssigne || todo.agent || '').trim().toLowerCase();
+
+        // Si la tâche est assignée directement à l'agent
+        if (assigned === userNom || (userAgent && assigned === userAgent) || (userEmail && assigned === userEmail)) {
+            return true;
+        }
+
+        // Si l'utilisateur est le créateur de la tâche
+        if (this.isAuthor(todo, user)) return true;
+
+        return false;
+    },
     formatDateTime: function(dateValue) {
         if (!dateValue) return '';
         try {
@@ -5771,6 +5810,19 @@ function TodoView({
         return filteredTodos.filter(t => t.statut === 'terminee');
     }, [filteredTodos]);
 
+    // Séparation : Mes Tâches Personnelles (assignées à moi ou créées par moi) vs Tâches Globales (Tous / Équipe)
+    const myPendingTodos = useMemo(() => {
+        return pendingTodos.filter(t => !TodoUtils.isGlobalTask(t) && TodoUtils.isTaskForUser(t, currentUser));
+    }, [pendingTodos, currentUser]);
+
+    const globalPendingTodos = useMemo(() => {
+        return pendingTodos.filter(t => TodoUtils.isGlobalTask(t));
+    }, [pendingTodos]);
+
+    const otherPendingTodos = useMemo(() => {
+        return pendingTodos.filter(t => !TodoUtils.isGlobalTask(t) && !TodoUtils.isTaskForUser(t, currentUser));
+    }, [pendingTodos, currentUser]);
+
     // Open Add Modal
     const handleOpenAdd = () => {
         setEditingTodo(null);
@@ -5872,7 +5924,8 @@ function TodoView({
             compteId,
             compteNom,
             agentAssigne,
-            creePar: creePar.trim() || (currentUser ? currentUser.nom : 'Florencio'),
+            creePar: creePar.trim() || (currentUser ? (currentUser.nom || currentUser.agentAssigne) : 'Florencio'),
+            creeParId: editingTodo ? (editingTodo.creeParId || (currentUser ? currentUser.id : undefined)) : (currentUser ? currentUser.id : undefined),
             dateCreation: editingTodo ? (editingTodo.dateCreation || new Date().toISOString()) : new Date().toISOString(),
             dateTerminee: editingTodo ? editingTodo.dateTerminee : (statut === 'terminee' ? new Date().toISOString() : null),
             terminePar: editingTodo ? editingTodo.terminePar : (statut === 'terminee' ? (currentUser ? currentUser.nom : 'Florencio') : null),
@@ -5996,11 +6049,21 @@ function TodoView({
 
     const handleBulkDelete = async () => {
         if (selectedIds.length === 0) return;
-        if (!confirm(`Supprimer définitivement ${selectedIds.length} tâche(s) ?`)) return;
-        await onBulkDeleteTodos(selectedIds);
+        const authorTodos = todos.filter(t => selectedIds.includes(t.id) && TodoUtils.isAuthor(t, currentUser));
+        if (authorTodos.length === 0) {
+            if (showToast) showToast("Action refusée : Vous ne pouvez supprimer que les tâches dont vous êtes l'auteur.", "error");
+            return;
+        }
+        const nonAuthorCount = selectedIds.length - authorTodos.length;
+        const confirmMsg = nonAuthorCount > 0
+            ? `Seules les ${authorTodos.length} tâche(s) dont vous êtes l'auteur seront supprimées (${nonAuthorCount} tâche(s) ignorée(s) car réservées à leur créateur). Continuer ?`
+            : `Supprimer définitivement ${authorTodos.length} tâche(s) ?`;
+        if (!confirm(confirmMsg)) return;
+        await onBulkDeleteTodos(authorTodos.map(t => t.id));
         setSelectedIds([]);
-        if (showToast) showToast(`${selectedIds.length} tâche(s) supprimée(s)`);
+        if (showToast) showToast(`${authorTodos.length} tâche(s) supprimée(s)`);
     };
+
 
     const renderTableHeader = (list = []) => {
         const isAllSelected = list.length > 0 && list.every(t => selectedIds.includes(t.id));
@@ -6318,18 +6381,30 @@ function TodoView({
                         >
                             <i className="fa-solid fa-pen"></i>
                         </button>
-                        <button
-                            type="button"
-                            className="btn btn-danger btn-xs"
-                            onClick={() => {
-                                if (confirm(`Supprimer la tâche "${todo.titre}" ?`)) {
-                                    onDeleteTodo(todo.id);
-                                }
-                            }}
-                            title="Supprimer la tâche"
-                        >
-                            <i className="fa-solid fa-trash"></i>
-                        </button>
+                        {TodoUtils.isAuthor(todo, currentUser) ? (
+                            <button
+                                type="button"
+                                className="btn btn-danger btn-xs"
+                                onClick={() => {
+                                    if (confirm(`Supprimer la tâche "${todo.titre}" ?`)) {
+                                        onDeleteTodo(todo.id);
+                                    }
+                                }}
+                                title="Supprimer la tâche (auteur)"
+                            >
+                                <i className="fa-solid fa-trash"></i>
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-xs"
+                                disabled
+                                style={{ opacity: 0.4, cursor: 'not-allowed' }}
+                                title={`Suppression réservée à l'auteur (${todo.creePar || 'le créateur'})`}
+                            >
+                                <i className="fa-solid fa-lock" style={{ fontSize: '10px' }}></i>
+                            </button>
+                        )}
                     </div>
                 </td>
             </tr>
@@ -6625,8 +6700,26 @@ function TodoView({
                 )}
             </div>
 
-            {/* Navigation Tabs : Vue Complète, À Réaliser, Terminées */}
+            {/* Navigation Tabs : Mes Tâches, Tâches Globales, Vue Complète, Terminées */}
             <div className="todo-tab-pills">
+                <button
+                    type="button"
+                    className={`todo-tab-pill ${activeTab === 'mine' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('mine')}
+                >
+                    <i className="fa-solid fa-user-check"></i>
+                    <span>Mes Tâches</span>
+                    <span className="todo-tab-badge">{myPendingTodos.length}</span>
+                </button>
+                <button
+                    type="button"
+                    className={`todo-tab-pill ${activeTab === 'global' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('global')}
+                >
+                    <i className="fa-solid fa-users"></i>
+                    <span>Tâches Globales</span>
+                    <span className="todo-tab-badge">{globalPendingTodos.length}</span>
+                </button>
                 <button
                     type="button"
                     className={`todo-tab-pill ${activeTab === 'all' ? 'active' : ''}`}
@@ -6634,15 +6727,6 @@ function TodoView({
                 >
                     <i className="fa-solid fa-table-cells-large"></i>
                     <span>Vue Séparée (Toutes)</span>
-                    <span className="todo-tab-badge">{filteredTodos.length}</span>
-                </button>
-                <button
-                    type="button"
-                    className={`todo-tab-pill ${activeTab === 'pending' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('pending')}
-                >
-                    <i className="fa-solid fa-clock"></i>
-                    <span>À Réaliser & En Cours</span>
                     <span className="todo-tab-badge">{pendingTodos.length}</span>
                 </button>
                 <button
@@ -6656,39 +6740,39 @@ function TodoView({
                 </button>
             </div>
 
-            {/* SECTION 1 : TÂCHES À RÉALISER & EN COURS */}
-            {(activeTab === 'all' || activeTab === 'pending') && (
-                <div className="todo-section-container">
+            {/* SECTION 1 : MES TÂCHES PERSONNELLES & ASSIGNÉES */}
+            {(activeTab === 'all' || activeTab === 'mine') && (
+                <div className="todo-section-container" style={{ borderLeft: '4px solid #6366f1' }}>
                     <div className="todo-section-header">
                         <div className="todo-section-title-wrap">
                             <h3 className="todo-section-title">
-                                <i className="fa-solid fa-list-check" style={{ color: '#09b1ba' }}></i>
-                                Tâches à Réaliser & En Cours
+                                <i className="fa-solid fa-user-check" style={{ color: '#6366f1' }}></i>
+                                Mes Tâches Personnelles & Assignées
                             </h3>
-                            <span className={`todo-section-count ${pendingTodos.some(t => t.priorite === 'urgente') ? 'urgent' : ''}`}>
-                                {pendingTodos.length} tâche{pendingTodos.length > 1 ? 's' : ''} active{pendingTodos.length > 1 ? 's' : ''}
+                            <span className={`todo-section-count ${myPendingTodos.some(t => t.priorite === 'urgente') ? 'urgent' : ''}`}>
+                                {myPendingTodos.length} tâche{myPendingTodos.length > 1 ? 's' : ''}
                             </span>
                         </div>
                         <span style={{ fontSize: '12px', color: '#64748b' }}>
                             <i className="fa-regular fa-circle-check" style={{ marginRight: '5px', color: '#10b981' }}></i>
-                            Cochez le cercle pour marquer une tâche comme terminée
+                            Tâches assignées à votre profil ou créées par vous
                         </span>
                     </div>
 
                     <div className="table-responsive">
                         <table className="data-table">
-                            {renderTableHeader(pendingTodos)}
+                            {renderTableHeader(myPendingTodos)}
                             <tbody>
-                                {pendingTodos.length === 0 ? (
+                                {myPendingTodos.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
-                                            <i className="fa-solid fa-circle-check" style={{ fontSize: '36px', color: '#10b981', marginBottom: '8px', display: 'block' }}></i>
-                                            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Toutes les tâches sont terminées !</div>
-                                            <div style={{ fontSize: '12px', marginTop: '4px', color: '#64748b' }}>Bravo ! Aucune action en attente pour les critères sélectionnés.</div>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
+                                            <i className="fa-solid fa-user-check" style={{ fontSize: '32px', color: '#6366f1', marginBottom: '8px', display: 'block' }}></i>
+                                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Aucune tâche personnelle en cours</div>
+                                            <div style={{ fontSize: '12px', marginTop: '4px', color: '#64748b' }}>Vous êtes à jour sur vos tâches assignées !</div>
                                         </td>
                                     </tr>
                                 ) : (
-                                    pendingTodos.map(renderTodoRow)
+                                    myPendingTodos.map(renderTodoRow)
                                 )}
                             </tbody>
                         </table>
@@ -6696,9 +6780,79 @@ function TodoView({
                 </div>
             )}
 
-            {/* SECTION 2 : TÂCHES TERMINÉES & RÉALISÉES */}
+            {/* SECTION 2 : TÂCHES GLOBALES D'ÉQUIPE (TOUS) */}
+            {(activeTab === 'all' || activeTab === 'global') && (
+                <div className="todo-section-container" style={{ borderLeft: '4px solid #09b1ba' }}>
+                    <div className="todo-section-header">
+                        <div className="todo-section-title-wrap">
+                            <h3 className="todo-section-title">
+                                <i className="fa-solid fa-users" style={{ color: '#09b1ba' }}></i>
+                                Tâches Globales d'Équipe (Tous)
+                            </h3>
+                            <span className={`todo-section-count ${globalPendingTodos.some(t => t.priorite === 'urgente') ? 'urgent' : ''}`}>
+                                {globalPendingTodos.length} tâche{globalPendingTodos.length > 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                            <i className="fa-solid fa-bullhorn" style={{ marginRight: '5px', color: '#09b1ba' }}></i>
+                            Tâches collectives partagées par l'ensemble des agents
+                        </span>
+                    </div>
+
+                    <div className="table-responsive">
+                        <table className="data-table">
+                            {renderTableHeader(globalPendingTodos)}
+                            <tbody>
+                                {globalPendingTodos.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
+                                            <i className="fa-solid fa-users" style={{ fontSize: '32px', color: '#09b1ba', marginBottom: '8px', display: 'block' }}></i>
+                                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Aucune tâche globale d'équipe en attente</div>
+                                            <div style={{ fontSize: '12px', marginTop: '4px', color: '#64748b' }}>Toutes les actions d'équipe ont été complétées.</div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    globalPendingTodos.map(renderTodoRow)
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* SECTION 3 : TÂCHES DES AUTRES COLLABORATEURS (VISIBLES EN VUE SÉPARÉE GLOBALE) */}
+            {activeTab === 'all' && otherPendingTodos.length > 0 && (
+                <div className="todo-section-container" style={{ borderLeft: '4px solid #8b5cf6', opacity: 0.95 }}>
+                    <div className="todo-section-header">
+                        <div className="todo-section-title-wrap">
+                            <h3 className="todo-section-title">
+                                <i className="fa-solid fa-user-group" style={{ color: '#8b5cf6' }}></i>
+                                Tâches des Autres Collaborateurs
+                            </h3>
+                            <span className="todo-section-count" style={{ background: '#f5f3ff', color: '#7c3aed' }}>
+                                {otherPendingTodos.length} tâche{otherPendingTodos.length > 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                            <i className="fa-regular fa-eye" style={{ marginRight: '5px', color: '#8b5cf6' }}></i>
+                            Tâches spécifiques attribuées à d'autres agents de l'équipe
+                        </span>
+                    </div>
+
+                    <div className="table-responsive">
+                        <table className="data-table">
+                            {renderTableHeader(otherPendingTodos)}
+                            <tbody>
+                                {otherPendingTodos.map(renderTodoRow)}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* SECTION 4 : TÂCHES TERMINÉES & RÉALISÉES */}
             {(activeTab === 'all' || activeTab === 'done') && (
-                <div className="todo-section-container">
+                <div className="todo-section-container" style={{ borderLeft: '4px solid #10b981' }}>
                     <div className="todo-section-header">
                         <div className="todo-section-title-wrap">
                             <h3 className="todo-section-title">
@@ -7157,7 +7311,8 @@ function TodoView({
 function StartupTodoModal({ isOpen, onClose, todos = [], currentUser = null, onNavigateToTodos, onSaveTodo, showToast }) {
     if (!isOpen) return null;
 
-    const pendingTodos = (todos || []).filter(t => t && t.statut !== 'terminee');
+    // Ne notifier que pour les tâches qui concernent l'agent connecté
+    const pendingTodos = (todos || []).filter(t => t && t.statut !== 'terminee' && TodoUtils.isTaskForUser(t, currentUser));
     if (pendingTodos.length === 0) return null;
 
     const urgentesCount = pendingTodos.filter(t => t.priorite === 'urgente').length;

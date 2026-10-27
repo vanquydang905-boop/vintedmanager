@@ -956,9 +956,23 @@ app.put('/api/todos/:id', async (req, res) => {
 app.delete('/api/todos/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const orgId = req.query.organisationId || 'org_default';
+        const orgId = req.query.organisationId || req.body.organisationId || 'org_default';
+        const userNom = (req.query.userNom || req.body.userNom || '').trim().toLowerCase();
+        const userId = req.query.userId || req.body.userId || '';
+
+        const todos = await dbService.getTodos(orgId);
+        const target = todos.find(t => t.id === id);
+        if (target && (userNom || userId)) {
+            const creator = (target.creePar || '').trim().toLowerCase();
+            const creatorId = target.creeParId;
+            const isAuthor = (creatorId && creatorId === userId) || (creator && creator === userNom);
+            if (!isAuthor) {
+                return res.status(403).json({ error: "Seul l'auteur de la tâche est autorisé à la supprimer." });
+            }
+        }
+
         await dbService.deleteTodo(id);
-        await dbService.logAction("To-Do", `Suppression de la tâche ID ${id}`, "Succès", orgId);
+        await dbService.logAction("To-Do", `Suppression de la tâche ID ${id}${userNom ? ` par ${userNom}` : ''}`, "Succès", orgId);
         res.json({ success: true, id });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -986,11 +1000,25 @@ app.post('/api/todos/bulk-update', async (req, res) => {
 
 app.post('/api/todos/bulk-delete', async (req, res) => {
     try {
-        const { ids, organisationId } = req.body;
+        const { ids, organisationId, userNom, userId } = req.body;
         const orgId = organisationId || 'org_default';
-        await dbService.bulkDeleteTodos(ids);
-        await dbService.logAction("To-Do", `Suppression groupée de ${(ids || []).length} tâche(s)`, "Succès", orgId);
-        res.json({ success: true, count: (ids || []).length });
+        const uNom = (userNom || '').trim().toLowerCase();
+
+        let idsToDelete = ids || [];
+        if (uNom || userId) {
+            const todos = await dbService.getTodos(orgId);
+            idsToDelete = idsToDelete.filter(id => {
+                const target = todos.find(t => t.id === id);
+                if (!target) return false;
+                const creator = (target.creePar || '').trim().toLowerCase();
+                const creatorId = target.creeParId;
+                return (creatorId && creatorId === userId) || (creator && creator === uNom);
+            });
+        }
+
+        await dbService.bulkDeleteTodos(idsToDelete);
+        await dbService.logAction("To-Do", `Suppression groupée de ${idsToDelete.length} tâche(s)`, "Succès", orgId);
+        res.json({ success: true, count: idsToDelete.length });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

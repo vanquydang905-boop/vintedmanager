@@ -138,7 +138,8 @@ function App() {
         }
 
         if (!hasCheckedStartupTodos && Array.isArray(appState.todos) && appState.todos.length > 0) {
-            const pending = appState.todos.filter(t => t && t.statut !== 'terminee');
+            // Notifie l'agent au démarrage UNIQUEMENT si la tâche le concerne
+            const pending = appState.todos.filter(t => t && t.statut !== 'terminee' && TodoUtils.isTaskForUser(t, currentUser));
             if (pending.length > 0) {
                 setShowStartupTodoModal(true);
                 if (typeof SoundEngine !== 'undefined' && SoundEngine.playWarningAlert) {
@@ -161,6 +162,9 @@ function App() {
             const currentTodos = appState.todos || [];
             currentTodos.forEach(todo => {
                 if (todo.statut === 'terminee') return;
+
+                // Règle : notifie uniquement l'agent si la tâche le concerne
+                if (!TodoUtils.isTaskForUser(todo, currentUser)) return;
 
                 const info = TodoUtils.getStatusInfo(todo);
                 const isOverdue = info.isOverdue;
@@ -231,10 +235,12 @@ function App() {
     const todoUrgentCount = useMemo(() => {
         return (appState.todos || []).filter(t => {
             if (t.statut === 'terminee') return false;
+            // Ne compter que les tâches qui concernent l'agent connecté
+            if (!TodoUtils.isTaskForUser(t, currentUser)) return false;
             const info = TodoUtils.getStatusInfo(t);
             return info.isOverdue || t.priorite === 'urgente' || info.isImminent;
         }).length;
-    }, [appState.todos]);
+    }, [appState.todos, currentUser]);
 
     const handleLoginSubmit = async (loginInput, password, role = null) => {
         setLoginError('');
@@ -400,11 +406,13 @@ function App() {
 
     const handleDeleteTodo = async (id) => {
         try {
-            await API.deleteTodo(id);
+            const userNom = currentUser ? (currentUser.nom || currentUser.agentAssigne) : null;
+            const userId = currentUser ? currentUser.id : null;
+            await API.deleteTodo(id, userNom, userId);
             showToast("Tâche supprimée");
             await loadData();
         } catch (err) {
-            showToast("Erreur lors de la suppression de la tâche", true);
+            showToast((err && err.message) || "Erreur : seul l'auteur peut supprimer cette tâche", true);
         }
     };
 
@@ -428,11 +436,13 @@ function App() {
 
     const handleBulkDeleteTodos = async (ids) => {
         try {
-            await API.bulkDeleteTodos(ids, currentOrgId);
+            const userNom = currentUser ? (currentUser.nom || currentUser.agentAssigne) : null;
+            const userId = currentUser ? currentUser.id : null;
+            await API.bulkDeleteTodos(ids, currentOrgId, userNom, userId);
             showToast(`${ids.length} tâche(s) supprimée(s) en masse !`);
             await loadData();
         } catch (err) {
-            showToast("Erreur lors de la suppression des tâches en masse", true);
+            showToast((err && err.message) || "Erreur : seul l'auteur peut supprimer ses tâches", true);
         }
     };
 

@@ -240,46 +240,7 @@ let DEFAULT_CALENDRIER = [];
 let DEFAULT_INCIDENTS = [];
 let DEFAULT_JOURNAL = [];
 let DEFAULT_CORBEILLE = [];
-let DEFAULT_TODOS = [
-    {
-        id: "todo_1",
-        organisationId: "org_default",
-        titre: "Vérifier les alertes de limitation et comptes sensibles",
-        description: "Contrôler les comptes ayant reçu des avertissements récents sur Vinted et ajuster les fréquences.",
-        priorite: "urgente",
-        statut: "a_faire",
-        agent: "Tous",
-        comptePseudo: "",
-        categorie: "Incident",
-        dateEcheance: new Date().toISOString().split('T')[0],
-        heureEcheance: "18:00",
-        rappelMinutes: 30,
-        sousTaches: [
-            { id: "sub_1", texte: "Vérifier le module Incidents", fait: true },
-            { id: "sub_2", texte: "Isoler les comptes signalés", fait: false }
-        ],
-        dateCreation: new Date().toISOString()
-    },
-    {
-        id: "todo_2",
-        organisationId: "org_default",
-        titre: "Synchroniser les ventes DotB Cloud",
-        description: "Lancer la synchronisation en direct pour actualiser les articles et commandes de la journée.",
-        priorite: "haute",
-        statut: "en_cours",
-        agent: "Tous",
-        comptePseudo: "",
-        categorie: "Publication",
-        dateEcheance: new Date().toISOString().split('T')[0],
-        heureEcheance: "20:00",
-        rappelMinutes: 15,
-        sousTaches: [
-            { id: "sub_3", texte: "Cliquer sur Actualiser DotB", fait: true },
-            { id: "sub_4", texte: "Vérifier les scores calculés", fait: false }
-        ],
-        dateCreation: new Date().toISOString()
-    }
-];
+let DEFAULT_TODOS = [];
 
 const dbService = {
     supabase,

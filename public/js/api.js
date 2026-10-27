@@ -206,8 +206,12 @@ const API = {
             body: JSON.stringify(data)
         });
     },
-    async deleteTodo(id) {
-        return this.fetchJSON(`/api/todos/${encodeURIComponent(id)}`, {
+    async deleteTodo(id, userNom = null, userId = null) {
+        const params = new URLSearchParams();
+        if (userNom) params.append('userNom', userNom);
+        if (userId) params.append('userId', userId);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.fetchJSON(`/api/todos/${encodeURIComponent(id)}${query}`, {
             method: 'DELETE'
         });
     },
@@ -217,10 +221,10 @@ const API = {
             body: JSON.stringify({ ids, fields, modifiePar, organisationId })
         });
     },
-    async bulkDeleteTodos(ids, organisationId = null) {
+    async bulkDeleteTodos(ids, organisationId = null, userNom = null, userId = null) {
         return this.fetchJSON('/api/todos/bulk-delete', {
             method: 'POST',
-            body: JSON.stringify({ ids, organisationId })
+            body: JSON.stringify({ ids, organisationId, userNom, userId })
         });
     },
 
