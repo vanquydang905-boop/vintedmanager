@@ -34,6 +34,9 @@ function App() {
     const [hasCheckedStartupTodos, setHasCheckedStartupTodos] = useState(false);
 
     const [isSyncingDotB, setIsSyncingDotB] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [isOrgSwitching, setIsOrgSwitching] = useState(false);
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
 
     // Synchronisation dynamique du titre du document au format : « Nom de la page · Vinted Manager »
     useEffect(() => {
@@ -107,7 +110,10 @@ function App() {
     }, []);
 
     const loadData = useCallback(async (orgId) => {
-        if (!currentUser) return;
+        if (!currentUser) {
+            setIsInitialLoading(false);
+            return;
+        }
         const targetOrgId = (currentUser.role !== 'admin' && currentUser.organisationId) 
             ? currentUser.organisationId 
             : (orgId || currentOrgId);
@@ -117,6 +123,9 @@ function App() {
         } catch (err) {
             console.error("[React App loadData Error]", err);
             showToast("Erreur API : " + (err.message || "Impossible de contacter le serveur"), true);
+        } finally {
+            setIsInitialLoading(false);
+            setIsOrgSwitching(false);
         }
     }, [currentUser, currentOrgId, showToast]);
 
@@ -244,6 +253,7 @@ function App() {
 
     const handleLoginSubmit = async (loginInput, password, role = null) => {
         setLoginError('');
+        setIsLoggingIn(true);
         try {
             const payload = role ? { role } : { email: loginInput, motDePasse: password };
             const user = await API.login(payload);
@@ -258,6 +268,8 @@ function App() {
             const errorMsg = "Identifiant ou mot de passe incorrect. Veuillez réessayer.";
             setLoginError(errorMsg);
             showToast(errorMsg, true);
+        } finally {
+            setIsLoggingIn(false);
         }
     };
 
@@ -267,13 +279,15 @@ function App() {
         showToast("Déconnexion réussie");
     };
 
-    const handleSwitchOrg = (orgId) => {
+    const handleSwitchOrg = async (orgId) => {
         if (currentUser && currentUser.role !== 'admin') {
             showToast("Accès restreint à votre organisation uniquement.", true);
             return;
         }
+        setIsOrgSwitching(true);
         setCurrentOrgId(orgId);
         showToast("Chargement de l'organisation...");
+        await loadData(orgId);
     };
 
 
@@ -612,7 +626,7 @@ function App() {
     if (!currentUser) {
         return (
             <div className="app-container">
-                <LoginView onLoginSubmit={handleLoginSubmit} loginError={loginError} />
+                <LoginView onLoginSubmit={handleLoginSubmit} loginError={loginError} isLoggingIn={isLoggingIn} />
                 <Toast toast={toast} />
             </div>
         );
@@ -743,9 +757,9 @@ function App() {
                                     title="Actualiser en direct tous les comptes, articles en ligne et commandes depuis DotB Cloud"
                                 >
                                     {isSyncingDotB ? (
-                                        <>
-                                            <i className="fa-solid fa-spinner fa-spin"></i> Sync DotB...
-                                        </>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                            <CircularLogoLoader size={16} pulse={false} showOuterRing={false} /> Sync DotB...
+                                        </span>
                                     ) : (
                                         <>
                                             <i className="fa-solid fa-arrows-rotate"></i> Actualiser DotB
@@ -887,8 +901,25 @@ function App() {
 
             <Toast toast={toast} />
 
-            {/* Écran de chargement avec logo animé pendant la synchronisation */}
-            {isSyncingDotB && <LoadingScreen message="Synchronisation et actualisation DotB Cloud..." />}
+            {/* Écran de chargement avec logo animé sur chaque chargement */}
+            {isInitialLoading && currentUser && (
+                <LoadingScreen
+                    message="Chargement de Vinted Manager..."
+                    subtext="Synchronisation sécurisée avec Supabase Cloud"
+                />
+            )}
+            {isOrgSwitching && (
+                <LoadingScreen
+                    message="Changement d'organisation en cours..."
+                    subtext={`Chargement des données pour l'organisation ${currentOrgId}...`}
+                />
+            )}
+            {isSyncingDotB && (
+                <LoadingScreen
+                    message="Synchronisation et actualisation DotB Cloud..."
+                    subtext="Actualisation des ventes, statuts et doublons"
+                />
+            )}
         </div>
     );
 }

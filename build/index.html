@@ -43,8 +43,32 @@
 
 <body>
 
-    <!-- POINT DE MONTAGE REACT -->
-    <div id="root"></div>
+    <!-- POINT DE MONTAGE REACT AVEC CHARGEMENT INITIAL LOGO & ANIMATION CYCLIQUE -->
+    <div id="root">
+        <div class="app-loading-overlay">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <div class="circular-loader-container" style="width: 84px; height: 84px;">
+                    <div class="circular-loader-ring-outer" style="inset: -28px; border-width: 1.5px;"></div>
+                    <div class="circular-loader-ring" style="inset: -18px; border-width: 4px;"></div>
+                    <div class="circular-loader-icon">
+                        <img src="/assets/icone/icone-256.png" alt="Vinted Manager Logo" width="58" height="58" style="object-fit: contain; border-radius: 14px; display: block;" />
+                    </div>
+                </div>
+                <div style="margin-top: 22px; margin-bottom: 4px;">
+                    <img src="/assets/logo/logo-header-h96.png" alt="Vinted Manager" height="34" style="object-fit: contain; display: block;" />
+                </div>
+                <div style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 10px; letter-spacing: -0.3px; text-align: center;">
+                    Chargement de Vinted Manager...
+                </div>
+                <div style="font-size: 12.5px; color: #64748b; font-weight: 500; text-align: center; margin-top: 3px;">
+                    Initialisation de l'application & des données
+                </div>
+                <div class="loading-progress-bar-indeterminate">
+                    <div class="loading-progress-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- SCRIPT BUNDLE REACT PRÉ-COMPILÉ (CHARGEMENT INSTANTANÉ SANS ÉCRAN BLANC) -->
     <script src="js/api.js?v=2.3.0"></script>

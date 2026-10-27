@@ -250,12 +250,15 @@ function Logo({
     return imgElement;
 }
 
-// ------------------- COMPOSANT LOADER CIRCULAIRE AVEC ICÔNE -------------------
-function CircularIconLoader({ size = 64, pulse = true, showOuterRing = true, className = "", style = {} }) {
-    const ringOffset = Math.max(8, Math.round(size * 0.22));
+// ------------------- COMPOSANT LOADER CIRCULAIRE AVEC LOGO -------------------
+function CircularLogoLoader({ size = 64, pulse = true, showOuterRing = true, variant = "icon", className = "", style = {} }) {
+    const ringOffset = Math.max(7, Math.round(size * 0.22));
     const outerRingOffset = ringOffset + Math.max(5, Math.round(size * 0.12));
-    const borderWidth = Math.max(2.5, Math.round(size * 0.05));
+    const borderWidth = Math.max(2, Math.round(size * 0.05));
     
+    // Pour variant='icon', logo 1:1 ; pour variant='header', adapter les proportions
+    const logoHeight = Math.max(12, Math.round(size * (variant === 'header' ? 0.42 : 0.72)));
+
     return (
         <div className={`circular-loader-container ${className}`} style={{ width: `${size}px`, height: `${size}px`, ...style }}>
             {showOuterRing && (
@@ -263,7 +266,7 @@ function CircularIconLoader({ size = 64, pulse = true, showOuterRing = true, cla
                     className="circular-loader-ring-outer"
                     style={{
                         inset: `-${outerRingOffset}px`,
-                        borderWidth: '1.5px'
+                        borderWidth: size > 30 ? '1.5px' : '1px'
                     }}
                 />
             )}
@@ -275,25 +278,36 @@ function CircularIconLoader({ size = 64, pulse = true, showOuterRing = true, cla
                 }}
             />
             <div className={pulse ? "circular-loader-icon" : ""}>
-                <Logo variant="icon" height={size} alt="Vinted Manager" />
+                <Logo variant={variant} height={logoHeight} alt="Vinted Manager Logo" />
             </div>
         </div>
     );
 }
+var CircularIconLoader = CircularLogoLoader;
 
-// ------------------- ÉCRAN DE CHARGEMENT AVEC ICÔNE & ANIMATION CIRCULAIRE -------------------
-function LoadingScreen({ message = "Chargement en cours...", subtext = "Vinted Manager" }) {
+// ------------------- ÉCRAN DE CHARGEMENT AVEC LOGO & ANIMATION CIRCULAIRE -------------------
+function LoadingScreen({ message = "Chargement en cours...", subtext = "Vinted Manager", showHeaderLogo = true }) {
     return (
         <div className="app-loading-overlay">
-            <CircularIconLoader size={72} pulse={true} showOuterRing={true} />
-            <div style={{ fontSize: '15.5px', fontWeight: 700, color: '#0f172a', marginTop: '16px', letterSpacing: '-0.3px', textAlign: 'center' }}>
-                {message}
-            </div>
-            {subtext && (
-                <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500, textAlign: 'center' }}>
-                    {subtext}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <CircularLogoLoader size={84} pulse={true} showOuterRing={true} variant="icon" />
+                {showHeaderLogo && (
+                    <div style={{ marginTop: '20px', marginBottom: '4px', opacity: 0.95 }}>
+                        <Logo variant="header" height={36} alt="Vinted Manager" />
+                    </div>
+                )}
+                <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginTop: showHeaderLogo ? '8px' : '16px', letterSpacing: '-0.3px', textAlign: 'center' }}>
+                    {message}
                 </div>
-            )}
+                {subtext && (
+                    <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500, textAlign: 'center', marginTop: '3px' }}>
+                        {subtext}
+                    </div>
+                )}
+                <div className="loading-progress-bar-indeterminate">
+                    <div className="loading-progress-bar-fill"></div>
+                </div>
+            </div>
         </div>
     );
 }
@@ -1917,7 +1931,7 @@ function ParametresView({ appState, onSaveParametres }) {
 }
 
 // ------------------- VIEW: LOGIN -------------------
-function LoginView({ onLoginSubmit, loginError }) {
+function LoginView({ onLoginSubmit, loginError, isLoggingIn }) {
     const [loginInput, setLoginInput] = useState('');
     const [password, setPassword] = useState('');
 
@@ -1997,8 +2011,16 @@ function LoginView({ onLoginSubmit, loginError }) {
                         <label style={{ fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px', fontSize: '13px' }}>Mot de passe</label>
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required style={{ width: '100%', padding: '12px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }} />
                     </div>
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, borderRadius: '8px', backgroundColor: 'var(--primary-color)', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(9, 177, 186, 0.3)' }}>
-                        <i className="fa-solid fa-right-to-bracket" style={{ marginRight: '8px' }}></i> Se connecter
+                    <button type="submit" disabled={isLoggingIn} className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, borderRadius: '8px', backgroundColor: 'var(--primary-color)', color: '#fff', border: 'none', cursor: isLoggingIn ? 'not-allowed' : 'pointer', boxShadow: '0 4px 12px rgba(9, 177, 186, 0.3)', opacity: isLoggingIn ? 0.8 : 1 }}>
+                        {isLoggingIn ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                <CircularLogoLoader size={18} pulse={false} showOuterRing={false} /> Connexion en cours...
+                            </span>
+                        ) : (
+                            <>
+                                <i className="fa-solid fa-right-to-bracket" style={{ marginRight: '8px' }}></i> Se connecter
+                            </>
+                        )}
                     </button>
                 </form>
             </div>
@@ -3709,7 +3731,9 @@ function ClassementView({ appState, onUpdateRow }) {
                             style={{ height: '42px', padding: '0 24px', fontSize: '13.5px', fontWeight: 600, backgroundColor: '#2563eb', border: 'none', borderRadius: '8px' }}
                         >
                             {isImportingCsv ? (
-                                <span><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> Filtrage Doublons & Stockage Base...</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                    <CircularLogoLoader size={18} pulse={false} showOuterRing={false} /> Filtrage Doublons & Stockage Base...
+                                </span>
                             ) : (
                                 <span><i className="fa-solid fa-database" style={{ marginRight: '8px' }}></i> Lancer l'importation & Stocker en Base</span>
                             )}
@@ -3861,9 +3885,9 @@ function ClassementView({ appState, onUpdateRow }) {
                             style={{ height: '40px', padding: '0 20px', fontSize: '13px', fontWeight: 600, backgroundColor: '#059669', color: '#ffffff', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                         >
                             {isBulkProcessing ? (
-                                <>
-                                    <i className="fa-solid fa-spinner fa-spin"></i> Traitement...
-                                </>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                    <CircularLogoLoader size={18} pulse={false} showOuterRing={false} /> Traitement...
+                                </span>
                             ) : (
                                 <>
                                     <i className="fa-solid fa-cloud-arrow-down"></i> Classer les SKUs du Sheet comme "À retester"
@@ -4346,7 +4370,9 @@ function ClassementView({ appState, onUpdateRow }) {
                                                 style={{ height: '42px', padding: '0 24px', fontSize: '13.5px', fontWeight: 600, width: '100%', backgroundColor: '#2563eb' }}
                                             >
                                                 {isPropagating ? (
-                                                    <span><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i> Propagation en cours...</span>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                                        <CircularLogoLoader size={18} pulse={false} showOuterRing={false} /> Propagation en cours...
+                                                    </span>
                                                 ) : (
                                                     <span><i className="fa-solid fa-paper-plane" style={{ marginRight: '8px' }}></i> Propager le SKU sur {selectedAccountsToPropagate.length} compte(s)</span>
                                                 )}
@@ -7672,6 +7698,7 @@ window.ReactComponents = {
     StartupTodoModal,
     TodoPhotoLightboxModal,
     Logo,
+    CircularLogoLoader,
     CircularIconLoader,
     LoadingScreen,
     EmptyStateWithLogo

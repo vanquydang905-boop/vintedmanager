@@ -411,17 +411,21 @@ function Logo({
   return imgElement;
 }
 
-// ------------------- COMPOSANT LOADER CIRCULAIRE AVEC ICÔNE -------------------
-function CircularIconLoader({
+// ------------------- COMPOSANT LOADER CIRCULAIRE AVEC LOGO -------------------
+function CircularLogoLoader({
   size = 64,
   pulse = true,
   showOuterRing = true,
+  variant = "icon",
   className = "",
   style = {}
 }) {
-  const ringOffset = Math.max(8, Math.round(size * 0.22));
+  const ringOffset = Math.max(7, Math.round(size * 0.22));
   const outerRingOffset = ringOffset + Math.max(5, Math.round(size * 0.12));
-  const borderWidth = Math.max(2.5, Math.round(size * 0.05));
+  const borderWidth = Math.max(2, Math.round(size * 0.05));
+
+  // Pour variant='icon', logo 1:1 ; pour variant='header', adapter les proportions
+  const logoHeight = Math.max(12, Math.round(size * (variant === 'header' ? 0.42 : 0.72)));
   return /*#__PURE__*/React.createElement("div", {
     className: `circular-loader-container ${className}`,
     style: {
@@ -433,7 +437,7 @@ function CircularIconLoader({
     className: "circular-loader-ring-outer",
     style: {
       inset: `-${outerRingOffset}px`,
-      borderWidth: '1.5px'
+      borderWidth: size > 30 ? '1.5px' : '1px'
     }
   }), /*#__PURE__*/React.createElement("div", {
     className: "circular-loader-ring",
@@ -444,29 +448,49 @@ function CircularIconLoader({
   }), /*#__PURE__*/React.createElement("div", {
     className: pulse ? "circular-loader-icon" : ""
   }, /*#__PURE__*/React.createElement(Logo, {
-    variant: "icon",
-    height: size,
-    alt: "Vinted Manager"
+    variant: variant,
+    height: logoHeight,
+    alt: "Vinted Manager Logo"
   })));
 }
+var CircularIconLoader = CircularLogoLoader;
 
-// ------------------- ÉCRAN DE CHARGEMENT AVEC ICÔNE & ANIMATION CIRCULAIRE -------------------
+// ------------------- ÉCRAN DE CHARGEMENT AVEC LOGO & ANIMATION CIRCULAIRE -------------------
 function LoadingScreen({
   message = "Chargement en cours...",
-  subtext = "Vinted Manager"
+  subtext = "Vinted Manager",
+  showHeaderLogo = true
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "app-loading-overlay"
-  }, /*#__PURE__*/React.createElement(CircularIconLoader, {
-    size: 72,
-    pulse: true,
-    showOuterRing: true
-  }), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: '15.5px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(CircularLogoLoader, {
+    size: 84,
+    pulse: true,
+    showOuterRing: true,
+    variant: "icon"
+  }), showHeaderLogo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '20px',
+      marginBottom: '4px',
+      opacity: 0.95
+    }
+  }, /*#__PURE__*/React.createElement(Logo, {
+    variant: "header",
+    height: 36,
+    alt: "Vinted Manager"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '15px',
       fontWeight: 700,
       color: '#0f172a',
-      marginTop: '16px',
+      marginTop: showHeaderLogo ? '8px' : '16px',
       letterSpacing: '-0.3px',
       textAlign: 'center'
     }
@@ -475,9 +499,14 @@ function LoadingScreen({
       fontSize: '12.5px',
       color: '#64748b',
       fontWeight: 500,
-      textAlign: 'center'
+      textAlign: 'center',
+      marginTop: '3px'
     }
-  }, subtext));
+  }, subtext), /*#__PURE__*/React.createElement("div", {
+    className: "loading-progress-bar-indeterminate"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "loading-progress-bar-fill"
+  }))));
 }
 
 // ------------------- ÉTAT VIDE AVEC LOGO -------------------
@@ -2935,7 +2964,8 @@ function ParametresView({
 // ------------------- VIEW: LOGIN -------------------
 function LoginView({
   onLoginSubmit,
-  loginError
+  loginError,
+  isLoggingIn
 }) {
   const [loginInput, setLoginInput] = useState('');
   const [password, setPassword] = useState('');
@@ -3074,6 +3104,7 @@ function LoginView({
     }
   })), /*#__PURE__*/React.createElement("button", {
     type: "submit",
+    disabled: isLoggingIn,
     className: "btn btn-primary",
     style: {
       width: '100%',
@@ -3084,15 +3115,27 @@ function LoginView({
       backgroundColor: 'var(--primary-color)',
       color: '#fff',
       border: 'none',
-      cursor: 'pointer',
-      boxShadow: '0 4px 12px rgba(9, 177, 186, 0.3)'
+      cursor: isLoggingIn ? 'not-allowed' : 'pointer',
+      boxShadow: '0 4px 12px rgba(9, 177, 186, 0.3)',
+      opacity: isLoggingIn ? 0.8 : 1
     }
-  }, /*#__PURE__*/React.createElement("i", {
+  }, isLoggingIn ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement(CircularLogoLoader, {
+    size: 18,
+    pulse: false,
+    showOuterRing: false
+  }), " Connexion en cours...") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-right-to-bracket",
     style: {
       marginRight: '8px'
     }
-  }), " Se connecter"))));
+  }), " Se connecter")))));
 }
 
 // ------------------- VIEW: UTILISATEURS AVEC ACCÈS PERSONNALISABLES -------------------
@@ -5402,11 +5445,16 @@ function ClassementView({
       border: 'none',
       borderRadius: '8px'
     }
-  }, isImportingCsv ? /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-spinner fa-spin",
+  }, isImportingCsv ? /*#__PURE__*/React.createElement("span", {
     style: {
-      marginRight: '8px'
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px'
     }
+  }, /*#__PURE__*/React.createElement(CircularLogoLoader, {
+    size: 18,
+    pulse: false,
+    showOuterRing: false
   }), " Filtrage Doublons & Stockage Base...") : /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-database",
     style: {
@@ -5725,8 +5773,16 @@ function ClassementView({
       alignItems: 'center',
       gap: '8px'
     }
-  }, isBulkProcessing ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-spinner fa-spin"
+  }, isBulkProcessing ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement(CircularLogoLoader, {
+    size: 18,
+    pulse: false,
+    showOuterRing: false
   }), " Traitement...") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-cloud-arrow-down"
   }), " Classer les SKUs du Sheet comme \"\xC0 retester\""))), /*#__PURE__*/React.createElement("div", {
@@ -6524,11 +6580,16 @@ function ClassementView({
         width: '100%',
         backgroundColor: '#2563eb'
       }
-    }, isPropagating ? /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
-      className: "fa-solid fa-spinner fa-spin",
+    }, isPropagating ? /*#__PURE__*/React.createElement("span", {
       style: {
-        marginRight: '8px'
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px'
       }
+    }, /*#__PURE__*/React.createElement(CircularLogoLoader, {
+      size: 18,
+      pulse: false,
+      showOuterRing: false
     }), " Propagation en cours...") : /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
       className: "fa-solid fa-paper-plane",
       style: {
@@ -10753,6 +10814,7 @@ window.ReactComponents = {
   StartupTodoModal,
   TodoPhotoLightboxModal,
   Logo,
+  CircularLogoLoader,
   CircularIconLoader,
   LoadingScreen,
   EmptyStateWithLogo
@@ -10796,6 +10858,9 @@ function App() {
   const [showStartupTodoModal, setShowStartupTodoModal] = useState(false);
   const [hasCheckedStartupTodos, setHasCheckedStartupTodos] = useState(false);
   const [isSyncingDotB, setIsSyncingDotB] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isOrgSwitching, setIsOrgSwitching] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Synchronisation dynamique du titre du document au format : « Nom de la page · Vinted Manager »
   useEffect(() => {
@@ -10876,7 +10941,10 @@ function App() {
     }, 3500);
   }, []);
   const loadData = useCallback(async orgId => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setIsInitialLoading(false);
+      return;
+    }
     const targetOrgId = currentUser.role !== 'admin' && currentUser.organisationId ? currentUser.organisationId : orgId || currentOrgId;
     try {
       const data = await API.getFullDB(targetOrgId);
@@ -10887,6 +10955,9 @@ function App() {
     } catch (err) {
       console.error("[React App loadData Error]", err);
       showToast("Erreur API : " + (err.message || "Impossible de contacter le serveur"), true);
+    } finally {
+      setIsInitialLoading(false);
+      setIsOrgSwitching(false);
     }
   }, [currentUser, currentOrgId, showToast]);
   useEffect(() => {
@@ -11004,6 +11075,7 @@ function App() {
   }, [appState.todos, currentUser]);
   const handleLoginSubmit = async (loginInput, password, role = null) => {
     setLoginError('');
+    setIsLoggingIn(true);
     try {
       const payload = role ? {
         role
@@ -11023,6 +11095,8 @@ function App() {
       const errorMsg = "Identifiant ou mot de passe incorrect. Veuillez réessayer.";
       setLoginError(errorMsg);
       showToast(errorMsg, true);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
   const handleLogout = () => {
@@ -11030,13 +11104,15 @@ function App() {
     setCurrentUser(null);
     showToast("Déconnexion réussie");
   };
-  const handleSwitchOrg = orgId => {
+  const handleSwitchOrg = async orgId => {
     if (currentUser && currentUser.role !== 'admin') {
       showToast("Accès restreint à votre organisation uniquement.", true);
       return;
     }
+    setIsOrgSwitching(true);
     setCurrentOrgId(orgId);
     showToast("Chargement de l'organisation...");
+    await loadData(orgId);
   };
   const handleSaveCompte = async compteData => {
     try {
@@ -11362,7 +11438,8 @@ function App() {
       className: "app-container"
     }, /*#__PURE__*/React.createElement(LoginView, {
       onLoginSubmit: handleLoginSubmit,
-      loginError: loginError
+      loginError: loginError,
+      isLoggingIn: isLoggingIn
     }), /*#__PURE__*/React.createElement(Toast, {
       toast: toast
     }));
@@ -11480,8 +11557,16 @@ function App() {
       boxShadow: '0 2px 8px rgba(37,99,235,0.3)'
     },
     title: "Actualiser en direct tous les comptes, articles en ligne et commandes depuis DotB Cloud"
-  }, isSyncingDotB ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-spinner fa-spin"
+  }, isSyncingDotB ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px'
+    }
+  }, /*#__PURE__*/React.createElement(CircularLogoLoader, {
+    size: 16,
+    pulse: false,
+    showOuterRing: false
   }), " Sync DotB...") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
     className: "fa-solid fa-arrows-rotate"
   }), " Actualiser DotB")), PermissionManager.can(currentUser, 'export_data') && /*#__PURE__*/React.createElement("button", {
@@ -11595,8 +11680,15 @@ function App() {
     showToast: showToast
   }), /*#__PURE__*/React.createElement(Toast, {
     toast: toast
+  }), isInitialLoading && currentUser && /*#__PURE__*/React.createElement(LoadingScreen, {
+    message: "Chargement de Vinted Manager...",
+    subtext: "Synchronisation s\xE9curis\xE9e avec Supabase Cloud"
+  }), isOrgSwitching && /*#__PURE__*/React.createElement(LoadingScreen, {
+    message: "Changement d'organisation en cours...",
+    subtext: `Chargement des données pour l'organisation ${currentOrgId}...`
   }), isSyncingDotB && /*#__PURE__*/React.createElement(LoadingScreen, {
-    message: "Synchronisation et actualisation DotB Cloud..."
+    message: "Synchronisation et actualisation DotB Cloud...",
+    subtext: "Actualisation des ventes, statuts et doublons"
   }));
 }
 
