@@ -199,21 +199,94 @@ body {
     animation: logoPulseAnimation 2s ease-in-out infinite;
 }
 
-/* Loading Overlay with Logo */
+/* ============================================================ */
+/* ANIMATION CIRCULAIRE DE CHARGEMENT AUTOUR DE L'ICÔNE         */
+/* ============================================================ */
+
+@keyframes circularLoaderSpin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes circularLoaderPulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 4px 14px rgba(9, 177, 186, 0.35));
+    }
+    50% {
+        transform: scale(1.05);
+        filter: drop-shadow(0 6px 22px rgba(9, 177, 186, 0.6));
+    }
+}
+
+.circular-loader-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+}
+
+.circular-loader-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 3.5px solid rgba(9, 177, 186, 0.16);
+    border-top: 3.5px solid #09b1ba;
+    border-right: 3.5px solid #0d9488;
+    animation: circularLoaderSpin 1.05s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.circular-loader-ring-outer {
+    position: absolute;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(9, 177, 186, 0.28);
+    animation: circularLoaderSpin 7s linear infinite reverse;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.circular-loader-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 22%;
+    animation: circularLoaderPulse 2s ease-in-out infinite;
+    line-height: 0;
+}
+
+/* Loading Overlay Global */
 .app-loading-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(4px);
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(8px);
     z-index: 999999;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 16px;
+    animation: fadeInOverlay 0.25s ease-out;
+}
+
+@keyframes fadeInOverlay {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 

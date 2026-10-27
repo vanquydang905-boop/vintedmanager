@@ -1946,6 +1946,45 @@ if (require.main === module) {
         console.log(`  Gestion des rôles : Admin, Cadre, Agent`);
         console.log(`  Local URL: http://localhost:${PORT}`);
         console.log(`================================================`);
+
+        // Synchronisation automatique DotB en arrière-plan toutes les 1h (60 * 60 * 1000 ms)
+        const SERVER_SYNC_INTERVAL_MS = 60 * 60 * 1000;
+        setInterval(async () => {
+            try {
+                console.log('[Server AutoSync 1h] Démarrage de la synchronisation automatique DotB...');
+                const orgId = 'org_default';
+                const params = await dbService.getParametres(orgId);
+                const token = params.dotbApiKey || 'dotb_pk_pmXggjdukM3FR-YCw2cXsgug2YrtJa_0ZBX9s5J6Wf8';
+                if (!token) return;
+
+                const [dotbAccounts] = await Promise.all([
+                    DotbApiService.getAccounts(token).catch(() => [])
+                ]);
+
+                if (dotbAccounts && dotbAccounts.length > 0) {
+                    const existingComptes = await dbService.getComptes(orgId);
+                    for (const acc of dotbAccounts) {
+                        const loginClean = acc.login ? acc.login.trim() : null;
+                        if (!loginClean) continue;
+                        const existing = existingComptes.find(c => c.pseudo && c.pseudo.toLowerCase() === loginClean.toLowerCase());
+                        if (!existing) {
+                            await dbService.createCompte({
+                                id: `compte_${acc.vinted_id || Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                                organisationId: orgId,
+                                numeroCompte: String(acc.vinted_id || ''),
+                                pseudo: loginClean,
+                                statut: 'Actif',
+                                agent: 'À attribuer',
+                                dateCreation: getLocalDateString(new Date())
+                            });
+                        }
+                    }
+                }
+                console.log('[Server AutoSync 1h] Synchronisation automatique terminée avec succès.');
+            } catch (err) {
+                console.error('[Server AutoSync 1h Erreur]:', err.message);
+            }
+        }, SERVER_SYNC_INTERVAL_MS);
     });
 }
 

@@ -200,6 +200,34 @@ function App() {
         return () => clearInterval(timer);
     }, [currentUser, appState.todos]);
 
+    // Synchronisation automatique DotB toutes les 1h (60 * 60 * 1000 ms)
+    useEffect(() => {
+        if (!currentUser) return;
+        const ONE_HOUR_MS = 60 * 60 * 1000;
+        const autoSyncTimer = setInterval(async () => {
+            console.log('[AutoSync] Déclenchement automatique de la synchronisation DotB (intervalle 1h)...');
+            try {
+                const targetOrg = (currentUser.role !== 'admin' && currentUser.organisationId)
+                    ? currentUser.organisationId
+                    : (currentOrgId || 'org_default');
+                const res = await fetch('/api/dotb/fetch-live', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ organisationId: targetOrg, period: 'all' })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await loadData(targetOrg);
+                    console.log('[AutoSync] Synchronisation 1h réussie:', data);
+                }
+            } catch (err) {
+                console.warn('[AutoSync] Erreur lors de la synchronisation 1h:', err);
+            }
+        }, ONE_HOUR_MS);
+
+        return () => clearInterval(autoSyncTimer);
+    }, [currentUser, currentOrgId, loadData]);
+
     const todoUrgentCount = useMemo(() => {
         return (appState.todos || []).filter(t => {
             if (t.statut === 'terminee') return false;

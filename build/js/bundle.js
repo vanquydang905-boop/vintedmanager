@@ -411,31 +411,73 @@ function Logo({
   return imgElement;
 }
 
-// ------------------- ÉCRAN DE CHARGEMENT AVEC LOGO -------------------
+// ------------------- COMPOSANT LOADER CIRCULAIRE AVEC ICÔNE -------------------
+function CircularIconLoader({
+  size = 64,
+  pulse = true,
+  showOuterRing = true,
+  className = "",
+  style = {}
+}) {
+  const ringOffset = Math.max(8, Math.round(size * 0.22));
+  const outerRingOffset = ringOffset + Math.max(5, Math.round(size * 0.12));
+  const borderWidth = Math.max(2.5, Math.round(size * 0.05));
+  return /*#__PURE__*/React.createElement("div", {
+    className: `circular-loader-container ${className}`,
+    style: {
+      width: `${size}px`,
+      height: `${size}px`,
+      ...style
+    }
+  }, showOuterRing && /*#__PURE__*/React.createElement("div", {
+    className: "circular-loader-ring-outer",
+    style: {
+      inset: `-${outerRingOffset}px`,
+      borderWidth: '1.5px'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "circular-loader-ring",
+    style: {
+      inset: `-${ringOffset}px`,
+      borderWidth: `${borderWidth}px`
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: pulse ? "circular-loader-icon" : ""
+  }, /*#__PURE__*/React.createElement(Logo, {
+    variant: "icon",
+    height: size,
+    alt: "Vinted Manager"
+  })));
+}
+
+// ------------------- ÉCRAN DE CHARGEMENT AVEC ICÔNE & ANIMATION CIRCULAIRE -------------------
 function LoadingScreen({
-  message = "Chargement en cours..."
+  message = "Chargement en cours...",
+  subtext = "Vinted Manager"
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "app-loading-overlay"
-  }, /*#__PURE__*/React.createElement(Logo, {
-    variant: "icon",
-    height: 80,
+  }, /*#__PURE__*/React.createElement(CircularIconLoader, {
+    size: 72,
     pulse: true,
-    alt: "Vinted Manager"
+    showOuterRing: true
   }), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: '15px',
+      fontSize: '15.5px',
       fontWeight: 700,
       color: '#0f172a',
-      marginTop: '12px',
-      letterSpacing: '-0.3px'
+      marginTop: '16px',
+      letterSpacing: '-0.3px',
+      textAlign: 'center'
     }
-  }, message), /*#__PURE__*/React.createElement("div", {
+  }, message), subtext && /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: '12px',
-      color: '#64748b'
+      fontSize: '12.5px',
+      color: '#64748b',
+      fontWeight: 500,
+      textAlign: 'center'
     }
-  }, "Vinted Manager"));
+  }, subtext));
 }
 
 // ------------------- ÉTAT VIDE AVEC LOGO -------------------
@@ -4233,15 +4275,16 @@ function ClassementView({
     return map;
   }, [comptesAll]);
 
-  // Filtre Temporel pour les Classements (Aujourd'hui, 2j, 3j, 7j, 14j, 30j, Custom, Tout)
-  const [rankingDateFilter, setRankingDateFilter] = useState('all');
+  // Filtre Temporel pour les Classements (Aujourd'hui par défaut, 2j, 3j, 7j, 14j, 30j, Custom, Tout)
+  const [rankingDateFilter, setRankingDateFilter] = useState('1');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const referenceDate = useMemo(() => {
     let maxMs = 0;
     (calendrier || []).forEach(l => {
-      if (l.date) {
-        const d = new Date(String(l.date).replace(' ', 'T'));
+      if (l.date || l.datePrevue || l.created_at) {
+        const val = l.date || l.datePrevue || l.created_at;
+        const d = new Date(String(val).replace(' ', 'T'));
         if (!isNaN(d.getTime()) && d.getTime() > maxMs) {
           maxMs = d.getTime();
         }
@@ -4264,10 +4307,17 @@ function ClassementView({
       });
     }
     const daysLimit = parseInt(rankingDateFilter, 10);
+    const todayStr = new Date().toISOString().split('T')[0];
     return (calendrier || []).filter(l => {
       if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return false;
       const dateVal = l.date || l.datePrevue || l.created_at;
       if (!dateVal) return false;
+      const dStr = String(dateVal).split(' ')[0].split('T')[0];
+
+      // Si filtre Aujourd'hui (1j) : match exact de la date du jour ou dernières 24h
+      if (daysLimit === 1 && dStr === todayStr) {
+        return true;
+      }
       const d = new Date(String(dateVal).replace(' ', 'T'));
       if (isNaN(d.getTime())) return false;
       const diffMs = referenceDate.getTime() - d.getTime();
@@ -4479,6 +4529,7 @@ function ClassementView({
         statsMap[key] = {
           name,
           role: u.role || 'agent',
+          dateCreation: u.dateCreation || u.createdAt || u.created_at || '',
           comptesCount: cStats.total,
           comptesTotal: cStats.total,
           comptesActifs: cStats.actifs,
@@ -4509,9 +4560,11 @@ function ClassementView({
           bannis: 0,
           restreints: 0
         };
+        const matchedUser = (appState.utilisateurs || []).find(u => u.nom && u.nom.trim().toLowerCase() === key || u.agentAssigne && u.agentAssigne.trim().toLowerCase() === key);
         statsMap[key] = {
           name: agentName,
-          role: 'agent',
+          role: matchedUser && matchedUser.role || 'agent',
+          dateCreation: matchedUser && (matchedUser.dateCreation || matchedUser.createdAt || matchedUser.created_at) || '',
           comptesCount: cStats.total,
           comptesTotal: cStats.total,
           comptesActifs: cStats.actifs,
@@ -4542,14 +4595,29 @@ function ClassementView({
       const taux = a.pubsTotales > 0 ? Math.round(a.pubsFaites / a.pubsTotales * 100) : 0;
       const scoreMoyen = a.pubsTotales > 0 ? (a.scoreTotal / a.pubsTotales).toFixed(1) : 0;
 
-      // Logique de classification cohérente basée sur l'activité réelle et les ventes
-      let classification = '🌟 Nouvel Agent';
+      // Calcul de l'ancienneté de l'agent sur VintedManager (moins de 30 jours)
+      let isRecentUser = false;
+      if (a.dateCreation) {
+        const creationDate = new Date(String(a.dateCreation).split('T')[0]);
+        if (!isNaN(creationDate.getTime())) {
+          const diffDays = (Date.now() - creationDate.getTime()) / (1000 * 3600 * 24);
+          // Règle : utilisateur ajouté sur vintedmanager depuis moins de 30 jours
+          if (diffDays <= 30) {
+            isRecentUser = true;
+          }
+        }
+      }
+
+      // Logique de classification : 🌟 Nouvel Agent uniquement si ajouté il y a - de 30 jours
+      let classification = '🛑 Inactif';
       if (a.scoreTotal >= 1000 || a.ventes >= 10 || taux >= 80 && a.pubsTotales >= 20) {
         classification = '🏆 Agent Top';
       } else if (a.scoreTotal >= 150 || a.ventes >= 2 || taux >= 50 && a.pubsFaites >= 5) {
         classification = '⚡ En Progression';
-      } else if (a.pubsTotales > 0 || a.comptesTotal > 0) {
+      } else if (isRecentUser) {
         classification = '🌟 Nouvel Agent';
+      } else if (a.pubsTotales > 0 || a.pubsFaites > 0 || a.scoreTotal > 0 || a.ventes > 0) {
+        classification = '⚡ En Progression';
       } else {
         classification = '🛑 Inactif';
       }
@@ -4704,7 +4772,7 @@ function ClassementView({
       fontSize: '12.5px',
       color: '#94a3b8'
     }
-  }, rankingDateFilter === 'all' ? 'Toutes les données historiques' : rankingDateFilter === 'custom' ? `Période personnalisée du ${customStartDate || 'début'} au ${customEndDate || 'fin'}` : `Derniers ${rankingDateFilter} jour(s)`))), /*#__PURE__*/React.createElement("div", {
+  }, rankingDateFilter === 'all' ? 'Toutes les données historiques' : rankingDateFilter === '1' ? 'Données d\'aujourd\'hui (1j)' : rankingDateFilter === 'custom' ? `Période personnalisée du ${customStartDate || 'début'} au ${customEndDate || 'fin'}` : `Derniers ${rankingDateFilter} jour(s)`))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '6px',
@@ -5013,7 +5081,7 @@ function ClassementView({
     style: {
       minWidth: '170px'
     }
-  }, "Comptes"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Publications"), /*#__PURE__*/React.createElement("th", null, "Taux R\xE9ussite"), /*#__PURE__*/React.createElement("th", null, "Engagement"), /*#__PURE__*/React.createElement("th", null, "Ventes"), /*#__PURE__*/React.createElement("th", {
+  }, "Comptes"), /*#__PURE__*/React.createElement("th", null, "Classification"), /*#__PURE__*/React.createElement("th", null, "Taux R\xE9ussite"), /*#__PURE__*/React.createElement("th", null, "Ventes"), /*#__PURE__*/React.createElement("th", {
     style: {
       textAlign: 'right'
     }
@@ -5173,7 +5241,7 @@ function ClassementView({
     className: "badge badge-nouveau"
   }, "\uD83C\uDF1F Nouvel Agent") : /*#__PURE__*/React.createElement("span", {
     className: "badge badge-ecarte"
-  }, "\uD83D\uDED1 Inactif")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, a.pubsFaites), " / ", a.pubsTotales, " pub", a.pubsTotales > 1 ? 's' : ''), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDED1 Inactif")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -5199,31 +5267,7 @@ function ClassementView({
       fontSize: '12px',
       fontWeight: 600
     }
-  }, a.taux, "%"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '12px',
-      color: 'var(--text-secondary)',
-      display: 'flex',
-      gap: '8px',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    title: "Vues"
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-regular fa-eye",
-    style: {
-      color: '#64748b',
-      marginRight: '3px'
-    }
-  }), a.vues.toLocaleString('fr-FR')), /*#__PURE__*/React.createElement("span", {
-    title: "Likes"
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-regular fa-heart",
-    style: {
-      color: '#e11d48',
-      marginRight: '3px'
-    }
-  }), a.likes.toLocaleString('fr-FR')))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+  }, a.taux, "%"))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700,
       color: a.ventes > 0 ? '#059669' : 'inherit'
@@ -5245,7 +5289,7 @@ function ClassementView({
       marginTop: '2px'
     }
   }, a.scoreMoyen, " pts/pub")))) : /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: "9",
+    colSpan: "7",
     style: {
       textAlign: 'center',
       color: 'var(--text-muted)',
@@ -9632,13 +9676,15 @@ function TodoView({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px',
+      gap: '10px',
       color: '#09b1ba',
       fontSize: '12px',
-      padding: '6px 0'
+      padding: '10px 0'
     }
-  }, /*#__PURE__*/React.createElement("i", {
-    className: "fa-solid fa-spinner fa-spin"
+  }, /*#__PURE__*/React.createElement(CircularIconLoader, {
+    size: 26,
+    pulse: false,
+    showOuterRing: false
   }), /*#__PURE__*/React.createElement("span", null, "Traitement et optimisation des images...")) : /*#__PURE__*/React.createElement("div", {
     style: {
       cursor: 'pointer'
@@ -10524,6 +10570,7 @@ window.ReactComponents = {
   StartupTodoModal,
   TodoPhotoLightboxModal,
   Logo,
+  CircularIconLoader,
   LoadingScreen,
   EmptyStateWithLogo
 };
@@ -10729,6 +10776,36 @@ function App() {
     const timer = setInterval(checkDeadlinesAndNotify, 25000);
     return () => clearInterval(timer);
   }, [currentUser, appState.todos]);
+
+  // Synchronisation automatique DotB toutes les 1h (60 * 60 * 1000 ms)
+  useEffect(() => {
+    if (!currentUser) return;
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const autoSyncTimer = setInterval(async () => {
+      console.log('[AutoSync] Déclenchement automatique de la synchronisation DotB (intervalle 1h)...');
+      try {
+        const targetOrg = currentUser.role !== 'admin' && currentUser.organisationId ? currentUser.organisationId : currentOrgId || 'org_default';
+        const res = await fetch('/api/dotb/fetch-live', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            organisationId: targetOrg,
+            period: 'all'
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          await loadData(targetOrg);
+          console.log('[AutoSync] Synchronisation 1h réussie:', data);
+        }
+      } catch (err) {
+        console.warn('[AutoSync] Erreur lors de la synchronisation 1h:', err);
+      }
+    }, ONE_HOUR_MS);
+    return () => clearInterval(autoSyncTimer);
+  }, [currentUser, currentOrgId, loadData]);
   const todoUrgentCount = useMemo(() => {
     return (appState.todos || []).filter(t => {
       if (t.statut === 'terminee') return false;

@@ -250,17 +250,50 @@ function Logo({
     return imgElement;
 }
 
-// ------------------- ÉCRAN DE CHARGEMENT AVEC LOGO -------------------
-function LoadingScreen({ message = "Chargement en cours..." }) {
+// ------------------- COMPOSANT LOADER CIRCULAIRE AVEC ICÔNE -------------------
+function CircularIconLoader({ size = 64, pulse = true, showOuterRing = true, className = "", style = {} }) {
+    const ringOffset = Math.max(8, Math.round(size * 0.22));
+    const outerRingOffset = ringOffset + Math.max(5, Math.round(size * 0.12));
+    const borderWidth = Math.max(2.5, Math.round(size * 0.05));
+    
+    return (
+        <div className={`circular-loader-container ${className}`} style={{ width: `${size}px`, height: `${size}px`, ...style }}>
+            {showOuterRing && (
+                <div
+                    className="circular-loader-ring-outer"
+                    style={{
+                        inset: `-${outerRingOffset}px`,
+                        borderWidth: '1.5px'
+                    }}
+                />
+            )}
+            <div
+                className="circular-loader-ring"
+                style={{
+                    inset: `-${ringOffset}px`,
+                    borderWidth: `${borderWidth}px`
+                }}
+            />
+            <div className={pulse ? "circular-loader-icon" : ""}>
+                <Logo variant="icon" height={size} alt="Vinted Manager" />
+            </div>
+        </div>
+    );
+}
+
+// ------------------- ÉCRAN DE CHARGEMENT AVEC ICÔNE & ANIMATION CIRCULAIRE -------------------
+function LoadingScreen({ message = "Chargement en cours...", subtext = "Vinted Manager" }) {
     return (
         <div className="app-loading-overlay">
-            <Logo variant="icon" height={80} pulse={true} alt="Vinted Manager" />
-            <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginTop: '12px', letterSpacing: '-0.3px' }}>
+            <CircularIconLoader size={72} pulse={true} showOuterRing={true} />
+            <div style={{ fontSize: '15.5px', fontWeight: 700, color: '#0f172a', marginTop: '16px', letterSpacing: '-0.3px', textAlign: 'center' }}>
                 {message}
             </div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>
-                Vinted Manager
-            </div>
+            {subtext && (
+                <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500, textAlign: 'center' }}>
+                    {subtext}
+                </div>
+            )}
         </div>
     );
 }
@@ -2850,16 +2883,17 @@ function ClassementView({ appState, onUpdateRow }) {
         return map;
     }, [comptesAll]);
 
-    // Filtre Temporel pour les Classements (Aujourd'hui, 2j, 3j, 7j, 14j, 30j, Custom, Tout)
-    const [rankingDateFilter, setRankingDateFilter] = useState('all');
+    // Filtre Temporel pour les Classements (Aujourd'hui par défaut, 2j, 3j, 7j, 14j, 30j, Custom, Tout)
+    const [rankingDateFilter, setRankingDateFilter] = useState('1');
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
 
     const referenceDate = useMemo(() => {
         let maxMs = 0;
         (calendrier || []).forEach(l => {
-            if (l.date) {
-                const d = new Date(String(l.date).replace(' ', 'T'));
+            if (l.date || l.datePrevue || l.created_at) {
+                const val = l.date || l.datePrevue || l.created_at;
+                const d = new Date(String(val).replace(' ', 'T'));
                 if (!isNaN(d.getTime()) && d.getTime() > maxMs) {
                     maxMs = d.getTime();
                 }
@@ -2885,10 +2919,19 @@ function ClassementView({ appState, onUpdateRow }) {
         }
 
         const daysLimit = parseInt(rankingDateFilter, 10);
+        const todayStr = new Date().toISOString().split('T')[0];
+
         return (calendrier || []).filter(l => {
             if (l.isDeleted || l.supprime || l.statut === 'Supprimé' || l.statut === 'Corbeille') return false;
             const dateVal = l.date || l.datePrevue || l.created_at;
             if (!dateVal) return false;
+            const dStr = String(dateVal).split(' ')[0].split('T')[0];
+            
+            // Si filtre Aujourd'hui (1j) : match exact de la date du jour ou dernières 24h
+            if (daysLimit === 1 && dStr === todayStr) {
+                return true;
+            }
+
             const d = new Date(String(dateVal).replace(' ', 'T'));
             if (isNaN(d.getTime())) return false;
             const diffMs = referenceDate.getTime() - d.getTime();
@@ -3117,6 +3160,7 @@ function ClassementView({ appState, onUpdateRow }) {
                 statsMap[key] = {
                     name,
                     role: u.role || 'agent',
+                    dateCreation: u.dateCreation || u.createdAt || u.created_at || '',
                     comptesCount: cStats.total,
                     comptesTotal: cStats.total,
                     comptesActifs: cStats.actifs,
@@ -3143,9 +3187,14 @@ function ClassementView({ appState, onUpdateRow }) {
             const key = agentName.toLowerCase();
             if (!statsMap[key]) {
                 const cStats = agentComptesStats[key] || { total: 0, actifs: 0, bannis: 0, restreints: 0 };
+                const matchedUser = (appState.utilisateurs || []).find(u => 
+                    (u.nom && u.nom.trim().toLowerCase() === key) ||
+                    (u.agentAssigne && u.agentAssigne.trim().toLowerCase() === key)
+                );
                 statsMap[key] = {
                     name: agentName,
-                    role: 'agent',
+                    role: (matchedUser && matchedUser.role) || 'agent',
+                    dateCreation: (matchedUser && (matchedUser.dateCreation || matchedUser.createdAt || matchedUser.created_at)) || '',
                     comptesCount: cStats.total,
                     comptesTotal: cStats.total,
                     comptesActifs: cStats.actifs,
@@ -3180,14 +3229,29 @@ function ClassementView({ appState, onUpdateRow }) {
             const taux = a.pubsTotales > 0 ? Math.round((a.pubsFaites / a.pubsTotales) * 100) : 0;
             const scoreMoyen = a.pubsTotales > 0 ? (a.scoreTotal / a.pubsTotales).toFixed(1) : 0;
             
-            // Logique de classification cohérente basée sur l'activité réelle et les ventes
-            let classification = '🌟 Nouvel Agent';
+            // Calcul de l'ancienneté de l'agent sur VintedManager (moins de 30 jours)
+            let isRecentUser = false;
+            if (a.dateCreation) {
+                const creationDate = new Date(String(a.dateCreation).split('T')[0]);
+                if (!isNaN(creationDate.getTime())) {
+                    const diffDays = (Date.now() - creationDate.getTime()) / (1000 * 3600 * 24);
+                    // Règle : utilisateur ajouté sur vintedmanager depuis moins de 30 jours
+                    if (diffDays <= 30) {
+                        isRecentUser = true;
+                    }
+                }
+            }
+
+            // Logique de classification : 🌟 Nouvel Agent uniquement si ajouté il y a - de 30 jours
+            let classification = '🛑 Inactif';
             if (a.scoreTotal >= 1000 || a.ventes >= 10 || (taux >= 80 && a.pubsTotales >= 20)) {
                 classification = '🏆 Agent Top';
             } else if (a.scoreTotal >= 150 || a.ventes >= 2 || (taux >= 50 && a.pubsFaites >= 5)) {
                 classification = '⚡ En Progression';
-            } else if (a.pubsTotales > 0 || a.comptesTotal > 0) {
+            } else if (isRecentUser) {
                 classification = '🌟 Nouvel Agent';
+            } else if (a.pubsTotales > 0 || a.pubsFaites > 0 || a.scoreTotal > 0 || a.ventes > 0) {
+                classification = '⚡ En Progression';
             } else {
                 classification = '🛑 Inactif';
             }
@@ -3305,6 +3369,7 @@ function ClassementView({ appState, onUpdateRow }) {
                             </h4>
                             <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
                                 {rankingDateFilter === 'all' ? 'Toutes les données historiques' :
+                                 rankingDateFilter === '1' ? 'Données d\'aujourd\'hui (1j)' :
                                  rankingDateFilter === 'custom' ? `Période personnalisée du ${customStartDate || 'début'} au ${customEndDate || 'fin'}` :
                                  `Derniers ${rankingDateFilter} jour(s)`}
                             </span>
@@ -3464,9 +3529,7 @@ function ClassementView({ appState, onUpdateRow }) {
                                 <th>Agent & Rôle</th>
                                 <th style={{ minWidth: '170px' }}>Comptes</th>
                                 <th>Classification</th>
-                                <th>Publications</th>
                                 <th>Taux Réussite</th>
-                                <th>Engagement</th>
                                 <th>Ventes</th>
                                 <th style={{ textAlign: 'right' }}>Score Total</th>
                             </tr>
@@ -3575,20 +3638,11 @@ function ClassementView({ appState, onUpdateRow }) {
                                             )}
                                         </td>
                                         <td>
-                                            <b>{a.pubsFaites}</b> / {a.pubsTotales} pub{a.pubsTotales > 1 ? 's' : ''}
-                                        </td>
-                                        <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '100px' }}>
                                                 <div style={{ flex: 1, backgroundColor: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
                                                     <div style={{ width: `${a.taux}%`, backgroundColor: a.taux >= 80 ? '#10b981' : a.taux >= 50 ? '#f59e0b' : '#ef4444', height: '100%' }}></div>
                                                 </div>
                                                 <span style={{ fontSize: '12px', fontWeight: 600 }}>{a.taux}%</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                <span title="Vues"><i className="fa-regular fa-eye" style={{ color: '#64748b', marginRight: '3px' }}></i>{a.vues.toLocaleString('fr-FR')}</span>
-                                                <span title="Likes"><i className="fa-regular fa-heart" style={{ color: '#e11d48', marginRight: '3px' }}></i>{a.likes.toLocaleString('fr-FR')}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -3608,7 +3662,7 @@ function ClassementView({ appState, onUpdateRow }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                                    <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
                                         Aucun agent correspondant à ce filtre de classification.
                                     </td>
                                 </tr>
@@ -6763,8 +6817,8 @@ function TodoView({
                                             disabled={isUploadingPhoto}
                                         />
                                         {isUploadingPhoto ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#09b1ba', fontSize: '12px', padding: '6px 0' }}>
-                                                <i className="fa-solid fa-spinner fa-spin"></i>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: '#09b1ba', fontSize: '12px', padding: '10px 0' }}>
+                                                <CircularIconLoader size={26} pulse={false} showOuterRing={false} />
                                                 <span>Traitement et optimisation des images...</span>
                                             </div>
                                         ) : (
@@ -7463,6 +7517,7 @@ window.ReactComponents = {
     StartupTodoModal,
     TodoPhotoLightboxModal,
     Logo,
+    CircularIconLoader,
     LoadingScreen,
     EmptyStateWithLogo
 };
