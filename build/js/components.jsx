@@ -1668,7 +1668,11 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
         if (gd && (clean.includes('drive.google.com') || clean.includes('docs.google.com'))) {
             return `https://drive.google.com/thumbnail?id=${gd[1]}&sz=w1000`;
         }
-        return clean;
+        // Vérification de validité d'URL ou chemin local
+        if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('/assets/') || clean.startsWith('data:image/')) {
+            return clean;
+        }
+        return '';
     }, []);
 
     // États pour l'upload photo dans le modal

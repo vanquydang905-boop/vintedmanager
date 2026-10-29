@@ -1656,7 +1656,8 @@ const dbService = {
                     const existingItem = (r[0] ? existingMap[r[0].toLowerCase().trim()] : null) || existingMap[`stock_${tab.key}_${idx + 1}`];
 
                     // Préservation de la photo locale si le Sheet n'en a pas
-                    const finalPhoto = parsedPhoto.photo || (existingItem && existingItem.photo ? existingItem.photo : '');
+                    const existingPhotoValid = existingItem && existingItem.photo && (existingItem.photo.startsWith('http') || existingItem.photo.startsWith('/assets/') || existingItem.photo.startsWith('data:image/'));
+                    const finalPhoto = existingPhotoValid ? existingItem.photo : (parsedPhoto.photo || '');
                     const finalNotes = (existingItem && existingItem.notes) ? existingItem.notes : parsedPhoto.note;
 
                     if (tab.key === 'chaussures') {
