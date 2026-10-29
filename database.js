@@ -87,6 +87,22 @@ function fromDbFormat(dbObj) {
     return res;
 }
 
+const ALLOWED_UTILISATEUR_COLUMNS = [
+    'id', 'nom', 'email', 'role', 'organisationid', 'agentassigne', 'motdepasse', 'datecreation'
+];
+
+function sanitizeUtilisateurDb(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    const dbObj = toDbFormat(obj);
+    const sanitized = {};
+    for (const col of ALLOWED_UTILISATEUR_COLUMNS) {
+        if (dbObj[col] !== undefined) {
+            sanitized[col] = dbObj[col];
+        }
+    }
+    return sanitized;
+}
+
 let DEFAULT_PARAMETRES = {
     poidsScore: { vues: 0.1, likes: 1, favoris: 2, messages: 5, vente: 20 },
     seuils: { ecarte: 15, gagnant: 40 },
@@ -504,14 +520,43 @@ const dbService = {
                 let query = supabase.from('utilisateurs').select('*');
                 if (organisationId) query = query.eq('organisationid', organisationId.toLowerCase());
                 const { data, error } = await query;
-                if (!error && Array.isArray(data)) {
+                if (error) {
+                    console.error('[Supabase getUtilisateurs Error]', error);
+                } else if (Array.isArray(data)) {
+                    // Récupération des métadonnées (permissions, contactType, contactNumero) depuis parametres
+                    const metaMap = {};
+                    try {
+                        const { data: metaRows, error: metaErr } = await supabase
+                            .from('parametres')
+                            .select('id, data')
+                            .like('id', 'usermeta_%');
+                        if (!metaErr && Array.isArray(metaRows)) {
+                            metaRows.forEach(row => {
+                                const uid = row.id.replace('usermeta_', '');
+                                const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+                                metaMap[uid] = d || {};
+                            });
+                        }
+                    } catch (metaErr) {
+                        console.warn('[Get Utilisateurs Meta Warning]', metaErr);
+                    }
+
                     data.map(fromDbFormat).forEach(dbRow => {
-                        const idx = list.findIndex(item => item.id === dbRow.id);
-                        if (idx >= 0) list[idx] = { ...list[idx], ...dbRow };
-                        else list.push(dbRow);
+                        const meta = metaMap[dbRow.id] || {};
+                        const mergedRow = {
+                            ...dbRow,
+                            contactType: meta.contactType || dbRow.contactType || 'WhatsApp',
+                            contactNumero: meta.contactNumero || dbRow.contactNumero || '',
+                            permissions: meta.permissions !== undefined ? meta.permissions : (dbRow.permissions || null)
+                        };
+                        const idx = list.findIndex(item => item.id === mergedRow.id);
+                        if (idx >= 0) list[idx] = { ...list[idx], ...mergedRow };
+                        else list.push(mergedRow);
                     });
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error('[getUtilisateurs Exception]', e);
+            }
         }
         if (organisationId) {
             return list.filter(u => u.organisationId === organisationId);
@@ -520,7 +565,9 @@ const dbService = {
     },
 
     async createUtilisateur(user) {
+        const id = user.id || ('usr_' + Date.now());
         const payload = {
+            id,
             organisationId: 'org_default',
             dateCreation: getLocalDateString(),
             ...user
@@ -528,6 +575,8 @@ const dbService = {
 
         if (payload.motDePasse) {
             payload.motDePasse = hashPassword(payload.motDePasse);
+        } else {
+            payload.motDePasse = hashPassword('123456');
         }
 
         const idx = DEFAULT_UTILISATEURS.findIndex(u => u.id === payload.id);
@@ -536,10 +585,39 @@ const dbService = {
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const dbPayload = toDbFormat(payload);
+                const dbPayload = sanitizeUtilisateurDb(payload);
                 const { data, error } = await supabase.from('utilisateurs').upsert([dbPayload]).select();
-                if (!error && data && data.length) return fromDbFormat(data[0]);
-            } catch (err) {}
+                if (error) {
+                    console.error('[Supabase createUtilisateur Error]', error);
+                }
+
+                // Sauvegarde métadonnées étendues (contactType, contactNumero, permissions) dans parametres
+                const metaData = {
+                    contactType: payload.contactType || 'WhatsApp',
+                    contactNumero: payload.contactNumero || '',
+                    permissions: payload.permissions !== undefined ? payload.permissions : null
+                };
+                const { error: metaErr } = await supabase.from('parametres').upsert({
+                    id: `usermeta_${payload.id}`,
+                    organisationid: payload.organisationId || 'org_default',
+                    data: metaData
+                });
+                if (metaErr) {
+                    console.error('[Supabase createUtilisateur Meta Error]', metaErr);
+                }
+
+                if (!error && data && data.length) {
+                    const row = fromDbFormat(data[0]);
+                    return {
+                        ...row,
+                        contactType: metaData.contactType,
+                        contactNumero: metaData.contactNumero,
+                        permissions: metaData.permissions
+                    };
+                }
+            } catch (err) {
+                console.error('[createUtilisateur Exception]', err);
+            }
         }
         return payload;
     },
@@ -548,23 +626,54 @@ const dbService = {
         const updatedFields = { ...fields };
         if (updatedFields.motDePasse) {
             updatedFields.motDePasse = hashPassword(updatedFields.motDePasse);
+        } else {
+            delete updatedFields.motDePasse;
         }
 
         const idx = DEFAULT_UTILISATEURS.findIndex(u => u.id === id);
-        if (idx >= 0) {
-            const snapshot = { ...DEFAULT_UTILISATEURS[idx] };
+        let existingUser = idx >= 0 ? DEFAULT_UTILISATEURS[idx] : null;
+        if (existingUser) {
+            const snapshot = { ...existingUser };
             await this.saveToCorbeille('utilisateurs', id, 'UPDATE', snapshot, snapshot.nom);
-            DEFAULT_UTILISATEURS[idx] = { ...DEFAULT_UTILISATEURS[idx], ...updatedFields };
+            DEFAULT_UTILISATEURS[idx] = { ...existingUser, ...updatedFields };
         }
 
         if (supabaseUrl && supabaseKey) {
             try {
-                const dbFields = toDbFormat(updatedFields);
-                const { data, error } = await supabase.from('utilisateurs').update(dbFields).eq('id', id).select();
-                if (!error && data && data.length) return fromDbFormat(data[0]);
-            } catch (err) {}
+                const dbFields = sanitizeUtilisateurDb(updatedFields);
+                delete dbFields.id;
+
+                if (Object.keys(dbFields).length > 0) {
+                    const { error } = await supabase.from('utilisateurs').update(dbFields).eq('id', id);
+                    if (error) {
+                        console.error('[Supabase updateUtilisateur Error]', error);
+                    }
+                }
+
+                // Métadonnées étendues
+                if (updatedFields.contactType !== undefined || updatedFields.contactNumero !== undefined || updatedFields.permissions !== undefined) {
+                    const metaUpdate = {
+                        contactType: updatedFields.contactType !== undefined ? updatedFields.contactType : (existingUser ? existingUser.contactType : 'WhatsApp'),
+                        contactNumero: updatedFields.contactNumero !== undefined ? updatedFields.contactNumero : (existingUser ? existingUser.contactNumero : ''),
+                        permissions: updatedFields.permissions !== undefined ? updatedFields.permissions : (existingUser ? existingUser.permissions : null)
+                    };
+                    const orgId = updatedFields.organisationId || (existingUser ? existingUser.organisationId : 'org_default');
+                    const { error: metaErr } = await supabase.from('parametres').upsert({
+                        id: `usermeta_${id}`,
+                        organisationid: orgId,
+                        data: metaUpdate
+                    });
+                    if (metaErr) {
+                        console.error('[Supabase updateUtilisateur Meta Error]', metaErr);
+                    }
+                }
+            } catch (err) {
+                console.error('[updateUtilisateur Exception]', err);
+            }
         }
-        return { id, ...updatedFields };
+
+        const merged = existingUser ? { ...existingUser, ...updatedFields } : { id, ...updatedFields };
+        return merged;
     },
 
     async deleteUtilisateur(id) {
@@ -575,8 +684,12 @@ const dbService = {
         DEFAULT_UTILISATEURS = DEFAULT_UTILISATEURS.filter(u => u.id !== id);
         if (supabaseUrl && supabaseKey) {
             try {
-                await supabase.from('utilisateurs').delete().eq('id', id);
-            } catch (err) {}
+                const { error } = await supabase.from('utilisateurs').delete().eq('id', id);
+                if (error) console.error('[Supabase deleteUtilisateur Error]', error);
+                await supabase.from('parametres').delete().eq('id', `usermeta_${id}`);
+            } catch (err) {
+                console.error('[deleteUtilisateur Exception]', err);
+            }
         }
         return true;
     },
@@ -1141,8 +1254,13 @@ const dbService = {
         DEFAULT_UTILISATEURS = DEFAULT_UTILISATEURS.filter(u => !ids.includes(u.id));
         if (supabaseUrl && supabaseKey) {
             try {
-                await supabase.from('utilisateurs').delete().in('id', ids);
-            } catch (err) {}
+                const { error } = await supabase.from('utilisateurs').delete().in('id', ids);
+                if (error) console.error('[Supabase bulkDeleteUtilisateurs Error]', error);
+                const metaIds = ids.map(id => `usermeta_${id}`);
+                await supabase.from('parametres').delete().in('id', metaIds);
+            } catch (err) {
+                console.error('[bulkDeleteUtilisateurs Exception]', err);
+            }
         }
         return true;
     },
@@ -1498,34 +1616,71 @@ const dbService = {
             return result;
         }
 
+        function normalizePhoto(val) {
+            if (!val || typeof val !== 'string') return { photo: '', note: '' };
+            let clean = val.trim();
+            if (clean.startsWith('=IMAGE(') && clean.endsWith(')')) {
+                const m = clean.match(/=IMAGE\s*\(\s*["\x27]([^"\x27]+)["\x27]/i);
+                if (m) clean = m[1].trim();
+            }
+            // Support direct des liens Google Drive (/file/d/ID ou ?id=ID)
+            const gd = clean.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || clean.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            if (gd && (clean.includes('drive.google.com') || clean.includes('docs.google.com'))) {
+                return { photo: `https://drive.google.com/thumbnail?id=${gd[1]}&sz=w1000`, note: '' };
+            }
+            if (/^https?:\/\//i.test(clean) || clean.startsWith('data:image/')) {
+                return { photo: clean, note: '' };
+            }
+            // Note textuelle en colonne photo ("PLUS DISPONIBLE SUR SHEIN", etc.)
+            return { photo: '', note: clean };
+        }
+
+        const currentStock = await this.getStock(organisationId);
         const freshStock = {};
         for (const tab of gids) {
             try {
                 const raw = execSync(`curl -sL "https://docs.google.com/spreadsheets/d/1oQUUfCg6orAkTApNDYLQekKJxTXE6B-rttdxVeXro_0/export?format=csv&gid=${tab.gid}"`).toString();
                 const rows = parseCsv(raw);
+
+                // Indexation des articles existants pour préserver les photos ajoutées par les utilisateurs
+                const existingMap = {};
+                if (currentStock && currentStock[tab.key] && Array.isArray(currentStock[tab.key].items)) {
+                    currentStock[tab.key].items.forEach(it => {
+                        if (it.sku) existingMap[it.sku.toLowerCase().trim()] = it;
+                        if (it.id) existingMap[it.id] = it;
+                    });
+                }
+
                 const items = rows.map((r, idx) => {
+                    const parsedPhoto = normalizePhoto(r[1]);
+                    const existingItem = (r[0] ? existingMap[r[0].toLowerCase().trim()] : null) || existingMap[`stock_${tab.key}_${idx + 1}`];
+
+                    // Préservation de la photo locale si le Sheet n'en a pas
+                    const finalPhoto = parsedPhoto.photo || (existingItem && existingItem.photo ? existingItem.photo : '');
+                    const finalNotes = (existingItem && existingItem.notes) ? existingItem.notes : parsedPhoto.note;
+
                     if (tab.key === 'chaussures') {
                         return {
                             id: `stock_${tab.key}_${idx + 1}`,
                             sku: r[0] || '',
-                            photo: r[1] || '',
+                            photo: finalPhoto,
                             taille: r[2] || '',
                             qte: parseInt(r[3]) || (r[3] ? 1 : 0),
                             localisation: r[4] || '',
-                            notes: ''
+                            notes: finalNotes || ''
                         };
                     }
                     return {
                         id: `stock_${tab.key}_${idx + 1}`,
                         sku: r[0] || '',
-                        photo: r[1] || '',
+                        photo: finalPhoto,
                         tailleS: r[2] || '',
                         tailleM: r[3] || '',
                         tailleL: r[4] || '',
                         tailleXL: r[5] || '',
                         tailleUnique: r[6] || '',
                         localisation: r[7] || '',
-                        notes: ''
+                        notes: finalNotes || ''
                     };
                 }).filter(it => it.sku || it.localisation || it.tailleS || it.tailleM || it.tailleL || it.tailleXL || it.tailleUnique || it.qte);
 
@@ -1564,10 +1719,27 @@ const dbService = {
                 await supabase.from('journal').delete().neq('id', '');
 
                 if (organisations.length) await supabase.from('organisations').upsert(organisations.map(toDbFormat));
-                if (utilisateurs.length) await supabase.from('utilisateurs').upsert(utilisateurs.map(toDbFormat));
+                if (utilisateurs.length) {
+                    await supabase.from('utilisateurs').upsert(utilisateurs.map(sanitizeUtilisateurDb));
+                    for (const u of utilisateurs) {
+                        if (u.contactType || u.contactNumero || u.permissions) {
+                            await supabase.from('parametres').upsert({
+                                id: `usermeta_${u.id}`,
+                                organisationid: u.organisationId || 'org_default',
+                                data: {
+                                    contactType: u.contactType || 'WhatsApp',
+                                    contactNumero: u.contactNumero || '',
+                                    permissions: u.permissions || null
+                                }
+                            });
+                        }
+                    }
+                }
                 if (comptes.length) await supabase.from('comptes').upsert(comptes.map(toDbFormat));
                 if (calendrier.length) await supabase.from('calendrier').upsert(calendrier.map(toDbFormat));
-            } catch (e) {}
+            } catch (e) {
+                console.error('[restoreFullDatabase Exception]', e);
+            }
         }
     }
 };

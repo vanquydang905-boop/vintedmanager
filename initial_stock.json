@@ -79,14 +79,14 @@
       {
         "id": "stock_tops_7",
         "sku": "sz25092931406141471",
-        "photo": "PLUS DISPONIBLE SUR SHEIN",
+        "photo": "",
         "tailleS": "",
         "tailleM": "5",
         "tailleL": "",
         "tailleXL": "",
         "tailleUnique": "",
         "localisation": "LABO",
-        "notes": ""
+        "notes": "PLUS DISPONIBLE SUR SHEIN"
       },
       {
         "id": "stock_tops_8",
@@ -499,14 +499,14 @@
       {
         "id": "stock_tops_42",
         "sku": "z25072897233250443",
-        "photo": "aucun résultat",
+        "photo": "",
         "tailleS": "1",
         "tailleM": "",
         "tailleL": "",
         "tailleXL": "",
         "tailleUnique": "",
         "localisation": "",
-        "notes": ""
+        "notes": "aucun résultat"
       },
       {
         "id": "stock_tops_43",
@@ -895,26 +895,26 @@
       {
         "id": "stock_tops_75",
         "sku": "23111391",
-        "photo": "$$$$$)",
+        "photo": "",
         "tailleS": "",
         "tailleM": "2",
         "tailleL": "1",
         "tailleXL": "",
         "tailleUnique": "",
         "localisation": "",
-        "notes": ""
+        "notes": "$$$$$)"
       },
       {
         "id": "stock_tops_76",
         "sku": "9086",
-        "photo": "//////",
+        "photo": "",
         "tailleS": "",
         "tailleM": "2",
         "tailleL": "5",
         "tailleXL": "",
         "tailleUnique": "",
         "localisation": "",
-        "notes": ""
+        "notes": "//////"
       },
       {
         "id": "stock_tops_77",
@@ -1123,14 +1123,14 @@
       {
         "id": "stock_tops_94",
         "sku": "sz60117120964765645418",
-        "photo": "GILET CROCHET SANS MANCHE MARRON ET BEIGE",
+        "photo": "",
         "tailleS": "",
         "tailleM": "",
         "tailleL": "",
         "tailleXL": "1",
         "tailleUnique": "",
         "localisation": "B2",
-        "notes": ""
+        "notes": "GILET CROCHET SANS MANCHE MARRON ET BEIGE"
       },
       {
         "id": "stock_tops_95",
@@ -1147,14 +1147,14 @@
       {
         "id": "stock_tops_96",
         "sku": "sz411214400183547",
-        "photo": "TOP SANS MANCHES RAYE BLANC BLEU LACETS ET COL CHINOIS",
+        "photo": "",
         "tailleS": "",
         "tailleM": "",
         "tailleL": "",
         "tailleXL": "1",
         "tailleUnique": "",
         "localisation": "B2",
-        "notes": ""
+        "notes": "TOP SANS MANCHES RAYE BLANC BLEU LACETS ET COL CHINOIS"
       },
       {
         "id": "stock_tops_97",
@@ -1195,14 +1195,14 @@
       {
         "id": "stock_tops_100",
         "sku": "sZ240809999751450",
-        "photo": "Blouson court patchwork multicolore + léopard",
+        "photo": "",
         "tailleS": "",
         "tailleM": "",
         "tailleL": "1",
         "tailleXL": "",
         "tailleUnique": "",
         "localisation": "B2",
-        "notes": ""
+        "notes": "Blouson court patchwork multicolore + léopard"
       },
       {
         "id": "stock_tops_101",
@@ -1667,14 +1667,14 @@
       {
         "id": "stock_divers_3",
         "sku": "sc260623102042813701391",
-        "photo": "CAGOULE DENTELLE BLANCHE",
+        "photo": "",
         "tailleS": "",
         "tailleM": "",
         "tailleL": "",
         "tailleXL": "",
         "tailleUnique": "1",
         "localisation": "B1",
-        "notes": ""
+        "notes": "CAGOULE DENTELLE BLANCHE"
       }
     ]
   },
@@ -1793,7 +1793,7 @@
       {
         "id": "stock_sacs_7",
         "sku": "sg2406276982612214",
-        "photo": "https://drive.google.com/file/d/1dTgbEd4VOn7MabyYXHXbXM03st62byY9/view?usp=sharing",
+        "photo": "https://drive.google.com/thumbnail?id=1dTgbEd4VOn7MabyYXHXbXM03st62byY9&sz=w1000",
         "tailleS": "3",
         "tailleM": "",
         "tailleL": "",

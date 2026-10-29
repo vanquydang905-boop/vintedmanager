@@ -762,7 +762,10 @@ app.get('/api/users', async (req, res) => {
             role: u.role,
             organisationId: u.organisationId || 'org_default',
             agentAssigne: u.agentAssigne || '',
-            dateCreation: u.dateCreation || ''
+            dateCreation: u.dateCreation || '',
+            contactType: u.contactType || 'WhatsApp',
+            contactNumero: u.contactNumero || '',
+            permissions: u.permissions || null
         }));
         res.json(safeUsers);
     } catch (err) {
@@ -838,14 +841,19 @@ app.put('/api/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { nom, email, role, organisationId, agentAssigne, motDePasse, contactType, contactNumero, permissions } = req.body;
-        const fields = { nom, email, role, organisationId, agentAssigne };
+        const fields = {};
+        if (nom !== undefined) fields.nom = nom;
+        if (email !== undefined) fields.email = email;
+        if (role !== undefined) fields.role = role;
+        if (organisationId !== undefined) fields.organisationId = organisationId;
+        if (agentAssigne !== undefined) fields.agentAssigne = agentAssigne;
         if (motDePasse) fields.motDePasse = motDePasse;
         if (contactType !== undefined) fields.contactType = contactType;
         if (contactNumero !== undefined) fields.contactNumero = contactNumero;
         if (permissions !== undefined) fields.permissions = permissions;
         
         const updated = await dbService.updateUtilisateur(id, fields);
-        await dbService.logAction("Gestion Utilisateur", `Modification de l'utilisateur ${nom}`, "Succès", organisationId || 'org_default');
+        await dbService.logAction("Gestion Utilisateur", `Modification de l'utilisateur ${fields.nom || (updated && updated.nom) || id}`, "Succès", organisationId || 'org_default');
         res.json(updated);
     } catch (err) {
         res.status(500).json({ error: err.message });

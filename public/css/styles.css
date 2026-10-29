@@ -809,6 +809,12 @@ tbody tr:hover .input-table {
     gap: 20px;
 }
 
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
 .form-group {
     margin-bottom: 16px;
 }

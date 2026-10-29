@@ -1656,7 +1656,87 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
         }
     };
 
-    // Upload photo pour une ligne
+    // Helper pour normaliser les URLs des photos (liens Google Drive, =IMAGE, base64, etc.)
+    const normalizePhotoUrl = useCallback((url) => {
+        if (!url || typeof url !== 'string') return '';
+        let clean = url.trim();
+        if (clean.startsWith('=IMAGE(') && clean.endsWith(')')) {
+            const m = clean.match(/=IMAGE\s*\(\s*["\x27]([^"\x27]+)["\x27]/i);
+            if (m) clean = m[1].trim();
+        }
+        const gd = clean.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || clean.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (gd && (clean.includes('drive.google.com') || clean.includes('docs.google.com'))) {
+            return `https://drive.google.com/thumbnail?id=${gd[1]}&sz=w1000`;
+        }
+        return clean;
+    }, []);
+
+    // États pour l'upload photo dans le modal
+    const [isUploadingModalPhoto, setIsUploadingModalPhoto] = useState(false);
+    const [modalPhotoDrag, setModalPhotoDrag] = useState(false);
+    const [photoUrlInput, setPhotoUrlInput] = useState('');
+
+    const handleModalPhotoFile = async (file) => {
+        if (!file || !file.type.startsWith('image/')) {
+            if (showToast) showToast("Veuillez sélectionner un fichier image valide", true);
+            return;
+        }
+        setIsUploadingModalPhoto(true);
+        try {
+            const utils = (typeof TodoUtils !== 'undefined' ? TodoUtils : window.TodoUtils);
+            let photoObj = null;
+            if (utils && utils.compressImageFile) {
+                photoObj = await utils.compressImageFile(file);
+            } else {
+                const reader = new FileReader();
+                photoObj = await new Promise(res => {
+                    reader.onload = e => res({ url: e.target.result, nom: file.name });
+                    reader.readAsDataURL(file);
+                });
+            }
+            setModalData(prev => ({ ...prev, photo: photoObj.url }));
+            if (showToast) showToast("📷 Photo optimisée et prête pour l'enregistrement !");
+            if (typeof SoundEngine !== 'undefined' && SoundEngine.playCheck) {
+                SoundEngine.playCheck();
+            }
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors du traitement de l'image", true);
+        } finally {
+            setIsUploadingModalPhoto(false);
+        }
+    };
+
+    const handleApplyPhotoUrl = () => {
+        if (!photoUrlInput.trim()) return;
+        const normalized = normalizePhotoUrl(photoUrlInput.trim());
+        setModalData(prev => ({ ...prev, photo: normalized }));
+        setPhotoUrlInput('');
+        if (showToast) showToast("🔗 Lien photo appliqué avec succès !");
+    };
+
+    // Support du collage d'image (Ctrl+V / Cmd+V) dans le modal d'ajout
+    useEffect(() => {
+        if (!isModalOpen) return;
+        const handlePaste = (e) => {
+            const clipboardItems = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+            if (!clipboardItems) return;
+            for (let i = 0; i < clipboardItems.length; i++) {
+                if (clipboardItems[i].type && clipboardItems[i].type.startsWith('image/')) {
+                    const file = clipboardItems[i].getAsFile();
+                    if (file) {
+                        e.preventDefault();
+                        handleModalPhotoFile(file);
+                        return;
+                    }
+                }
+            }
+        };
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+    }, [isModalOpen]);
+
+    // Upload photo pour une ligne du tableau
     const handleRowPhotoUpload = async (rowId, file) => {
         if (!file || !file.type.startsWith('image/')) return;
         try {
@@ -1677,9 +1757,48 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                 handleCellChange(rowId, 'photo', photoObj.url);
                 await onSaveStockItem(activeTab, updated);
                 if (showToast) showToast("📷 Photo de l'article enregistrée en direct !");
+                if (typeof SoundEngine !== 'undefined' && SoundEngine.playCheck) {
+                    SoundEngine.playCheck();
+                }
             }
         } catch (err) {
             console.error(err);
+            if (showToast) showToast("Erreur lors de l'enregistrement de la photo", true);
+        }
+    };
+
+    // Suppression d'une photo d'une ligne
+    const handleRemoveRowPhoto = async (rowId) => {
+        const targetItem = items.find(it => it.id === rowId);
+        if (!targetItem) return;
+        if (!window.confirm("Voulez-vous supprimer la photo de cet article ?")) return;
+        try {
+            const updated = { ...targetItem, photo: '' };
+            handleCellChange(rowId, 'photo', '');
+            await onSaveStockItem(activeTab, updated);
+            if (showToast) showToast("Photo supprimée de l'article");
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de la suppression de la photo", true);
+        }
+    };
+
+    // Saisie d'un lien d'image ou Google Drive direct pour une ligne
+    const handlePromptRowPhotoLink = async (rowId) => {
+        const targetItem = items.find(it => it.id === rowId);
+        if (!targetItem) return;
+        const currentUrl = targetItem.photo || '';
+        const url = window.prompt("Collez le lien Google Drive ou l'URL de l'image :", currentUrl);
+        if (url === null) return;
+        const normalized = normalizePhotoUrl(url);
+        try {
+            const updated = { ...targetItem, photo: normalized };
+            handleCellChange(rowId, 'photo', normalized);
+            await onSaveStockItem(activeTab, updated);
+            if (showToast) showToast(normalized ? "📷 Lien photo mis à jour avec succès !" : "Photo effacée");
+        } catch (err) {
+            console.error(err);
+            if (showToast) showToast("Erreur lors de la mise à jour du lien photo", true);
         }
     };
 
@@ -2023,7 +2142,8 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                                     const totalQty = getItemTotalQty(item);
                                     const isSavingThis = savingRowId === item.id;
                                     const isSavedFeedback = savedFeedbackId === item.id;
-                                    const hasPhoto = !!item.photo;
+                                    const cleanPhotoUrl = normalizePhotoUrl(item.photo);
+                                    const hasPhoto = !!cleanPhotoUrl;
                                     const locBadge = getLocationBadgeStyle(item.localisation);
 
                                     return (
@@ -2084,42 +2204,80 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                                             {/* PHOTO */}
                                             <td style={{ textAlign: 'center' }}>
                                                 {hasPhoto ? (
-                                                    <div style={{ position: 'relative', display: 'inline-block' }}>
-                                                        <img
-                                                            src={item.photo}
-                                                            alt="Photo"
-                                                            onClick={() => setLightboxData({
-                                                                isOpen: true,
-                                                                photos: [{ id: item.id, url: item.photo, nom: item.sku || 'Photo Article' }],
-                                                                initialIndex: 0,
-                                                                taskTitle: `Stock: ${item.sku || 'Article'} (${currentTabDef.name})`
-                                                            })}
-                                                            style={{
-                                                                width: '34px',
-                                                                height: '34px',
-                                                                objectFit: 'cover',
-                                                                borderRadius: '6px',
-                                                                border: '1px solid #cbd5e1',
-                                                                cursor: 'pointer'
-                                                            }}
-                                                            title="Cliquer pour agrandir la photo"
-                                                        />
+                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                            <img
+                                                                src={cleanPhotoUrl}
+                                                                alt="Photo"
+                                                                onClick={() => setLightboxData({
+                                                                    isOpen: true,
+                                                                    photos: [{ id: item.id, url: cleanPhotoUrl, nom: item.sku || 'Photo Article' }],
+                                                                    initialIndex: 0,
+                                                                    taskTitle: `Stock: ${item.sku || 'Article'} (${currentTabDef.name})`
+                                                                })}
+                                                                style={{
+                                                                    width: '36px',
+                                                                    height: '36px',
+                                                                    objectFit: 'cover',
+                                                                    borderRadius: '6px',
+                                                                    border: '1px solid #cbd5e1',
+                                                                    cursor: 'pointer',
+                                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+                                                                }}
+                                                                title="Cliquer pour agrandir la photo (Lightbox)"
+                                                            />
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                            <label style={{ cursor: 'pointer', margin: 0, padding: '2px 4px', borderRadius: '3px', background: '#f1f5f9', color: '#475569', fontSize: '10px' }} title="Remplacer la photo">
+                                                                <i className="fa-solid fa-camera"></i>
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    style={{ display: 'none' }}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.files && e.target.files[0]) {
+                                                                            handleRowPhotoUpload(item.id, e.target.files[0]);
+                                                                        }
+                                                                        e.target.value = '';
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveRowPhoto(item.id)}
+                                                                style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '3px', padding: '2px 4px', fontSize: '10px', cursor: 'pointer' }}
+                                                                title="Supprimer la photo"
+                                                            >
+                                                                <i className="fa-solid fa-xmark"></i>
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ) : (
-                                                    <label style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', padding: '4px 6px', color: '#94a3b8', borderRadius: '4px', background: '#f1f5f9' }} title="Ajouter une photo">
-                                                        <i className="fa-solid fa-camera" style={{ fontSize: '13px' }}></i>
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            style={{ display: 'none' }}
-                                                            onChange={(e) => {
-                                                                if (e.target.files && e.target.files[0]) {
-                                                                    handleRowPhotoUpload(item.id, e.target.files[0]);
-                                                                }
-                                                                e.target.value = '';
-                                                            }}
-                                                        />
-                                                    </label>
+                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                        <label style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 6px', color: '#0284c7', borderRadius: '5px', background: '#f0f9ff', border: '1px dashed #7dd3fc', fontSize: '11px', fontWeight: 600 }} title="Prendre ou choisir une photo">
+                                                            <i className="fa-solid fa-camera"></i>
+                                                            <span>+ Photo</span>
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                style={{ display: 'none' }}
+                                                                onChange={(e) => {
+                                                                    if (e.target.files && e.target.files[0]) {
+                                                                        handleRowPhotoUpload(item.id, e.target.files[0]);
+                                                                    }
+                                                                    e.target.value = '';
+                                                                }}
+                                                            />
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handlePromptRowPhotoLink(item.id)}
+                                                            style={{ border: 'none', background: '#f8fafc', color: '#64748b', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
+                                                            title="Ajouter un lien Google Drive ou URL image"
+                                                        >
+                                                            <i className="fa-solid fa-link"></i>
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
 
@@ -2405,6 +2563,176 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                                         placeholder="ex: LABO, B1, B2, B3, SAC IKEA..."
                                         list="stock-locations-datalist"
                                     />
+                                </div>
+
+                                {/* SECTION PHOTO DE L'ARTICLE */}
+                                <div className="form-group" style={{ marginBottom: '8px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b' }}>
+                                            <i className="fa-solid fa-camera" style={{ color: 'var(--primary-color)', marginRight: '6px' }}></i>
+                                            Photo de l'article {modalData.photo ? '✓ (Photo sélectionnée)' : '(Optionnelle)'}
+                                        </span>
+                                        <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                            Coller avec <kbd style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', border: '1px solid #cbd5e1' }}>Ctrl+V</kbd> supporté
+                                        </span>
+                                    </label>
+
+                                    {modalData.photo ? (
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            padding: '10px 12px',
+                                            background: '#f8fafc',
+                                            border: '1px solid #e2e8f0',
+                                            borderRadius: '8px'
+                                        }}>
+                                            <img
+                                                src={normalizePhotoUrl(modalData.photo)}
+                                                alt="Aperçu article"
+                                                onClick={() => setLightboxData({
+                                                    isOpen: true,
+                                                    photos: [{ id: 'modal_prev', url: normalizePhotoUrl(modalData.photo), nom: modalData.sku || 'Aperçu' }],
+                                                    initialIndex: 0,
+                                                    taskTitle: `Aperçu: ${modalData.sku || 'Nouvel Article'}`
+                                                })}
+                                                style={{
+                                                    width: '54px',
+                                                    height: '54px',
+                                                    objectFit: 'cover',
+                                                    borderRadius: '6px',
+                                                    border: '1px solid #cbd5e1',
+                                                    cursor: 'pointer',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
+                                                }}
+                                                title="Cliquer pour zoomer (Lightbox)"
+                                            />
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#1e293b' }}>
+                                                    Photo attachée à la référence
+                                                </div>
+                                                <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                                                    Sera sauvegardée et synchronisée avec l'article
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, padding: '5px 8px', fontSize: '11px' }} title="Remplacer la photo">
+                                                    <i className="fa-solid fa-arrows-rotate"></i>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        style={{ display: 'none' }}
+                                                        onChange={(e) => {
+                                                            if (e.target.files && e.target.files[0]) {
+                                                                handleModalPhotoFile(e.target.files[0]);
+                                                            }
+                                                            e.target.value = '';
+                                                        }}
+                                                    />
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setModalData(prev => ({ ...prev, photo: '' }))}
+                                                    className="btn btn-danger btn-sm"
+                                                    style={{ padding: '5px 8px', fontSize: '11px' }}
+                                                    title="Supprimer la photo"
+                                                >
+                                                    <i className="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div
+                                                onDragOver={(e) => { e.preventDefault(); setModalPhotoDrag(true); }}
+                                                onDragLeave={(e) => { e.preventDefault(); setModalPhotoDrag(false); }}
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    setModalPhotoDrag(false);
+                                                    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                                        handleModalPhotoFile(e.dataTransfer.files[0]);
+                                                    }
+                                                }}
+                                                style={{
+                                                    border: modalPhotoDrag ? '2px dashed var(--primary-color)' : '1px dashed #cbd5e1',
+                                                    borderRadius: '8px',
+                                                    padding: '12px',
+                                                    textAlign: 'center',
+                                                    background: modalPhotoDrag ? 'rgba(9, 177, 186, 0.05)' : '#f8fafc',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            >
+                                                {isUploadingModalPhoto ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#09b1ba', fontSize: '12px', padding: '8px 0' }}>
+                                                        <i className="fa-solid fa-spinner fa-spin"></i>
+                                                        <span>Compression et traitement de l'image...</span>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <i className="fa-solid fa-cloud-arrow-up" style={{ fontSize: '22px', color: '#09b1ba', marginBottom: '4px', display: 'block' }}></i>
+                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                                                            Glissez une photo ici ou choisissez une option :
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                                                            <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, fontSize: '11px', padding: '4px 8px' }}>
+                                                                <i className="fa-solid fa-folder-open" style={{ marginRight: '5px' }}></i>
+                                                                Parcourir fichier
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    style={{ display: 'none' }}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.files && e.target.files[0]) {
+                                                                            handleModalPhotoFile(e.target.files[0]);
+                                                                        }
+                                                                        e.target.value = '';
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                            <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, fontSize: '11px', padding: '4px 8px' }}>
+                                                                <i className="fa-solid fa-camera" style={{ marginRight: '5px' }}></i>
+                                                                Prendre photo
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    capture="environment"
+                                                                    style={{ display: 'none' }}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.files && e.target.files[0]) {
+                                                                            handleModalPhotoFile(e.target.files[0]);
+                                                                        }
+                                                                        e.target.value = '';
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Lien URL / Google Drive direct */}
+                                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                                                <input
+                                                    type="text"
+                                                    className="input"
+                                                    value={photoUrlInput}
+                                                    onChange={(e) => setPhotoUrlInput(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyPhotoUrl(); } }}
+                                                    placeholder="Ou coller un lien Google Drive ou URL image..."
+                                                    style={{ fontSize: '11.5px', padding: '5px 8px' }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-secondary btn-sm"
+                                                    onClick={handleApplyPhotoUrl}
+                                                    disabled={!photoUrlInput.trim()}
+                                                    style={{ fontSize: '11.5px', whiteSpace: 'nowrap', padding: '4px 9px' }}
+                                                >
+                                                    Appliquer
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {isChaussures ? (
