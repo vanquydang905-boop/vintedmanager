@@ -7327,12 +7327,12 @@ function NotificationBellCenter({ todos = [], currentUser = null, onNavigateTodo
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', marginTop: '8px', paddingTop: '6px', borderTop: '1px dashed #f1f5f9' }}>
                                                 <button
                                                     type="button"
-                                                    className="btn btn-xs btn-success"
+                                                    className="btn btn-xs btn-outline-success"
                                                     onClick={(e) => handleQuickDone(todo, e)}
-                                                    title="Marquer comme terminée"
-                                                    style={{ fontSize: '10.5px', padding: '2px 7px' }}
+                                                    title="Cliquer pour valider et marquer cette tâche comme terminée"
+                                                    style={{ fontSize: '11px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
                                                 >
-                                                    <i className="fa-solid fa-check"></i> Fait
+                                                    <i className="fa-regular fa-circle-check"></i> Terminer
                                                 </button>
                                                 <button
                                                     type="button"
@@ -9437,23 +9437,32 @@ function StartupTodoModal({ isOpen, onClose, todos = [], currentUser = null, onN
                                         onClick={(e) => handleQuickDone(todo, e)}
                                         className="btn btn-outline-success btn-xs"
                                         style={{
-                                            border: '1px solid #a7f3d0',
-                                            backgroundColor: '#f0fdf4',
-                                            color: '#16a34a',
+                                            border: '1px solid #10b981',
+                                            backgroundColor: '#ffffff',
+                                            color: '#059669',
                                             borderRadius: '8px',
-                                            padding: '6px 10px',
-                                            fontSize: '11.5px',
+                                            padding: '6px 12px',
+                                            fontSize: '12px',
                                             fontWeight: 600,
                                             cursor: 'pointer',
                                             display: 'inline-flex',
                                             alignItems: 'center',
-                                            gap: '5px',
-                                            flexShrink: 0
+                                            gap: '6px',
+                                            flexShrink: 0,
+                                            transition: 'all 0.15s ease'
                                         }}
-                                        title="Marquer directement comme terminée"
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#10b981';
+                                            e.currentTarget.style.color = '#ffffff';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#ffffff';
+                                            e.currentTarget.style.color = '#059669';
+                                        }}
+                                        title="Cliquer pour valider et marquer cette tâche comme terminée"
                                     >
-                                        <i className="fa-solid fa-check"></i>
-                                        <span>Fait</span>
+                                        <i className="fa-regular fa-circle-check"></i>
+                                        <span>Terminer</span>
                                     </button>
                                 </div>
                             );
