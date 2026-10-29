@@ -2119,7 +2119,7 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                             <tr>
                                 <th style={{ width: '40px', textAlign: 'center' }}>#</th>
                                 <th style={{ minWidth: '220px' }}>SKU / Code Article (MM)</th>
-                                <th style={{ width: '85px', textAlign: 'center' }}>Photo</th>
+                                <th style={{ width: '105px', textAlign: 'center' }}>Photo</th>
                                 {isChaussures ? (
                                     <>
                                         <th style={{ width: '100px', textAlign: 'center' }}>Pointure</th>
@@ -2208,7 +2208,7 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                                             {/* PHOTO */}
                                             <td style={{ textAlign: 'center' }}>
                                                 {hasPhoto ? (
-                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                                         <div style={{ position: 'relative', display: 'inline-block' }}>
                                                             <img
                                                                 src={cleanPhotoUrl}
@@ -2220,19 +2220,31 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                                                                     taskTitle: `Stock: ${item.sku || 'Article'} (${currentTabDef.name})`
                                                                 })}
                                                                 style={{
-                                                                    width: '36px',
-                                                                    height: '36px',
+                                                                    width: '56px',
+                                                                    height: '56px',
                                                                     objectFit: 'cover',
-                                                                    borderRadius: '6px',
+                                                                    borderRadius: '8px',
                                                                     border: '1px solid #cbd5e1',
                                                                     cursor: 'pointer',
-                                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+                                                                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                                                                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                                                                    display: 'block'
                                                                 }}
-                                                                title="Cliquer pour agrandir la photo (Lightbox)"
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                                                    e.currentTarget.style.boxShadow = '0 6px 14px rgba(0,0,0,0.18)';
+                                                                    e.currentTarget.style.zIndex = '5';
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.transform = 'scale(1)';
+                                                                    e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+                                                                    e.currentTarget.style.zIndex = '1';
+                                                                }}
+                                                                title="Cliquer pour agrandir la photo (Lightbox plein écran)"
                                                             />
                                                         </div>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                            <label style={{ cursor: 'pointer', margin: 0, padding: '2px 4px', borderRadius: '3px', background: '#f1f5f9', color: '#475569', fontSize: '10px' }} title="Remplacer la photo">
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            <label style={{ cursor: 'pointer', margin: 0, padding: '4px 5px', borderRadius: '4px', background: '#f1f5f9', color: '#475569', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remplacer la photo">
                                                                 <i className="fa-solid fa-camera"></i>
                                                                 <input
                                                                     type="file"
@@ -2249,7 +2261,7 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleRemoveRowPhoto(item.id)}
-                                                                style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '3px', padding: '2px 4px', fontSize: '10px', cursor: 'pointer' }}
+                                                                style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '4px', padding: '4px 5px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                                 title="Supprimer la photo"
                                                             >
                                                                 <i className="fa-solid fa-xmark"></i>
