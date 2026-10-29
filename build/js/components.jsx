@@ -2072,7 +2072,7 @@ function StockView({ appState, currentUser, showToast, onSaveStockTab, onSaveSto
                                 style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '12.5px', border: '1px solid #cbd5e1' }}
                             >
                                 <option value="all">Tous</option>
-                                <option value="in_stock">En stock (> 0)</option>
+                                <option value="in_stock">En stock (&gt; 0)</option>
                                 <option value="out_of_stock">Rupture (0)</option>
                             </select>
                         </div>
